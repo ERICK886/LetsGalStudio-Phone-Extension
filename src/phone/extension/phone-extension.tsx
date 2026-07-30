@@ -189,6 +189,59 @@ function subscribeStoryMessages(listener: PhoneStoryMessageListener): () => void
   };
 }
 
+const STORY_UI_SUBSCRIPTION_TIMEOUT_MS = 320;
+
+/**
+ * 等待 React 手机 UI 建立消息订阅。
+ * `ctx.ui.show()` 的完成只代表宿主已接受显示请求，不保证 React effect 已执行；首次剧情消息必须等待该订阅，
+ * 才能避免场景/黑场转场期间出现“方法正在等待、手机却没有显示”的孤立会话。
+ */
+async function waitForStoryMessageSubscriber(timeoutMs = STORY_UI_SUBSCRIPTION_TIMEOUT_MS): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (storyMessageListeners.size === 0 && Date.now() < deadline) {
+    await new Promise<void>((resolve) => {
+      globalThis.setTimeout(resolve, 16);
+    });
+  }
+  return storyMessageListeners.size > 0;
+}
+
+/**
+ * 以单次受控重试挂载消息手机。
+ * 初次 show 未产生 React 订阅时，先完整 hide 已注册但不可用的容器，再重新 show；不会直接重复注册同一容器。
+ */
+async function showStoryMessageUi(
+  ctx: ExtensionContext,
+  storyMessages: readonly PhoneStoryMessage[],
+  storyPopupPosition: PhonePopupPosition,
+  sequenceId: number,
+): Promise<void> {
+  const show = () => ctx.ui.show("phone", {
+    storyMessages,
+    storyPopupPosition,
+  }, {
+    size: "(100%, 100%)",
+    position: "(0, 0)",
+    interactable: true,
+  });
+
+  await show();
+  if (await waitForStoryMessageSubscriber()) return;
+
+  phoneDebug("ui-show-no-subscriber", { sequenceId, attempt: 1 });
+  await ctx.ui.hide("phone");
+  // 等待宿主卸载旧容器，防止下一次 show 命中“容器已经被注册”。
+  await new Promise<void>((resolve) => {
+    globalThis.setTimeout(resolve, 0);
+  });
+
+  await show();
+  if (await waitForStoryMessageSubscriber()) return;
+
+  phoneDebug("ui-show-no-subscriber", { sequenceId, attempt: 2 });
+  throw new Error("手机剧情消息界面未能完成挂载");
+}
+
 function finishStoryMessageSequence(reason = "unspecified"): boolean {
   const sequence = pendingStorySequence;
   if (!sequence) {
@@ -373,15 +426,12 @@ async function showStoryMessages(
         activeMessageCount: activeStoryMessages.length,
         reportedUiVisible: uiVisible,
       });
-      await ctx.ui.show("phone", {
-        storyMessages: activeStoryMessages,
-        storyPopupPosition: activeStoryPopupPosition,
-      }, {
-        size: "(100%, 100%)",
-        position: "(0, 0)",
-        // 全屏透明层消费点击：有下一条则追加，最后一次点击完成方法。
-        interactable: true,
-      });
+      await showStoryMessageUi(
+        ctx,
+        activeStoryMessages,
+        activeStoryPopupPosition,
+        debugId,
+      );
       if (!isCurrentPhoneMount(mountEpoch)) {
         phoneDebug("sequence-request-cancelled-unmounted", { stage: "after-show" });
         if (ctx.ui.isVisible("phone")) await ctx.ui.hide("phone");
@@ -864,7 +914,13 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
     });
 
     ctx.input.onAction(OPEN_PHONE_ACTION, () => {
-      if (!phoneMounted || PhoneExtension.opening || ctx.ui.isVisible("phone")) return;
+      // 剧情消息正在请求/显示时，ArrowUp 不能抢占同一个 phone 容器并把普通手机关闭回调误用于结束剧情序列。
+      if (
+        !phoneMounted ||
+        PhoneExtension.opening ||
+        storyMessageSessionVisible ||
+        ctx.ui.isVisible("phone")
+      ) return;
       const mountEpoch = phoneMountEpoch;
       PhoneExtension.opening = true;
       try {
