@@ -1,14 +1,38 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useExtensionContext } from "@avg-studio/sdk";
-import type { PhoneStoryMessage } from "../../extension/phone-extension";
+import type { PhoneMessageStatus, PhoneStoryMessage } from "../../extension/phone-extension";
 import { firstGlyph, resolveAssetUrl } from "../asset-utils";
 
+const MessageStatusIndicator: React.FC<{ status: PhoneMessageStatus }> = ({ status }) => {
+  if (status === "sending") {
+    return (
+      <span className="phone-story-status-icon phone-story-status-loading" aria-label="发送中">
+        <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M0 0h24v24H0z" fill="none" />
+          <path fill="currentColor" d="M12 2A10 10 0 1 0 22 12A10 10 0 0 0 12 2Zm0 18a8 8 0 1 1 8-8A8 8 0 0 1 12 20Z" opacity=".5" />
+          <path fill="currentColor" d="M20 12h2A10 10 0 0 0 12 2V4A8 8 0 0 1 20 12Z">
+            <animateTransform attributeName="transform" dur="1s" from="0 12 12" repeatCount="indefinite" to="360 12 12" type="rotate" />
+          </path>
+        </svg>
+      </span>
+    );
+  }
+  if (status === "failed" || status === "blocked") {
+    return (
+      <span className="phone-story-status-icon phone-story-status-error" aria-label={status === "blocked" ? "已被拉黑" : "发送失败"}>
+        <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M0 0h24v24H0z" fill="none" />
+          <path fill="#fc4343" d="M12.713 16.713Q13 16.425 13 16t-.288-.712T12 15t-.712.288T11 16t.288.713T12 17t.713-.288m0-4Q13 12.425 13 12V8q0-.425-.288-.712T12 7t-.712.288T11 8v4q0 .425.288.713T12 13t.713-.288M12 22q-2.075 0-3.9-.788t-3.175-2.137T2.788 15.9T2 12t.788-3.9t2.137-3.175T8.1 2.788T12 2t3.9.788t3.175 2.137T21.213 8.1T22 12t-.788 3.9t-2.137 3.175t-3.175 2.138T12 22" />
+        </svg>
+      </span>
+    );
+  }
+  return <span className="phone-story-status-text">{status === "unread" ? "未读" : "已读"}</span>;
+};
+
 /**
- * 渲染一条手机剧情消息，并实时订阅 Studio 角色资料。
- *
- * 头像候选顺序为：消息指定的角色立绘、角色默认头像、角色第一张立绘。
- * 立绘选择器的正常值是稳定 ID；为兼容 Studio 版本把唯一立绘显示名或 URI 写入参数的情况，
- * 也接受与当前角色立绘的精确匹配。任一图片加载失败会自动尝试下一候选；全部失败时显示角色名首字。
+ * 渲染一条手机剧情消息。聊天角色预设在方法执行时已经展开为快照，
+ * 所以播放中不会因为作者修改预设而改变历史消息。
  */
 export const PhoneStoryMessageItem: React.FC<{ storyMessage: PhoneStoryMessage }> = ({
   storyMessage,
@@ -20,84 +44,58 @@ export const PhoneStoryMessageItem: React.FC<{ storyMessage: PhoneStoryMessage }
     const portraitRef = storyMessage.portraitId;
     const portraits = character?.portraits ?? [];
     if (!portraitRef) return undefined;
-
-    // 稳定 ID 是首选契约；URI 与唯一显示名仅用于兼容不同 Studio 选择器实现。
-    const idMatch = portraits.find((portrait) => portrait.id === portraitRef);
-    if (idMatch) return idMatch;
-    const uriMatch = portraits.find((portrait) => portrait.uri === portraitRef);
-    if (uriMatch) return uriMatch;
-    const normalizedRef = portraitRef.trim().normalize("NFC");
-    const nameMatches = portraits.filter(
-      (portrait) => portrait.name?.trim().normalize("NFC") === normalizedRef,
-    );
-    return nameMatches.length === 1 ? nameMatches[0] : undefined;
+    return portraits.find((portrait) => portrait.id === portraitRef)
+      ?? portraits.find((portrait) => portrait.uri === portraitRef)
+      ?? (() => {
+        const normalizedRef = portraitRef.trim().normalize("NFC");
+        const matches = portraits.filter(
+          (portrait) => portrait.name?.trim().normalize("NFC") === normalizedRef,
+        );
+        return matches.length === 1 ? matches[0] : undefined;
+      })();
   }, [character?.portraits, storyMessage.portraitId]);
   const avatarCandidates = useMemo(() => {
+    const presetAvatarUri = storyMessage.avatarSource === "asset"
+      ? storyMessage.avatarAsset
+      : storyMessage.avatarSource === "character-avatar"
+        ? character?.avatarUri
+        : character?.portraits?.[0]?.uri;
     const candidateUris = [
-      { source: "selected-portrait", uri: selectedPortrait?.uri },
+      { source: `preset-${storyMessage.avatarSource}`, uri: presetAvatarUri },
+      { source: "legacy-selected-portrait", uri: selectedPortrait?.uri },
       { source: "character-avatar", uri: character?.avatarUri },
       { source: "first-portrait", uri: character?.portraits?.[0]?.uri },
-    ] as const;
+    ];
     const seenUrls = new Set<string>();
     return candidateUris.flatMap((candidate) => {
       const url = resolveAssetUrl(ctx, candidate.uri);
       if (!url || seenUrls.has(url)) return [];
       seenUrls.add(url);
-      return [{ source: candidate.source, uri: candidate.uri, url }];
+      return [{ ...candidate, url }];
     });
-  }, [character?.avatarUri, character?.portraits, ctx, selectedPortrait?.uri]);
+  }, [character?.avatarUri, character?.portraits, ctx, selectedPortrait?.uri, storyMessage.avatarAsset, storyMessage.avatarSource]);
   const [avatarIndex, setAvatarIndex] = useState(0);
   const avatarUrl = avatarCandidates[avatarIndex]?.url;
-  const avatarDiagnosticRef = React.useRef<string>();
 
   useEffect(() => setAvatarIndex(0), [avatarCandidates]);
 
-  useEffect(() => {
-    if (!storyMessage.portraitId && avatarCandidates.length > 0) return;
-    const diagnosticKey = [
-      storyMessage.characterId,
-      storyMessage.portraitId ?? "",
-      selectedPortrait?.id ?? "",
-      character?.portraits?.length ?? 0,
-      avatarCandidates.map((candidate) => candidate.source).join(","),
-    ].join("|");
-    if (avatarDiagnosticRef.current === diagnosticKey) return;
-    avatarDiagnosticRef.current = diagnosticKey;
-    console.log("[phone-avatar] resolution", {
-      characterId: storyMessage.characterId,
-      portraitRef: storyMessage.portraitId,
-      portraitCount: character?.portraits?.length ?? 0,
-      selectedPortrait: selectedPortrait
-        ? { id: selectedPortrait.id, name: selectedPortrait.name, hasUri: Boolean(selectedPortrait.uri) }
-        : null,
-      hasCharacterAvatar: Boolean(character?.avatarUri),
-      candidates: avatarCandidates.map((candidate) => ({
-        source: candidate.source,
-        rawUri: candidate.uri,
-        resolvedUrl: candidate.url,
-      })),
-    });
-  }, [avatarCandidates, character?.avatarUri, character?.portraits?.length, selectedPortrait, storyMessage.characterId, storyMessage.portraitId]);
-
   const reportAvatarLoaded = useCallback((event: React.SyntheticEvent<HTMLImageElement>) => {
-    const image = event.currentTarget;
-    const loadedCandidate = avatarCandidates[avatarIndex];
+    const candidate = avatarCandidates[avatarIndex];
     console.log("[phone-avatar] image-load-succeeded", {
       characterId: storyMessage.characterId,
-      portraitRef: storyMessage.portraitId,
-      candidateSource: loadedCandidate?.source,
-      candidateIndex: avatarIndex,
-      rawUri: loadedCandidate?.uri,
-      resolvedUrl: loadedCandidate?.url,
-      imageCurrentSrc: image.currentSrc,
-      naturalWidth: image.naturalWidth,
-      naturalHeight: image.naturalHeight,
+      chatRoleId: storyMessage.chatRoleId,
+      candidateSource: candidate?.source,
+      rawUri: candidate?.uri,
+      resolvedUrl: candidate?.url,
+      imageCurrentSrc: event.currentTarget.currentSrc,
+      naturalWidth: event.currentTarget.naturalWidth,
+      naturalHeight: event.currentTarget.naturalHeight,
     });
-  }, [avatarCandidates, avatarIndex, storyMessage.characterId, storyMessage.portraitId]);
+  }, [avatarCandidates, avatarIndex, storyMessage.characterId, storyMessage.chatRoleId]);
 
   const tryNextAvatar = useCallback((event: React.SyntheticEvent<HTMLImageElement>) => {
     const image = event.currentTarget;
-    const failedImage = {
+    const imageDetails = {
       currentSrc: image.currentSrc,
       src: image.src,
       complete: image.complete,
@@ -105,35 +103,39 @@ export const PhoneStoryMessageItem: React.FC<{ storyMessage: PhoneStoryMessage }
       naturalHeight: image.naturalHeight,
     };
     setAvatarIndex((current) => {
-      const failedCandidate = avatarCandidates[current];
+      const candidate = avatarCandidates[current];
       console.warn("[phone-avatar] image-load-failed", {
         characterId: storyMessage.characterId,
-        portraitRef: storyMessage.portraitId,
-        candidateSource: failedCandidate?.source,
+        chatRoleId: storyMessage.chatRoleId,
+        candidateSource: candidate?.source,
         candidateIndex: current,
         candidateCount: avatarCandidates.length,
-        rawUri: failedCandidate?.uri,
-        resolvedUrl: failedCandidate?.url,
-        image: failedImage,
+        rawUri: candidate?.uri,
+        resolvedUrl: candidate?.url,
+        image: imageDetails,
       });
       return current + 1 < avatarCandidates.length ? current + 1 : avatarCandidates.length;
     });
-  }, [avatarCandidates, storyMessage.characterId, storyMessage.portraitId]);
+  }, [avatarCandidates, storyMessage.characterId, storyMessage.chatRoleId]);
 
   return (
     <div
       className="phone-story-message-row"
       data-direction={storyMessage.direction}
+      data-status={storyMessage.status}
       aria-label={storyMessage.direction === "incoming" ? "对方发来的消息" : "我方发送的消息"}
     >
       <div className="phone-story-avatar" aria-hidden="true">
-        {avatarUrl ? (
-          <img src={avatarUrl} alt="" onLoad={reportAvatarLoaded} onError={tryNextAvatar} />
-        ) : firstGlyph(characterName)}
+        {avatarUrl ? <img src={avatarUrl} alt="" onLoad={reportAvatarLoaded} onError={tryNextAvatar} /> : firstGlyph(characterName)}
       </div>
-      <div className="phone-story-bubble">
-        <strong>{characterName}</strong>
-        <p>{storyMessage.message}</p>
+      <div className="phone-story-message-body">
+        <div className="phone-story-message-content">
+          <span className="phone-story-status" role="status"><MessageStatusIndicator status={storyMessage.status} /></span>
+          <div className="phone-story-bubble">
+            <strong>{characterName}</strong>
+            <p>{storyMessage.message}</p>
+          </div>
+        </div>
       </div>
     </div>
   );

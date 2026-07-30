@@ -775,12 +775,19 @@ const PhoneUIContent: React.FC<PhoneUIProps> = ({
               aria-relevant="additions"
               aria-label="手机消息列表"
             >
-              {displayStoryMessages.map((storyMessage, index) => (
-                <PhoneStoryMessageItem
-                  key={`${storyMessage.characterId}-${storyMessage.direction}-${index}`}
-                  storyMessage={storyMessage}
-                />
-              ))}
+              {displayStoryMessages.map((storyMessage, index) => {
+                const messageKey = `${storyMessage.chatRoleId}-${storyMessage.direction}-${storyMessage.status}-${index}`;
+                return (
+                  <React.Fragment key={messageKey}>
+                    <PhoneStoryMessageItem storyMessage={storyMessage} />
+                    {storyMessage.status === "blocked" ? (
+                      <p className="phone-story-blocked-hint" role="status">
+                        {storyMessage.blockedHint ?? "您的消息已发送，但被对方拒收"}
+                      </p>
+                    ) : null}
+                  </React.Fragment>
+                );
+              })}
             </main>
           ) : (
             <main className="phone-app-grid" aria-label="应用列表">

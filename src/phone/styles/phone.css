@@ -167,6 +167,21 @@
   background: #172036 center / cover no-repeat;
 }
 
+/* 剧情消息仅在手机屏幕内部压暗背景，避免干扰手机外部画面。 */
+[data-phone-root="ext-7a9373"][data-phone-message-mode="true"] .phone-screen::before {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  content: "";
+  background: rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+}
+
+[data-phone-root="ext-7a9373"][data-phone-message-mode="true"] .phone-screen > * {
+  position: relative;
+  z-index: 1;
+}
+
 [data-phone-root="ext-7a9373"] .phone-status {
   display: flex;
   align-items: center;
@@ -606,6 +621,82 @@
   line-height: 1.55;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
+}
+
+[data-phone-root="ext-7a9373"] .phone-story-message-body {
+  min-width: 0;
+  max-width: calc(100% - 78px);
+}
+
+[data-phone-root="ext-7a9373"] .phone-story-message-content {
+  position: relative;
+  display: inline-block;
+  min-width: 0;
+  max-width: 100%;
+}
+
+[data-phone-root="ext-7a9373"] .phone-story-bubble {
+  display: block;
+}
+
+[data-phone-root="ext-7a9373"] .phone-story-status {
+  position: absolute;
+  bottom: 0;
+  display: inline-flex;
+  min-width: 1.25em;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* 我方状态位于气泡左下角外侧；对方的“已读”位于右下角外侧。 */
+[data-phone-root="ext-7a9373"] .phone-story-message-row[data-direction="outgoing"] .phone-story-status {
+  right: calc(100% + 6px);
+}
+
+[data-phone-root="ext-7a9373"] .phone-story-message-row[data-direction="incoming"] .phone-story-status {
+  left: calc(100% + 6px);
+}
+
+[data-phone-root="ext-7a9373"] .phone-story-status-icon {
+  display: inline-grid;
+  place-items: center;
+  font-size: 18px;
+}
+
+[data-phone-root="ext-7a9373"] .phone-story-status-loading {
+  color: var(--phone-accent);
+}
+
+[data-phone-root="ext-7a9373"] .phone-story-status-error {
+  color: #fc4343;
+}
+
+[data-phone-root="ext-7a9373"] .phone-story-status-text {
+  color: rgba(255, 255, 255, 0.64);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+[data-phone-root="ext-7a9373"] .phone-story-message-row[data-status="failed"] .phone-story-bubble,
+[data-phone-root="ext-7a9373"] .phone-story-message-row[data-status="blocked"] .phone-story-bubble {
+  border-color: color-mix(in srgb, #fc4343, transparent 38%);
+}
+
+[data-phone-root="ext-7a9373"] .phone-story-blocked-hint {
+  width: min(92%, 330px);
+  flex: 0 0 auto;
+  align-self: center;
+  box-sizing: border-box;
+  margin: -8px 0 0;
+  padding: 0 8px;
+  color: #ff9494;
+  font-size: 11px;
+  line-height: 1.45;
+  text-align: center;
 }
 
 [data-phone-root="ext-7a9373"][data-phone-message-mode="true"] .phone-shell {

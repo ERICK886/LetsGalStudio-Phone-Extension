@@ -71,6 +71,82 @@ type PhoneSaveMap = {
 };
 
 export type PhoneMessageDirection = "incoming" | "outgoing";
+export type PhoneMessageStatus = "sending" | "unread" | "read" | "failed" | "blocked";
+export type ChatRoleAvatarSource = "first-portrait" | "character-avatar" | "asset";
+
+const CHAT_ROLE_AVATAR_SOURCES = ["first-portrait", "character-avatar", "asset"] as const;
+const OUTGOING_MESSAGE_STATUSES = ["sending", "unread", "read", "failed", "blocked"] as const;
+const DEFAULT_BLOCKED_HINT = "您的消息已发送，但被对方拒收";
+
+interface ChatRolePreset {
+  id: string;
+  characterId: string;
+  avatarSource: ChatRoleAvatarSource;
+  avatarAsset?: string;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function nonEmptyString(value: unknown, maxLength = 1024): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim();
+  return normalized && normalized.length <= maxLength ? normalized : undefined;
+}
+
+function normalizeChatAvatarAssets(value: unknown): ReadonlyMap<string, string> {
+  const assets = new Map<string, string>();
+  if (!Array.isArray(value)) return assets;
+
+  for (const raw of value) {
+    if (!isRecord(raw)) continue;
+    const id = nonEmptyString(raw.id, 80);
+    const asset = nonEmptyString(raw.asset, 4096);
+    if (id && asset && !assets.has(id)) assets.set(id, asset);
+  }
+  return assets;
+}
+
+function normalizeChatRolePresets(
+  value: unknown,
+  chatAvatarAssetRows: unknown,
+): ReadonlyMap<string, ChatRolePreset> {
+  const presets = new Map<string, ChatRolePreset>();
+  const avatarAssets = normalizeChatAvatarAssets(chatAvatarAssetRows);
+  if (!Array.isArray(value)) return presets;
+
+  for (const raw of value) {
+    if (!isRecord(raw)) continue;
+    const id = nonEmptyString(raw.id, 80);
+    const characterId = nonEmptyString(raw.characterId, 160);
+    if (!id || !characterId || presets.has(id)) continue;
+    const avatarSource = (CHAT_ROLE_AVATAR_SOURCES as readonly unknown[]).includes(raw.avatarSource)
+      ? raw.avatarSource as ChatRoleAvatarSource
+      : "first-portrait";
+    const avatarAssetId = nonEmptyString(raw.avatarAssetId, 80);
+    // avatarAsset 是旧版同表字段；保留读取以便已有项目迁移后仍可显示头像。
+    const legacyAvatarAsset = nonEmptyString(raw.avatarAsset, 4096);
+    const avatarAsset = avatarSource === "asset"
+      ? (avatarAssetId ? avatarAssets.get(avatarAssetId) : undefined) ?? legacyAvatarAsset
+      : undefined;
+    presets.set(id, {
+      id,
+      characterId,
+      avatarSource,
+      ...(avatarAsset ? { avatarAsset } : {}),
+    });
+  }
+  return presets;
+}
+
+function normalizeMessageStatus(value: unknown, direction: PhoneMessageDirection): PhoneMessageStatus {
+  // 对方消息固定已读；我方消息未指定或非法时也默认显示已读。
+  if (direction === "incoming") return "read";
+  return (OUTGOING_MESSAGE_STATUSES as readonly unknown[]).includes(value)
+    ? value as PhoneMessageStatus
+    : "read";
+}
 
 function normalizeStoryPopupPosition(value: unknown): PhonePopupPosition {
   return (PHONE_POPUP_POSITIONS as readonly unknown[]).includes(value)
@@ -79,11 +155,21 @@ function normalizeStoryPopupPosition(value: unknown): PhonePopupPosition {
 }
 
 export interface PhoneStoryMessage {
+  /** 预设在方法开始时展开的资产角色稳定 ID。 */
   characterId: string;
-  /** 由 Studio 的 characterPortrait 选择器写入的角色立绘 ID。 */
+  /** 已展开的聊天角色预设 ID，仅用于诊断和保留消息快照来源。 */
+  chatRoleId: string;
+  /** 当前预设要求优先使用的头像来源。 */
+  avatarSource: ChatRoleAvatarSource;
+  /** `avatarSource === "asset"` 时的新扩展素材 URI。 */
+  avatarAsset?: string;
+  /** 兼容旧消息快照中的角色立绘引用。 */
   portraitId?: string;
   message: string;
   direction: PhoneMessageDirection;
+  status: PhoneMessageStatus;
+  /** 仅在 `status === "blocked"` 时显示。 */
+  blockedHint?: string;
 }
 
 type PhoneStoryMessageListener = (
@@ -491,55 +577,60 @@ async function showStoryMessages(
  * 文本会 trim，空文本直接跳过；第 2–8 条未选角色时继承第 1 条角色，未选方向默认为 incoming；
  * `portraitId` 保持为 characterPortrait 选择器给出的稳定立绘 ID。该函数只做容错归一化，不启动 UI。
  */
-function collectStoryMessages(params: Record<string, unknown>): PhoneStoryMessage[] {
+function collectStoryMessages(
+  params: Record<string, unknown>,
+  chatRolePresetRows: unknown,
+  chatAvatarAssetRows: unknown,
+): PhoneStoryMessage[] {
+  const presets = normalizeChatRolePresets(chatRolePresetRows, chatAvatarAssetRows);
   const slots = Array.from({ length: 8 }, (_, offset) => {
     const index = offset + 1;
     const suffix = index === 1 ? "" : String(index);
-    const characterValue = params[`characterId${suffix}`];
-    const messageValue = params[`message${suffix}`];
-    const directionValue = params[`direction${suffix}`];
     return {
       index,
-      characterKey: `characterId${suffix}`,
-      characterType: typeof characterValue,
-      characterValue,
-      messageKey: `message${suffix}`,
-      messageType: typeof messageValue,
-      messageValue,
-      directionKey: `direction${suffix}`,
-      directionType: typeof directionValue,
-      directionValue,
+      presetId: params[`presetId${suffix}`],
+      message: params[`message${suffix}`],
+      direction: params[`direction${suffix}`],
+      status: params[`status${suffix}`],
     };
   });
   phoneDebug("method-params", {
     keys: Object.keys(params),
-    params,
     slots,
+    availableChatRoleIds: [...presets.keys()],
   });
 
   const messages: PhoneStoryMessage[] = [];
-  const defaultCharacterId = typeof params.characterId === "string" ? params.characterId : "";
+  const defaultPresetId = nonEmptyString(params.presetId, 80);
 
   for (let index = 1; index <= 8; index += 1) {
     const suffix = index === 1 ? "" : String(index);
     const rawMessage = params[`message${suffix}`];
     if (typeof rawMessage !== "string" || rawMessage.trim() === "") continue;
 
-    const rawCharacterId = params[`characterId${suffix}`];
-    const characterId = typeof rawCharacterId === "string" && rawCharacterId
-      ? rawCharacterId
-      : defaultCharacterId;
-    if (!characterId) continue;
+    const presetId = nonEmptyString(params[`presetId${suffix}`], 80) ?? defaultPresetId;
+    const preset = presetId ? presets.get(presetId) : undefined;
+    if (!preset) {
+      phoneDebug("message-skipped-invalid-chat-role", { index, presetId });
+      continue;
+    }
 
-    const rawPortraitId = params[`portraitId${suffix}`];
-    const portraitId = typeof rawPortraitId === "string" && rawPortraitId
-      ? rawPortraitId
+    const direction: PhoneMessageDirection = params[`direction${suffix}`] === "outgoing"
+      ? "outgoing"
+      : "incoming";
+    const status = normalizeMessageStatus(params[`status${suffix}`], direction);
+    const blockedHint = status === "blocked"
+      ? nonEmptyString(params[`blockedHint${suffix}`], 240) ?? DEFAULT_BLOCKED_HINT
       : undefined;
     messages.push({
-      characterId,
-      ...(portraitId ? { portraitId } : {}),
+      characterId: preset.characterId,
+      chatRoleId: preset.id,
+      avatarSource: preset.avatarSource,
+      ...(preset.avatarAsset ? { avatarAsset: preset.avatarAsset } : {}),
       message: rawMessage.trim(),
-      direction: params[`direction${suffix}`] === "outgoing" ? "outgoing" : "incoming",
+      direction,
+      status,
+      ...(blockedHint ? { blockedHint } : {}),
     });
   }
 
@@ -548,6 +639,82 @@ function collectStoryMessages(params: Record<string, unknown>): PhoneStoryMessag
     messages,
   });
   return messages;
+}
+
+/**
+ * Schema 只能使用静态字段，当前 SDK 不支持从扩展设置的数组动态生成下拉项。
+ * 因此消息块保存聊天角色预设的稳定 ID，并在执行时解析为不可变消息快照。
+ */
+function createStoryMessageSchema() {
+  const directionOptions = [
+    { label: "对方发消息", value: "incoming" },
+    { label: "我方发消息", value: "outgoing" },
+  ] as const;
+  const statusOptions = [
+    { label: "发送中（仅我方）", value: "sending" },
+    { label: "未读（仅我方）", value: "unread" },
+    { label: "已读", value: "read" },
+    { label: "发送失败（仅我方）", value: "failed" },
+    { label: "被拉黑（仅我方）", value: "blocked" },
+  ] as const;
+
+  return {
+    appendToExisting: { type: "boolean", label: "接续上一组消息", default: false } as const,
+    closeAfterMessages: { type: "boolean", label: "本组结束后关闭手机", default: true } as const,
+    popupPosition: {
+      type: "enum",
+      label: "手机消息显示位置",
+      options: [
+        { label: "左上", value: "top-left" },
+        { label: "中上", value: "top-center" },
+        { label: "右上", value: "top-right" },
+        { label: "左下", value: "bottom-left" },
+        { label: "中下", value: "bottom-center" },
+        { label: "右下", value: "bottom-right" },
+        { label: "中部", value: "center" },
+      ],
+      default: "bottom-right",
+      required: true,
+    } as const,
+    ...Object.fromEntries(Array.from({ length: 8 }, (_, offset) => {
+      const index = offset + 1;
+      const suffix = index === 1 ? "" : String(index);
+      const required = index === 1;
+      return [
+        [`presetId${suffix}`, {
+          type: "string",
+          label: `第 ${index} 条 · 聊天角色预设 ID`,
+          required,
+          suggestions: { key: "phone-chat-role-preset" },
+        } as const],
+        [`message${suffix}`, {
+          type: "string",
+          label: `第 ${index} 条 · 内容`,
+          multiline: true,
+          required,
+        } as const],
+        [`direction${suffix}`, {
+          type: "enum",
+          label: `第 ${index} 条 · 发送方`,
+          options: directionOptions,
+          default: "incoming",
+          required,
+        } as const],
+        [`status${suffix}`, {
+          type: "enum",
+          label: `第 ${index} 条 · 消息状态`,
+          options: statusOptions,
+          default: "read",
+          required,
+        } as const],
+        [`blockedHint${suffix}`, {
+          type: "string",
+          label: `第 ${index} 条 · 被拉黑提示文本`,
+          multiline: true,
+        } as const],
+      ];
+    }).flat()),
+  };
 }
 
 /**
@@ -610,177 +777,17 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
   static showMessage = method({
     id: "show-message",
     title: "显示手机消息",
-    description: "每块最多 8 条，可接续无限扩展；最后一组显示完并确认后自动关闭手机。",
-    schema: {
-      appendToExisting: {
-        type: "boolean",
-        label: "接续上一组消息",
-        default: false,
-      },
-      closeAfterMessages: {
-        type: "boolean",
-        label: "本组结束后关闭手机",
-        default: true,
-      },
-      popupPosition: {
-        type: "enum",
-        label: "手机消息显示位置",
-        options: [
-          { label: "左上", value: "top-left" },
-          { label: "中上", value: "top-center" },
-          { label: "右上", value: "top-right" },
-          { label: "左下", value: "bottom-left" },
-          { label: "中下", value: "bottom-center" },
-          { label: "右下", value: "bottom-right" },
-          { label: "中部弹出", value: "center" },
-        ],
-        default: "bottom-right",
-        required: true,
-      },
-      characterId: {
-        type: "character",
-        label: "第 1 条 · 角色",
-        required: true,
-      },
-      portraitId: {
-        type: "characterPortrait",
-        label: "第 1 条 · 角色立绘（可选）",
-        characterField: "characterId",
-      },
-      message: {
-        type: "string",
-        label: "第 1 条 · 内容",
-        multiline: true,
-        required: true,
-      },
-      direction: {
-        type: "enum",
-        label: "第 1 条 · 发送方",
-        options: [
-          { label: "对方发消息", value: "incoming" },
-          { label: "我方发消息", value: "outgoing" },
-        ],
-        default: "incoming",
-        required: true,
-      },
-      characterId2: { type: "character", label: "第 2 条 · 角色" },
-      portraitId2: {
-        type: "characterPortrait",
-        label: "第 2 条 · 角色立绘（可选）",
-        characterField: "characterId2",
-      },
-      message2: { type: "string", label: "第 2 条 · 内容", multiline: true },
-      direction2: {
-        type: "enum",
-        label: "第 2 条 · 发送方",
-        options: [
-          { label: "对方发消息", value: "incoming" },
-          { label: "我方发消息", value: "outgoing" },
-        ],
-        default: "incoming",
-      },
-      characterId3: { type: "character", label: "第 3 条 · 角色" },
-      portraitId3: {
-        type: "characterPortrait",
-        label: "第 3 条 · 角色立绘（可选）",
-        characterField: "characterId3",
-      },
-      message3: { type: "string", label: "第 3 条 · 内容", multiline: true },
-      direction3: {
-        type: "enum",
-        label: "第 3 条 · 发送方",
-        options: [
-          { label: "对方发消息", value: "incoming" },
-          { label: "我方发消息", value: "outgoing" },
-        ],
-        default: "incoming",
-      },
-      characterId4: { type: "character", label: "第 4 条 · 角色" },
-      portraitId4: {
-        type: "characterPortrait",
-        label: "第 4 条 · 角色立绘（可选）",
-        characterField: "characterId4",
-      },
-      message4: { type: "string", label: "第 4 条 · 内容", multiline: true },
-      direction4: {
-        type: "enum",
-        label: "第 4 条 · 发送方",
-        options: [
-          { label: "对方发消息", value: "incoming" },
-          { label: "我方发消息", value: "outgoing" },
-        ],
-        default: "incoming",
-      },
-      characterId5: { type: "character", label: "第 5 条 · 角色" },
-      portraitId5: {
-        type: "characterPortrait",
-        label: "第 5 条 · 角色立绘（可选）",
-        characterField: "characterId5",
-      },
-      message5: { type: "string", label: "第 5 条 · 内容", multiline: true },
-      direction5: {
-        type: "enum",
-        label: "第 5 条 · 发送方",
-        options: [
-          { label: "对方发消息", value: "incoming" },
-          { label: "我方发消息", value: "outgoing" },
-        ],
-        default: "incoming",
-      },
-      characterId6: { type: "character", label: "第 6 条 · 角色" },
-      portraitId6: {
-        type: "characterPortrait",
-        label: "第 6 条 · 角色立绘（可选）",
-        characterField: "characterId6",
-      },
-      message6: { type: "string", label: "第 6 条 · 内容", multiline: true },
-      direction6: {
-        type: "enum",
-        label: "第 6 条 · 发送方",
-        options: [
-          { label: "对方发消息", value: "incoming" },
-          { label: "我方发消息", value: "outgoing" },
-        ],
-        default: "incoming",
-      },
-      characterId7: { type: "character", label: "第 7 条 · 角色" },
-      portraitId7: {
-        type: "characterPortrait",
-        label: "第 7 条 · 角色立绘（可选）",
-        characterField: "characterId7",
-      },
-      message7: { type: "string", label: "第 7 条 · 内容", multiline: true },
-      direction7: {
-        type: "enum",
-        label: "第 7 条 · 发送方",
-        options: [
-          { label: "对方发消息", value: "incoming" },
-          { label: "我方发消息", value: "outgoing" },
-        ],
-        default: "incoming",
-      },
-      characterId8: { type: "character", label: "第 8 条 · 角色" },
-      portraitId8: {
-        type: "characterPortrait",
-        label: "第 8 条 · 角色立绘（可选）",
-        characterField: "characterId8",
-      },
-      message8: { type: "string", label: "第 8 条 · 内容", multiline: true },
-      direction8: {
-        type: "enum",
-        label: "第 8 条 · 发送方",
-        options: [
-          { label: "对方发消息", value: "incoming" },
-          { label: "我方发消息", value: "outgoing" },
-        ],
-        default: "incoming",
-      },
-    },
+    description: "每块最多 8 条。每条填写在扩展设置中定义的聊天角色预设 ID；最后一组显示完并确认后自动关闭手机。",
+    schema: createStoryMessageSchema(),
     run(ctx, params) {
       return showStoryMessages(
         ctx,
-        collectStoryMessages(params as Record<string, unknown>),
-        params.appendToExisting,
+        collectStoryMessages(
+          params as Record<string, unknown>,
+          ctx.settings.get<unknown[]>("chatRolePresets"),
+          ctx.settings.get<unknown[]>("chatAvatarAssets"),
+        ),
+        params.appendToExisting === true,
         params.closeAfterMessages !== false,
         normalizeStoryPopupPosition(params.popupPosition),
       );
@@ -815,6 +822,36 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
         center: "中部",
       })
       .describe("选择手机贴近视口的弹出位置；打开时从该方向滑入并淡入，关闭时反向滑出。"),
+    chatAvatarAssets: s.array("聊天头像素材库", (item) => ({
+      id: item.string("素材 ID").default("new-chat-avatar"),
+      asset: item.asset("头像素材").accepts("image"),
+    }))
+      .itemDefault({ id: "new-chat-avatar" })
+      .maxItems(80)
+      .addLabel("添加头像素材")
+      .emptyHint("仅在聊天角色使用“新扩展素材”头像时添加。")
+      .describe("自定义头像集中在此处选择，避免素材预览撑高聊天角色预设表格。记录素材 ID 后，将它填入对应角色预设的“头像素材 ID”。"),
+    chatRolePresets: s.array("聊天角色预设", (item) => ({
+      id: item.string("预设 ID").default("new-chat-role"),
+      characterId: item.character("资产角色"),
+      avatarSource: item.enum("头像来源", CHAT_ROLE_AVATAR_SOURCES)
+        .default("first-portrait")
+        .labels({
+          "first-portrait": "第一张立绘（默认）",
+          "character-avatar": "角色默认头像",
+          asset: "扩展素材库",
+        }),
+      avatarAssetId: item.string("头像素材 ID").default(""),
+    }))
+      .itemDefault({
+        id: "new-chat-role",
+        avatarSource: "first-portrait",
+        avatarAssetId: "",
+      })
+      .maxItems(80)
+      .addLabel("添加聊天角色预设")
+      .emptyHint("未配置聊天角色预设时，显示手机消息会跳过对应消息。")
+      .describe("每条预设绑定一个项目资产角色。消息块填写预设 ID；角色名可覆盖资产角色名。只有选择“扩展素材库”时，才需要填写上方素材库的素材 ID。"),
     programUiActions: s.array("动作 · 程序 UI", (item) => ({
       id: item.string("ID").default("new-program-ui"),
       name: item.string("名称").default("新程序界面"),
@@ -1017,20 +1054,38 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
     const inputMessages = this.data?.storyMessages;
     const storyPopupPosition = normalizeStoryPopupPosition(this.data?.storyPopupPosition);
     const storyMessages = Array.isArray(inputMessages)
-      ? inputMessages.flatMap((inputMessage) =>
-          inputMessage &&
-          typeof inputMessage.characterId === "string" &&
-          typeof inputMessage.message === "string"
-            ? [{
-                characterId: inputMessage.characterId,
-                ...(typeof inputMessage.portraitId === "string" && inputMessage.portraitId
-                  ? { portraitId: inputMessage.portraitId }
-                  : {}),
-                message: inputMessage.message,
-                direction: inputMessage.direction === "outgoing" ? "outgoing" as const : "incoming" as const,
-              }]
-            : [],
-        )
+      ? inputMessages.flatMap((inputMessage) => {
+          if (
+            !inputMessage ||
+            typeof inputMessage.characterId !== "string" ||
+            typeof inputMessage.message !== "string"
+          ) return [];
+
+          const direction: PhoneMessageDirection = inputMessage.direction === "outgoing" ? "outgoing" : "incoming";
+          const avatarSource = (CHAT_ROLE_AVATAR_SOURCES as readonly unknown[]).includes(inputMessage.avatarSource)
+            ? inputMessage.avatarSource as ChatRoleAvatarSource
+            : "first-portrait";
+          const status = normalizeMessageStatus(inputMessage.status, direction);
+          const blockedHint = status === "blocked"
+            ? nonEmptyString(inputMessage.blockedHint, 240) ?? DEFAULT_BLOCKED_HINT
+            : undefined;
+
+          return [{
+            characterId: inputMessage.characterId,
+            chatRoleId: nonEmptyString(inputMessage.chatRoleId, 80) ?? `legacy:${inputMessage.characterId}`,
+            avatarSource,
+            ...(typeof inputMessage.avatarAsset === "string" && inputMessage.avatarAsset
+              ? { avatarAsset: inputMessage.avatarAsset }
+              : {}),
+            ...(typeof inputMessage.portraitId === "string" && inputMessage.portraitId
+              ? { portraitId: inputMessage.portraitId }
+              : {}),
+            message: inputMessage.message,
+            direction,
+            status,
+            ...(blockedHint ? { blockedHint } : {}),
+          }];
+        })
       : undefined;
 
     return {
