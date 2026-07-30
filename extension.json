@@ -1,0 +1,9 @@
+{
+  "id": "ext-7a9373",
+  "name": "手机",
+  "description": "可自定义化的手机组件",
+  "author": "池水三两升",
+  "version": "0.1.0",
+  "entry": "dist/index.js",
+  "sdkVersion": "^1.0.0"
+}

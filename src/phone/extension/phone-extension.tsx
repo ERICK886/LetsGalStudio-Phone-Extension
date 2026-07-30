@@ -1,0 +1,944 @@
+import {
+  Extension,
+  INTERNAL_SYSTEM_SLOT,
+  defineSave,
+  extension,
+  method,
+  settings,
+  type ExtensionContext,
+  type ExtensionProps,
+  type ExtensionRenderData,
+  type SaveAPI,
+} from "@avg-studio/sdk";
+import { type PlayerPhonePreferences } from "../core/catalog";
+import { PhoneUI } from "../ui/phone-ui";
+
+const OPEN_PHONE_ACTION = "ext-7a9373.open-phone";
+const PHONE_POPUP_POSITIONS = [
+  "top-left",
+  "top-center",
+  "top-right",
+  "bottom-left",
+  "bottom-center",
+  "bottom-right",
+  "center",
+] as const;
+export type PhonePopupPosition = (typeof PHONE_POPUP_POSITIONS)[number];
+const LOCAL_COMMAND_IDS = ["quick-save", "quick-load", "toggle-fullscreen"] as const;
+const SYSTEM_SLOT_IDS = [
+  INTERNAL_SYSTEM_SLOT.Title,
+  INTERNAL_SYSTEM_SLOT.Toolbar,
+  INTERNAL_SYSTEM_SLOT.Save,
+  INTERNAL_SYSTEM_SLOT.Load,
+  INTERNAL_SYSTEM_SLOT.Settings,
+  INTERNAL_SYSTEM_SLOT.History,
+  INTERNAL_SYSTEM_SLOT.Gallery,
+] as const;
+
+const PHONE_DEBUG_PREFIX = "[phone-debug]";
+let nextStorySequenceDebugId = 1;
+
+function debugSnapshot(value: unknown, depth = 0, seen = new WeakSet<object>()): unknown {
+  if (value === null || typeof value !== "object") return value;
+  if (depth >= 4) return "[max-depth]";
+  if (seen.has(value)) return "[circular]";
+  seen.add(value);
+
+  if (Array.isArray(value)) {
+    return value.map((item) => debugSnapshot(item, depth + 1, seen));
+  }
+
+  const output: Record<string, unknown> = {};
+  try {
+    for (const [key, item] of Object.entries(value)) {
+      output[key] = debugSnapshot(item, depth + 1, seen);
+    }
+  } catch (error) {
+    return `[unreadable: ${error instanceof Error ? error.message : String(error)}]`;
+  }
+  return output;
+}
+
+function phoneDebug(event: string, details?: unknown): void {
+  if (details === undefined) console.log(PHONE_DEBUG_PREFIX, event);
+  else console.log(PHONE_DEBUG_PREFIX, event, debugSnapshot(details));
+}
+
+type PhoneSaveMap = {
+  preferences: readonly PlayerPhonePreferences[];
+};
+
+export type PhoneMessageDirection = "incoming" | "outgoing";
+
+function normalizeStoryPopupPosition(value: unknown): PhonePopupPosition {
+  return (PHONE_POPUP_POSITIONS as readonly unknown[]).includes(value)
+    ? value as PhonePopupPosition
+    : "bottom-right";
+}
+
+export interface PhoneStoryMessage {
+  characterId: string;
+  /** 由 Studio 的 characterPortrait 选择器写入的角色立绘 ID。 */
+  portraitId?: string;
+  message: string;
+  direction: PhoneMessageDirection;
+}
+
+type PhoneStoryMessageListener = (
+  messages: readonly PhoneStoryMessage[],
+  awaitingAdvance: boolean,
+  popupPosition: PhonePopupPosition,
+) => void;
+
+export type PhoneStoryAdvanceResult = "appended" | "finished" | "close" | false;
+
+export interface PhoneUIProps extends ExtensionProps {
+  loadPreferences: () => readonly PlayerPhonePreferences[];
+  savePreferences: (value: readonly PlayerPhonePreferences[]) => void;
+  /** 读取当前运行时挂载状态；UI 在异步关闭后据此阻止继续启动动作。 */
+  isPhoneMounted: () => boolean;
+  closePhone: () => void;
+  storyMessages?: readonly PhoneStoryMessage[];
+  storyPopupPosition?: PhonePopupPosition;
+  subscribeStoryMessages?: (listener: PhoneStoryMessageListener) => () => void;
+  advanceStoryMessage?: () => PhoneStoryAdvanceResult;
+}
+
+interface PendingStorySequence {
+  readonly debugId: number;
+  readonly key: string;
+  readonly messages: readonly PhoneStoryMessage[];
+  nextIndex: number;
+  readonly closeAfterMessages: boolean;
+  readonly promise: Promise<void>;
+  readonly resolve: () => void;
+}
+
+let activeStoryMessages: readonly PhoneStoryMessage[] = [];
+let activeStoryPopupPosition: PhonePopupPosition = "bottom-right";
+let storyMessageSessionVisible = false;
+let pendingStorySequence: PendingStorySequence | undefined;
+const storyMessageListeners = new Set<PhoneStoryMessageListener>();
+
+/**
+ * 手机功能的运行时挂载状态。它故意不写入 saveSchema：卸载只禁用能力，不删除玩家偏好或作者配置。
+ * 每次挂载/卸载都推进 epoch，使已经开始的异步 show/message 请求失效。
+ */
+let phoneMounted = false;
+let phoneMountEpoch = 0;
+
+function isCurrentPhoneMount(epoch: number): boolean {
+  return phoneMounted && epoch === phoneMountEpoch;
+}
+
+function publishStoryMessages(): void {
+  const awaitingAdvance = pendingStorySequence !== undefined;
+  phoneDebug("sequence-publish", {
+    sequenceId: pendingStorySequence?.debugId ?? null,
+    awaitingAdvance,
+    messageCount: activeStoryMessages.length,
+    nextIndex: pendingStorySequence?.nextIndex ?? null,
+    totalCount: pendingStorySequence?.messages.length ?? null,
+    listenerCount: storyMessageListeners.size,
+  });
+  for (const listener of storyMessageListeners) {
+    listener(activeStoryMessages, awaitingAdvance, activeStoryPopupPosition);
+  }
+}
+
+/** 启用运行时手机能力；不自动打开 UI，也不改动任何存档数据。 */
+function activatePhoneRuntime(): void {
+  if (phoneMounted) return;
+  phoneMounted = true;
+  phoneMountEpoch += 1;
+  phoneDebug("phone-mounted", { epoch: phoneMountEpoch });
+}
+
+/**
+ * 立即让所有手机入口失效，并清理临时消息会话。
+ * pending Promise 必须被 resolve，避免已调用 show-message 的 Fragment 永久等待；preferences 等 SaveAPI 数据不会触碰。
+ */
+async function deactivatePhoneRuntime(ctx: ExtensionContext): Promise<void> {
+  phoneMounted = false;
+  phoneMountEpoch += 1;
+
+  const pending = pendingStorySequence;
+  pendingStorySequence = undefined;
+  storyMessageSessionVisible = false;
+  activeStoryMessages = [];
+  activeStoryPopupPosition = "bottom-right";
+  publishStoryMessages();
+  pending?.resolve();
+
+  phoneDebug("phone-unmounted", { epoch: phoneMountEpoch, hadPendingSequence: Boolean(pending) });
+  if (!ctx.ui.isVisible("phone")) return;
+  try {
+    await ctx.ui.hide("phone");
+  } catch (error) {
+    console.error("[phone] 卸载时关闭手机失败", error);
+  }
+}
+
+function subscribeStoryMessages(listener: PhoneStoryMessageListener): () => void {
+  storyMessageListeners.add(listener);
+  phoneDebug("listener-subscribe", { listenerCount: storyMessageListeners.size });
+  listener(activeStoryMessages, pendingStorySequence !== undefined, activeStoryPopupPosition);
+  return () => {
+    storyMessageListeners.delete(listener);
+    phoneDebug("listener-unsubscribe", { listenerCount: storyMessageListeners.size });
+  };
+}
+
+function finishStoryMessageSequence(reason = "unspecified"): boolean {
+  const sequence = pendingStorySequence;
+  if (!sequence) {
+    phoneDebug("sequence-finish-ignored", { reason, pending: false });
+    return false;
+  }
+
+  phoneDebug("sequence-finish", {
+    sequenceId: sequence.debugId,
+    reason,
+    nextIndex: sequence.nextIndex,
+    totalCount: sequence.messages.length,
+    visibleMessageCount: activeStoryMessages.length,
+  });
+  pendingStorySequence = undefined;
+  publishStoryMessages();
+  sequence.resolve();
+  return true;
+}
+
+/**
+ * 推进当前消息会话一次。
+ * 有下一条时追加并返回 `appended`；非关闭组的末条会 resolve 会话并返回 `finished`；关闭组的末条返回 `close`，
+ * 由 UI 播放退出动画后调用 closePhone 完成 Promise。无活动会话时返回 false，调用方必须安全忽略。
+ */
+function advanceStoryMessage(): PhoneStoryAdvanceResult {
+  const sequence = pendingStorySequence;
+  if (!sequence) {
+    phoneDebug("advance-ignored", { pending: false });
+    return false;
+  }
+
+  phoneDebug("advance-received", {
+    sequenceId: sequence.debugId,
+    nextIndex: sequence.nextIndex,
+    totalCount: sequence.messages.length,
+    visibleMessageCount: activeStoryMessages.length,
+    closeAfterMessages: sequence.closeAfterMessages,
+  });
+
+  const nextMessage = sequence.messages[sequence.nextIndex];
+  if (nextMessage) {
+    const appendedIndex = sequence.nextIndex;
+    sequence.nextIndex += 1;
+    activeStoryMessages = [...activeStoryMessages, nextMessage];
+    phoneDebug("advance-appended", {
+      sequenceId: sequence.debugId,
+      appendedIndex,
+      nextIndex: sequence.nextIndex,
+      message: nextMessage,
+      visibleMessageCount: activeStoryMessages.length,
+    });
+    publishStoryMessages();
+    return "appended";
+  }
+
+  if (sequence.closeAfterMessages) {
+    phoneDebug("advance-close-requested", {
+      sequenceId: sequence.debugId,
+      nextIndex: sequence.nextIndex,
+      totalCount: sequence.messages.length,
+    });
+    return "close";
+  }
+  finishStoryMessageSequence("group-finished-without-close");
+  return "finished";
+}
+
+/**
+ * 创建、接续或排队一组剧情手机消息。
+ *
+ * 该函数维护模块级 pending Promise：相同请求复用同一等待结果，其他请求等待上一组结束；首次消息模式会在必要时关闭普通手机，
+ * 后续组只发布新快照而不重复 `ctx.ui.show("phone")`。它不会在最后一条时自行关闭或 resolve，必须等待 UI 调用
+ * `advanceStoryMessage` 并在需要时执行 `closePhone`，从而保证“最后一条显示后再点一次才关闭”的交互契约。
+ */
+async function showStoryMessages(
+  ctx: ExtensionContext,
+  messages: readonly PhoneStoryMessage[],
+  appendToExisting: boolean,
+  closeAfterMessages: boolean,
+  popupPosition: PhonePopupPosition,
+): Promise<void> {
+  const mountEpoch = phoneMountEpoch;
+  if (!isCurrentPhoneMount(mountEpoch)) {
+    phoneDebug("sequence-request-ignored-unmounted", { messageCount: messages.length });
+    return;
+  }
+
+  if (messages.length === 0) {
+    phoneDebug("sequence-request-empty", { appendToExisting, closeAfterMessages });
+    return;
+  }
+
+  const sequenceKey = JSON.stringify({
+    messages,
+    appendToExisting,
+    closeAfterMessages,
+    popupPosition,
+  });
+  phoneDebug("sequence-request", {
+    sequenceKey,
+    messageCount: messages.length,
+    messages,
+    appendToExisting,
+    closeAfterMessages,
+    popupPosition,
+    existingSequenceId: pendingStorySequence?.debugId ?? null,
+    uiVisible: ctx.ui.isVisible("phone"),
+    storyMessageSessionVisible,
+  });
+  while (pendingStorySequence) {
+    if (pendingStorySequence.key === sequenceKey) {
+      phoneDebug("sequence-request-reused", {
+        sequenceId: pendingStorySequence.debugId,
+        sequenceKey,
+      });
+      return pendingStorySequence.promise;
+    }
+    phoneDebug("sequence-request-queued", {
+      waitingForSequenceId: pendingStorySequence.debugId,
+      nextSequenceKey: sequenceKey,
+    });
+    await pendingStorySequence.promise;
+  }
+
+  if (!isCurrentPhoneMount(mountEpoch)) {
+    phoneDebug("sequence-request-cancelled-unmounted", { stage: "after-queue" });
+    return;
+  }
+
+  const uiVisible = ctx.ui.isVisible("phone");
+  const hasStorySession = storyMessageSessionVisible;
+  // Studio 的 isVisible 只表示当前可见层，不表示容器是否已注册；接续组以逻辑会话为唯一复用依据。
+  const shouldCreateStoryUi = !hasStorySession;
+  const continuingSession = appendToExisting && activeStoryMessages.length > 0;
+  if (!hasStorySession && uiVisible) {
+    await ctx.ui.hide("phone");
+  }
+  if (!isCurrentPhoneMount(mountEpoch)) {
+    phoneDebug("sequence-request-cancelled-unmounted", { stage: "after-hide" });
+    return;
+  }
+
+  // 接续以扩展自身会话状态为准；宿主短暂重建 UI 时仍保留上一组消息。
+  activeStoryPopupPosition = popupPosition;
+  activeStoryMessages = continuingSession
+    ? [...activeStoryMessages, messages[0]]
+    : [messages[0]];
+  const debugId = nextStorySequenceDebugId++;
+  let resolveSequence!: () => void;
+  const sequencePromise = new Promise<void>((resolve) => {
+    resolveSequence = resolve;
+  });
+  pendingStorySequence = {
+    debugId,
+    key: sequenceKey,
+    messages,
+    nextIndex: 1,
+    closeAfterMessages,
+    promise: sequencePromise,
+    resolve: resolveSequence,
+  };
+  phoneDebug("sequence-created", {
+    sequenceId: debugId,
+    uiVisible,
+    hasStorySession,
+    continuingSession,
+    appendToExisting,
+    closeAfterMessages,
+    popupPosition,
+    activeMessageCount: activeStoryMessages.length,
+    totalCount: messages.length,
+    messages,
+  });
+  publishStoryMessages();
+
+  try {
+    if (shouldCreateStoryUi) {
+      storyMessageSessionVisible = true;
+      phoneDebug("ui-show-start", {
+        sequenceId: debugId,
+        activeMessageCount: activeStoryMessages.length,
+        reportedUiVisible: uiVisible,
+      });
+      await ctx.ui.show("phone", {
+        storyMessages: activeStoryMessages,
+        storyPopupPosition: activeStoryPopupPosition,
+      }, {
+        size: "(100%, 100%)",
+        position: "(0, 0)",
+        // 全屏透明层消费点击：有下一条则追加，最后一次点击完成方法。
+        interactable: true,
+      });
+      if (!isCurrentPhoneMount(mountEpoch)) {
+        phoneDebug("sequence-request-cancelled-unmounted", { stage: "after-show" });
+        if (ctx.ui.isVisible("phone")) await ctx.ui.hide("phone");
+        return;
+      }
+      phoneDebug("ui-show-complete", { sequenceId: debugId });
+    } else {
+      phoneDebug("ui-show-reused", { sequenceId: debugId, reportedUiVisible: uiVisible });
+    }
+
+    phoneDebug("sequence-await-start", { sequenceId: debugId });
+    await sequencePromise;
+    phoneDebug("sequence-await-resolved", { sequenceId: debugId });
+  } catch (error) {
+    phoneDebug("sequence-error", {
+      sequenceId: debugId,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : error,
+    });
+    storyMessageSessionVisible = false;
+    finishStoryMessageSequence("show-or-wait-error");
+    throw error;
+  } finally {
+    const stillOwnsPending = pendingStorySequence?.resolve === resolveSequence;
+    phoneDebug("sequence-finally", { sequenceId: debugId, stillOwnsPending });
+    if (stillOwnsPending) {
+      pendingStorySequence = undefined;
+      publishStoryMessages();
+    }
+  }
+}
+
+/**
+ * 从 Studio method 参数的 1–8 号槽位构造可显示消息。
+ * 文本会 trim，空文本直接跳过；第 2–8 条未选角色时继承第 1 条角色，未选方向默认为 incoming；
+ * `portraitId` 保持为 characterPortrait 选择器给出的稳定立绘 ID。该函数只做容错归一化，不启动 UI。
+ */
+function collectStoryMessages(params: Record<string, unknown>): PhoneStoryMessage[] {
+  const slots = Array.from({ length: 8 }, (_, offset) => {
+    const index = offset + 1;
+    const suffix = index === 1 ? "" : String(index);
+    const characterValue = params[`characterId${suffix}`];
+    const messageValue = params[`message${suffix}`];
+    const directionValue = params[`direction${suffix}`];
+    return {
+      index,
+      characterKey: `characterId${suffix}`,
+      characterType: typeof characterValue,
+      characterValue,
+      messageKey: `message${suffix}`,
+      messageType: typeof messageValue,
+      messageValue,
+      directionKey: `direction${suffix}`,
+      directionType: typeof directionValue,
+      directionValue,
+    };
+  });
+  phoneDebug("method-params", {
+    keys: Object.keys(params),
+    params,
+    slots,
+  });
+
+  const messages: PhoneStoryMessage[] = [];
+  const defaultCharacterId = typeof params.characterId === "string" ? params.characterId : "";
+
+  for (let index = 1; index <= 8; index += 1) {
+    const suffix = index === 1 ? "" : String(index);
+    const rawMessage = params[`message${suffix}`];
+    if (typeof rawMessage !== "string" || rawMessage.trim() === "") continue;
+
+    const rawCharacterId = params[`characterId${suffix}`];
+    const characterId = typeof rawCharacterId === "string" && rawCharacterId
+      ? rawCharacterId
+      : defaultCharacterId;
+    if (!characterId) continue;
+
+    const rawPortraitId = params[`portraitId${suffix}`];
+    const portraitId = typeof rawPortraitId === "string" && rawPortraitId
+      ? rawPortraitId
+      : undefined;
+    messages.push({
+      characterId,
+      ...(portraitId ? { portraitId } : {}),
+      message: rawMessage.trim(),
+      direction: params[`direction${suffix}`] === "outgoing" ? "outgoing" : "incoming",
+    });
+  }
+
+  phoneDebug("method-messages-parsed", {
+    messageCount: messages.length,
+    messages,
+  });
+  return messages;
+}
+
+/**
+ * Studio 的“手机”程序扩展。
+ *
+ * 它同时声明项目设置、shared 玩家偏好存档、打开手机的语义快捷键，以及供 Fragment 调用的
+ * `show-message` 方法。剧情消息状态保持在模块级，以便宿主短暂重建 React UI 时仍能接续同一序列。
+ * 对外运行时 UI ID 固定为 `phone`，不得随重构修改。
+ */
+@extension({ id: "phone", label: "手机", category: "游戏系统" })
+export class PhoneExtension extends Extension<PhoneUIProps> {
+  private static opening = false;
+
+  /**
+   * Fragment 方法：启用本次运行中的手机功能（method id: `mount-phone`）。
+   * 挂载不会自动弹出手机，也不会重置玩家个性化、应用绑定或任何其他保存数据。
+   */
+  static mountPhone = method({
+    id: "mount-phone",
+    title: "挂载手机",
+    description: "启用手机功能。挂载后可通过快捷键打开手机或调用“显示手机消息”。不会自动打开手机。",
+    run() {
+      activatePhoneRuntime();
+    },
+    runImmediately() {
+      activatePhoneRuntime();
+    },
+    skip() {
+      activatePhoneRuntime();
+    },
+  });
+
+  /**
+   * Fragment 方法：禁用本次运行中的手机功能（method id: `unmount-phone`）。
+   * 会立即结束等待中的消息序列并关闭当前手机 UI，但不清除 shared preferences 或作者配置；再次挂载可继续使用已有数据。
+   */
+  static unmountPhone = method({
+    id: "unmount-phone",
+    title: "卸载手机",
+    description: "关闭并禁用手机功能，不删除玩家已保存的手机个性化与应用配置。",
+    async run(ctx) {
+      await deactivatePhoneRuntime(ctx);
+    },
+    async runImmediately(ctx) {
+      await deactivatePhoneRuntime(ctx);
+    },
+    async skip(ctx) {
+      await deactivatePhoneRuntime(ctx);
+    },
+  });
+
+  /**
+   * Studio Fragment 可调用的剧情消息方法（method id 固定为 `show-message`）。
+   *
+   * 一个块最多读取 8 条消息：空内容或无有效角色的槽位会跳过，后续消息缺少角色时继承第一条角色。
+   * 首组默认重新创建列表；`appendToExisting` 仅在活动会话已有消息时追加到旧 UI。方法返回的 Promise 会等待
+   * 玩家逐条推进：显示最后一条后，若 `closeAfterMessages` 为 true，需再点击一次由 UI 执行关闭动画。
+   * 相同请求会复用当前等待 Promise，不同请求则按调用顺序排队，避免重复注册 `phone` UI 容器。
+   */
+  static showMessage = method({
+    id: "show-message",
+    title: "显示手机消息",
+    description: "每块最多 8 条，可接续无限扩展；最后一组显示完并确认后自动关闭手机。",
+    schema: {
+      appendToExisting: {
+        type: "boolean",
+        label: "接续上一组消息",
+        default: false,
+      },
+      closeAfterMessages: {
+        type: "boolean",
+        label: "本组结束后关闭手机",
+        default: true,
+      },
+      popupPosition: {
+        type: "enum",
+        label: "手机消息显示位置",
+        options: [
+          { label: "左上", value: "top-left" },
+          { label: "中上", value: "top-center" },
+          { label: "右上", value: "top-right" },
+          { label: "左下", value: "bottom-left" },
+          { label: "中下", value: "bottom-center" },
+          { label: "右下", value: "bottom-right" },
+          { label: "中部弹出", value: "center" },
+        ],
+        default: "bottom-right",
+        required: true,
+      },
+      characterId: {
+        type: "character",
+        label: "第 1 条 · 角色",
+        required: true,
+      },
+      portraitId: {
+        type: "characterPortrait",
+        label: "第 1 条 · 角色立绘（可选）",
+        characterField: "characterId",
+      },
+      message: {
+        type: "string",
+        label: "第 1 条 · 内容",
+        multiline: true,
+        required: true,
+      },
+      direction: {
+        type: "enum",
+        label: "第 1 条 · 发送方",
+        options: [
+          { label: "对方发消息", value: "incoming" },
+          { label: "我方发消息", value: "outgoing" },
+        ],
+        default: "incoming",
+        required: true,
+      },
+      characterId2: { type: "character", label: "第 2 条 · 角色" },
+      portraitId2: {
+        type: "characterPortrait",
+        label: "第 2 条 · 角色立绘（可选）",
+        characterField: "characterId2",
+      },
+      message2: { type: "string", label: "第 2 条 · 内容", multiline: true },
+      direction2: {
+        type: "enum",
+        label: "第 2 条 · 发送方",
+        options: [
+          { label: "对方发消息", value: "incoming" },
+          { label: "我方发消息", value: "outgoing" },
+        ],
+        default: "incoming",
+      },
+      characterId3: { type: "character", label: "第 3 条 · 角色" },
+      portraitId3: {
+        type: "characterPortrait",
+        label: "第 3 条 · 角色立绘（可选）",
+        characterField: "characterId3",
+      },
+      message3: { type: "string", label: "第 3 条 · 内容", multiline: true },
+      direction3: {
+        type: "enum",
+        label: "第 3 条 · 发送方",
+        options: [
+          { label: "对方发消息", value: "incoming" },
+          { label: "我方发消息", value: "outgoing" },
+        ],
+        default: "incoming",
+      },
+      characterId4: { type: "character", label: "第 4 条 · 角色" },
+      portraitId4: {
+        type: "characterPortrait",
+        label: "第 4 条 · 角色立绘（可选）",
+        characterField: "characterId4",
+      },
+      message4: { type: "string", label: "第 4 条 · 内容", multiline: true },
+      direction4: {
+        type: "enum",
+        label: "第 4 条 · 发送方",
+        options: [
+          { label: "对方发消息", value: "incoming" },
+          { label: "我方发消息", value: "outgoing" },
+        ],
+        default: "incoming",
+      },
+      characterId5: { type: "character", label: "第 5 条 · 角色" },
+      portraitId5: {
+        type: "characterPortrait",
+        label: "第 5 条 · 角色立绘（可选）",
+        characterField: "characterId5",
+      },
+      message5: { type: "string", label: "第 5 条 · 内容", multiline: true },
+      direction5: {
+        type: "enum",
+        label: "第 5 条 · 发送方",
+        options: [
+          { label: "对方发消息", value: "incoming" },
+          { label: "我方发消息", value: "outgoing" },
+        ],
+        default: "incoming",
+      },
+      characterId6: { type: "character", label: "第 6 条 · 角色" },
+      portraitId6: {
+        type: "characterPortrait",
+        label: "第 6 条 · 角色立绘（可选）",
+        characterField: "characterId6",
+      },
+      message6: { type: "string", label: "第 6 条 · 内容", multiline: true },
+      direction6: {
+        type: "enum",
+        label: "第 6 条 · 发送方",
+        options: [
+          { label: "对方发消息", value: "incoming" },
+          { label: "我方发消息", value: "outgoing" },
+        ],
+        default: "incoming",
+      },
+      characterId7: { type: "character", label: "第 7 条 · 角色" },
+      portraitId7: {
+        type: "characterPortrait",
+        label: "第 7 条 · 角色立绘（可选）",
+        characterField: "characterId7",
+      },
+      message7: { type: "string", label: "第 7 条 · 内容", multiline: true },
+      direction7: {
+        type: "enum",
+        label: "第 7 条 · 发送方",
+        options: [
+          { label: "对方发消息", value: "incoming" },
+          { label: "我方发消息", value: "outgoing" },
+        ],
+        default: "incoming",
+      },
+      characterId8: { type: "character", label: "第 8 条 · 角色" },
+      portraitId8: {
+        type: "characterPortrait",
+        label: "第 8 条 · 角色立绘（可选）",
+        characterField: "characterId8",
+      },
+      message8: { type: "string", label: "第 8 条 · 内容", multiline: true },
+      direction8: {
+        type: "enum",
+        label: "第 8 条 · 发送方",
+        options: [
+          { label: "对方发消息", value: "incoming" },
+          { label: "我方发消息", value: "outgoing" },
+        ],
+        default: "incoming",
+      },
+    },
+    run(ctx, params) {
+      return showStoryMessages(
+        ctx,
+        collectStoryMessages(params as Record<string, unknown>),
+        params.appendToExisting,
+        params.closeAfterMessages !== false,
+        normalizeStoryPopupPosition(params.popupPosition),
+      );
+    },
+    /**
+     * Studio 的即时执行路径（例如“运行到当前行”）。
+     * 消息方法的正常 run 会等待玩家逐条确认，因此此路径必须保持同步且无副作用：
+     * 不打开手机、不创建 pending sequence，也不等待 UI 关闭。
+     */
+    runImmediately() {
+      // Intentionally empty: 立即执行时跳过纯展示型剧情消息。
+    },
+    /**
+     * Ctrl 快进路径。与 runImmediately 一样跳过纯展示型消息，避免快进过程中被手机 UI 阻塞。
+     */
+    skip() {
+      // Intentionally empty: 快进不弹出手机。
+    },
+  });
+
+  static settings = settings((s) => ({
+    phoneTitle: s.string("手机标题").default("手机"),
+    popupPosition: s.enum("手机弹出位置", PHONE_POPUP_POSITIONS)
+      .default("bottom-right")
+      .labels({
+        "top-left": "左上",
+        "top-center": "中上",
+        "top-right": "右上",
+        "bottom-left": "左下",
+        "bottom-center": "中下",
+        "bottom-right": "右下",
+        center: "中部",
+      })
+      .describe("选择手机贴近视口的弹出位置；打开时从该方向滑入并淡入，关闭时反向滑出。"),
+    programUiActions: s.array("动作 · 程序 UI", (item) => ({
+      id: item.string("ID").default("new-program-ui"),
+      name: item.string("名称").default("新程序界面"),
+      programUiRef: item.string("UI 引用")
+        .describe("本扩展填 ui-id；跨扩展填 extension-id/ui-id，不要加 @。"),
+      description: item.string("说明"),
+    }))
+      .itemDefault({ id: "new-program-ui", name: "新程序界面", programUiRef: "", description: "" })
+      .maxItems(40)
+      .addLabel("添加程序 UI 动作")
+      .emptyHint("没有程序 UI 动作。")
+      .describe("操作：①点击“添加程序 UI 动作”；②填写唯一 ID 和名称；③本扩展 UI 填 ui-id，跨扩展填 extension-id/ui-id（不要加 @）；④在“手机应用目录”的默认动作 ID 中填写同一 ID。"),
+    visualUiActions: s.array("动作 · 可视化 UI", (item) => ({
+      id: item.string("ID").default("new-visual-ui"),
+      name: item.string("名称").default("新可视化界面"),
+      visualUiName: item.string("界面名称")
+        .describe("项目界面填 ui-name；扩展界面填 @extension-id/ui-name。"),
+      modal: item.boolean("模态").default(true),
+      description: item.string("说明"),
+    }))
+      .itemDefault({ id: "new-visual-ui", name: "新可视化界面", visualUiName: "", modal: true, description: "" })
+      .maxItems(40)
+      .addLabel("添加可视化 UI 动作")
+      .emptyHint("没有可视化 UI 动作。")
+      .describe("操作：①点击“添加可视化 UI 动作”；②填写唯一 ID 和名称；③项目界面填 ui-name，扩展界面填 @extension-id/ui-name；④按需开启模态；⑤在应用目录中绑定该 ID。"),
+    systemSlotActions: s.array("动作 · 内置系统界面", (item) => ({
+      id: item.string("ID").default("new-system-ui"),
+      name: item.string("名称").default("新系统界面"),
+      systemSlot: item.enum("系统界面", SYSTEM_SLOT_IDS)
+        .default(INTERNAL_SYSTEM_SLOT.Settings)
+        .labels({
+          [INTERNAL_SYSTEM_SLOT.Title]: "标题画面",
+          [INTERNAL_SYSTEM_SLOT.Toolbar]: "对话工具栏",
+          [INTERNAL_SYSTEM_SLOT.Save]: "存档界面",
+          [INTERNAL_SYSTEM_SLOT.Load]: "读档界面",
+          [INTERNAL_SYSTEM_SLOT.Settings]: "设置界面",
+          [INTERNAL_SYSTEM_SLOT.History]: "历史记录",
+          [INTERNAL_SYSTEM_SLOT.Gallery]: "鉴赏界面",
+        }),
+      description: item.string("说明"),
+    }))
+      .itemDefault({ id: "new-system-ui", name: "新系统界面", systemSlot: INTERNAL_SYSTEM_SLOT.Settings, description: "" })
+      .maxItems(40)
+      .addLabel("添加系统界面动作")
+      .emptyHint("没有额外的系统界面动作。")
+      .describe("操作：①点击“添加系统界面动作”；②填写唯一 ID 和名称；③从下拉框选择标题、存档、读档、设置、历史或鉴赏界面；④在应用目录中绑定该 ID。"),
+    internalMethodActions: s.array("动作 · 手机内部方法", (item) => ({
+      id: item.string("ID").default("new-internal-method"),
+      name: item.string("名称").default("新内部方法"),
+      commandId: item.enum("内部方法", LOCAL_COMMAND_IDS)
+        .default("quick-save")
+        .labels({
+          "quick-save": "快速存档",
+          "quick-load": "快速读档",
+          "toggle-fullscreen": "切换全屏",
+        }),
+      description: item.string("说明"),
+    }))
+      .itemDefault({ id: "new-internal-method", name: "新内部方法", commandId: "quick-save", description: "" })
+      .maxItems(40)
+      .addLabel("添加内部方法动作")
+      .emptyHint("没有额外的手机内部方法动作。")
+      .describe("操作：①点击“添加内部方法动作”；②填写唯一 ID 和名称；③从下拉框选择快速存档、快速读档或切换全屏；④在应用目录中绑定该 ID。只能选择插件预注册的安全方法。"),
+    catalogApps: s.array("手机应用目录", (item) => ({
+      id: item.string("应用 ID").default("new-app"),
+      name: item.string("应用名称").default("新应用"),
+      icon: item.asset("应用图标").accepts("image"),
+      enabled: item.boolean("启用").default(true),
+      locked: item.boolean("锁定玩家编辑").default(false),
+      defaultActionId: item.string("默认动作 ID").default("settings"),
+    }))
+      .itemDefault({
+        id: "new-app",
+        name: "新应用",
+        enabled: true,
+        locked: false,
+        defaultActionId: "settings",
+      })
+      .maxItems(40)
+      .addLabel("添加应用")
+      .emptyHint("未配置应用时使用插件内置应用目录。")
+      .describe("操作：①先在上方任一动作分组中添加动作并记下其 ID；②点击“添加应用”；③填写唯一应用 ID、名称并选择图标；④把动作 ID 原样填入“默认动作 ID”；⑤按需启用或锁定玩家编辑。"),
+    backgroundColor: s.string("默认背景色").default("#172036"),
+    backgroundImage: s.asset("默认背景图").accepts("image"),
+    backgroundCss: s.string("默认 CSS 背景值")
+      .default("")
+      .describe("例如 linear-gradient(135deg, #182848, #4b6cb7)"),
+    accentColor: s.string("默认强调色").default("#79c7ff"),
+    shellColor: s.string("默认外壳颜色").default("#11151f"),
+    allowPlayerCustomization: s.boolean("允许玩家个性化手机")
+      .default(true)
+      .describe("关闭后隐藏玩家端个性化入口，并忽略玩家保存的名称、图标、背景、颜色、动作覆盖和应用绑定；数据不会删除，重新开启后恢复生效。"),
+    allowPlayerWallpaper: s.boolean("允许玩家更换背景")
+      .default(true)
+      .enabledWhen("allowPlayerCustomization", true),
+    allowPlayerIcons: s.boolean("允许玩家更换图标")
+      .default(true)
+      .enabledWhen("allowPlayerCustomization", true),
+  }));
+
+  static saveSchema = defineSave({
+    preferences: {
+      type: "list",
+      persistence: "shared",
+      default: [] as PlayerPhonePreferences[],
+      label: "玩家手机个性化配置",
+    },
+  });
+
+  /**
+   * 在扩展注册时声明全局“打开手机”语义动作，并绑定默认 ArrowUp。
+   * `opening` 锁和 `ctx.ui.isVisible("phone")` 双重防止长按或重复事件创建多个 UI 实例；`ctx.ui.show` 的异步失败
+   * 只记录日志并确保释放锁。手机打开后的 ArrowUp 由 UI 自己处理为网格向上导航，不会在此处关闭手机。
+   */
+  static onRegister(ctx: ExtensionContext): void {
+    ctx.input.registerAction({
+      id: OPEN_PHONE_ACTION,
+      label: "打开手机",
+      defaultKeys: ["ArrowUp"],
+    });
+
+    ctx.input.onAction(OPEN_PHONE_ACTION, () => {
+      if (!phoneMounted || PhoneExtension.opening || ctx.ui.isVisible("phone")) return;
+      const mountEpoch = phoneMountEpoch;
+      PhoneExtension.opening = true;
+      try {
+        const shown = ctx.ui.show("phone", undefined, {
+          size: "(100%, 100%)",
+          position: "(0, 0)",
+          interactable: true,
+        });
+        void Promise.resolve(shown)
+          .then(async () => {
+            if (!isCurrentPhoneMount(mountEpoch) && ctx.ui.isVisible("phone")) {
+              await ctx.ui.hide("phone");
+            }
+          })
+          .catch((error: unknown) => {
+            console.error("[phone] 打开手机失败", error);
+          })
+          .finally(() => {
+            PhoneExtension.opening = false;
+          });
+      } catch (error) {
+        PhoneExtension.opening = false;
+        console.error("[phone] 打开手机失败", error);
+      }
+    });
+  }
+
+  /**
+   * 构造宿主挂载 React UI 所需的 props。
+   * 会过滤宿主传入的非消息对象，并在闭包内延迟访问 `this.save`，因为 Studio 可能在 render 之后才注入 SaveAPI。
+   * `closePhone` 先 resolve 所有等待中的剧情序列，再销毁 UI，避免 Fragment 永久停在扩展方法块。
+   */
+  render(): ExtensionRenderData<PhoneUIProps> {
+    const inputMessages = this.data?.storyMessages;
+    const storyPopupPosition = normalizeStoryPopupPosition(this.data?.storyPopupPosition);
+    const storyMessages = Array.isArray(inputMessages)
+      ? inputMessages.flatMap((inputMessage) =>
+          inputMessage &&
+          typeof inputMessage.characterId === "string" &&
+          typeof inputMessage.message === "string"
+            ? [{
+                characterId: inputMessage.characterId,
+                ...(typeof inputMessage.portraitId === "string" && inputMessage.portraitId
+                  ? { portraitId: inputMessage.portraitId }
+                  : {}),
+                message: inputMessage.message,
+                direction: inputMessage.direction === "outgoing" ? "outgoing" as const : "incoming" as const,
+              }]
+            : [],
+        )
+      : undefined;
+
+    return {
+      component: PhoneUI,
+      props: {
+        // 延迟到 React mount 后再访问 this.save，兼容宿主在 render 后注入 save proxy。
+        loadPreferences: () =>
+          (this.save as unknown as SaveAPI<PhoneSaveMap>).get("preferences"),
+        savePreferences: (value) =>
+          (this.save as unknown as SaveAPI<PhoneSaveMap>).set("preferences", value),
+        isPhoneMounted: () => phoneMounted,
+        closePhone: () => {
+          finishStoryMessageSequence();
+          storyMessageSessionVisible = false;
+          activeStoryMessages = [];
+          activeStoryPopupPosition = "bottom-right";
+          publishStoryMessages();
+          this.close();
+        },
+        // 不依赖 ctx.ui.show() 的初始 data：首次 render 若尚未拿到消息快照，UI 也能订阅并回放当前会话。
+        subscribeStoryMessages,
+        advanceStoryMessage,
+        ...(storyMessages ? { storyMessages, storyPopupPosition } : {}),
+      },
+    };
+  }
+}
