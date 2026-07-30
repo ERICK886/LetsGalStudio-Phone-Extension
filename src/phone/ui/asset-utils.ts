@@ -42,15 +42,17 @@ export function firstGlyph(value: string): string {
  * 将 Studio 素材 URI 转换为可赋给 HTML 图片元素的 URL。
  *
  * @param ctx 当前扩展上下文的素材解析能力。
- * @param source Studio 素材 URI 或玩家上传的 data image；空值直接视为没有素材。
- * @returns 可渲染 URL；解析失败时记录警告并返回 `undefined`，由调用方回退为文字或下一张候选图片。
+ * @param source Studio 的相对素材引用、完整 `local://` URI，或玩家上传的 data image；空值直接视为没有素材。
+ * @returns 可渲染 URL；完整 URI 直接保留，相对引用经 SDK 解析；解析失败时记录警告并返回 `undefined`，由调用方回退为文字或下一张候选图片。
  */
 export function resolveAssetUrl(
   ctx: AssetResolverContext,
   source?: string,
 ): string | undefined {
   if (!source) return undefined;
-  if (source.startsWith("data:image/")) return source;
+  // 角色的 avatarUri / portrait.uri 在 Player 中可能已是完整 local URI。
+  // 再交给 asset.resolve 会被误当作相对 assets/ 路径，生成 `assets/local:///...`。
+  if (source.startsWith("data:image/") || source.startsWith("local://")) return source;
   try {
     return ctx.asset.resolve(source).url;
   } catch (error) {

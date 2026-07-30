@@ -43,7 +43,7 @@ export const PhoneStoryMessageItem: React.FC<{ storyMessage: PhoneStoryMessage }
       const url = resolveAssetUrl(ctx, candidate.uri);
       if (!url || seenUrls.has(url)) return [];
       seenUrls.add(url);
-      return [{ source: candidate.source, url }];
+      return [{ source: candidate.source, uri: candidate.uri, url }];
     });
   }, [character?.avatarUri, character?.portraits, ctx, selectedPortrait?.uri]);
   const [avatarIndex, setAvatarIndex] = useState(0);
@@ -71,11 +71,39 @@ export const PhoneStoryMessageItem: React.FC<{ storyMessage: PhoneStoryMessage }
         ? { id: selectedPortrait.id, name: selectedPortrait.name, hasUri: Boolean(selectedPortrait.uri) }
         : null,
       hasCharacterAvatar: Boolean(character?.avatarUri),
-      candidateSources: avatarCandidates.map((candidate) => candidate.source),
+      candidates: avatarCandidates.map((candidate) => ({
+        source: candidate.source,
+        rawUri: candidate.uri,
+        resolvedUrl: candidate.url,
+      })),
     });
   }, [avatarCandidates, character?.avatarUri, character?.portraits?.length, selectedPortrait, storyMessage.characterId, storyMessage.portraitId]);
 
-  const tryNextAvatar = useCallback(() => {
+  const reportAvatarLoaded = useCallback((event: React.SyntheticEvent<HTMLImageElement>) => {
+    const image = event.currentTarget;
+    const loadedCandidate = avatarCandidates[avatarIndex];
+    console.log("[phone-avatar] image-load-succeeded", {
+      characterId: storyMessage.characterId,
+      portraitRef: storyMessage.portraitId,
+      candidateSource: loadedCandidate?.source,
+      candidateIndex: avatarIndex,
+      rawUri: loadedCandidate?.uri,
+      resolvedUrl: loadedCandidate?.url,
+      imageCurrentSrc: image.currentSrc,
+      naturalWidth: image.naturalWidth,
+      naturalHeight: image.naturalHeight,
+    });
+  }, [avatarCandidates, avatarIndex, storyMessage.characterId, storyMessage.portraitId]);
+
+  const tryNextAvatar = useCallback((event: React.SyntheticEvent<HTMLImageElement>) => {
+    const image = event.currentTarget;
+    const failedImage = {
+      currentSrc: image.currentSrc,
+      src: image.src,
+      complete: image.complete,
+      naturalWidth: image.naturalWidth,
+      naturalHeight: image.naturalHeight,
+    };
     setAvatarIndex((current) => {
       const failedCandidate = avatarCandidates[current];
       console.warn("[phone-avatar] image-load-failed", {
@@ -84,6 +112,9 @@ export const PhoneStoryMessageItem: React.FC<{ storyMessage: PhoneStoryMessage }
         candidateSource: failedCandidate?.source,
         candidateIndex: current,
         candidateCount: avatarCandidates.length,
+        rawUri: failedCandidate?.uri,
+        resolvedUrl: failedCandidate?.url,
+        image: failedImage,
       });
       return current + 1 < avatarCandidates.length ? current + 1 : avatarCandidates.length;
     });
@@ -96,7 +127,9 @@ export const PhoneStoryMessageItem: React.FC<{ storyMessage: PhoneStoryMessage }
       aria-label={storyMessage.direction === "incoming" ? "对方发来的消息" : "我方发送的消息"}
     >
       <div className="phone-story-avatar" aria-hidden="true">
-        {avatarUrl ? <img src={avatarUrl} alt="" onError={tryNextAvatar} /> : firstGlyph(characterName)}
+        {avatarUrl ? (
+          <img src={avatarUrl} alt="" onLoad={reportAvatarLoaded} onError={tryNextAvatar} />
+        ) : firstGlyph(characterName)}
       </div>
       <div className="phone-story-bubble">
         <strong>{characterName}</strong>
