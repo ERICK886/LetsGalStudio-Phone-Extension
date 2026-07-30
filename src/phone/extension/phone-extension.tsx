@@ -13,7 +13,9 @@ import {
 import { type PlayerPhonePreferences } from "../core/catalog";
 import { PhoneUI } from "../ui/phone-ui";
 
-const OPEN_PHONE_ACTION = "ext-7a9373.open-phone";
+const OPEN_PHONE_ACTION = "ink.zenly.ext-7a9373.open-phone";
+/** 宿主未完成 show 时的保险释放时间，避免一次异常显示永久阻塞后续打开动作。 */
+const NORMAL_PHONE_OPEN_TIMEOUT_MS = 1_200;
 const PHONE_POPUP_POSITIONS = [
   "top-left",
   "top-center",
@@ -353,18 +355,39 @@ async function showStoryMessages(
     storyMessageSessionVisible,
   });
   while (pendingStorySequence) {
-    if (pendingStorySequence.key === sequenceKey) {
+    const pending = pendingStorySequence;
+    const uiAttached = ctx.ui.isVisible("phone") || storyMessageListeners.size > 0;
+
+    // UI 已卸载且没有任何订阅者时，逻辑会话已无法继续显示。不能复用它，
+    // 否则重新执行相同方法块只会返回旧 Promise，永远不会再次调用 ctx.ui.show。
+    if (!uiAttached) {
+      phoneDebug("sequence-request-recover-stale", {
+        staleSequenceId: pending.debugId,
+        sameSequenceKey: pending.key === sequenceKey,
+        uiVisible: ctx.ui.isVisible("phone"),
+        listenerCount: storyMessageListeners.size,
+      });
+      pendingStorySequence = undefined;
+      storyMessageSessionVisible = false;
+      activeStoryMessages = [];
+      activeStoryPopupPosition = "bottom-right";
+      publishStoryMessages();
+      pending.resolve();
+      continue;
+    }
+
+    if (pending.key === sequenceKey) {
       phoneDebug("sequence-request-reused", {
-        sequenceId: pendingStorySequence.debugId,
+        sequenceId: pending.debugId,
         sequenceKey,
       });
-      return pendingStorySequence.promise;
+      return pending.promise;
     }
     phoneDebug("sequence-request-queued", {
-      waitingForSequenceId: pendingStorySequence.debugId,
+      waitingForSequenceId: pending.debugId,
       nextSequenceKey: sequenceKey,
     });
-    await pendingStorySequence.promise;
+    await pending.promise;
   }
 
   if (!isCurrentPhoneMount(mountEpoch)) {
@@ -903,8 +926,8 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
 
   /**
    * 在扩展注册时声明全局“打开手机”语义动作，并绑定默认 ArrowUp。
-   * `opening` 锁和 `ctx.ui.isVisible("phone")` 双重防止长按或重复事件创建多个 UI 实例；`ctx.ui.show` 的异步失败
-   * 只记录日志并确保释放锁。手机打开后的 ArrowUp 由 UI 自己处理为网格向上导航，不会在此处关闭手机。
+   * 门控诊断会记录未挂载、正在打开、剧情消息占用和 UI 已显示等静默忽略原因；宿主 show 未 settle 时，
+   * 保险计时器会释放 `opening` 锁，避免一次异常显示永久阻塞之后的打开动作。
    */
   static onRegister(ctx: ExtensionContext): void {
     ctx.input.registerAction({
@@ -914,36 +937,73 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
     });
 
     ctx.input.onAction(OPEN_PHONE_ACTION, () => {
+      const uiVisible = ctx.ui.isVisible("phone");
+      phoneDebug("open-action-received", {
+        phoneMounted,
+        opening: PhoneExtension.opening,
+        storyMessageSessionVisible,
+        uiVisible,
+        mountEpoch: phoneMountEpoch,
+      });
+
       // 剧情消息正在请求/显示时，ArrowUp 不能抢占同一个 phone 容器并把普通手机关闭回调误用于结束剧情序列。
-      if (
-        !phoneMounted ||
-        PhoneExtension.opening ||
-        storyMessageSessionVisible ||
-        ctx.ui.isVisible("phone")
-      ) return;
+      if (!phoneMounted || PhoneExtension.opening || storyMessageSessionVisible || uiVisible) {
+        const reason = !phoneMounted
+          ? "unmounted"
+          : PhoneExtension.opening
+            ? "opening"
+            : storyMessageSessionVisible
+              ? "story-message-session"
+              : "ui-visible";
+        phoneDebug("open-ignored", { reason, mountEpoch: phoneMountEpoch });
+        return;
+      }
+
       const mountEpoch = phoneMountEpoch;
+      let settled = false;
+      let openingTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
+      const releaseOpening = (outcome: "shown" | "error" | "timeout") => {
+        if (settled) return;
+        settled = true;
+        if (openingTimer !== undefined) globalThis.clearTimeout(openingTimer);
+        PhoneExtension.opening = false;
+        phoneDebug("open-lock-released", {
+          outcome,
+          mountEpoch,
+          uiVisible: ctx.ui.isVisible("phone"),
+        });
+      };
+
       PhoneExtension.opening = true;
       try {
+        phoneDebug("open-show-start", { mountEpoch });
         const shown = ctx.ui.show("phone", undefined, {
           size: "(100%, 100%)",
           position: "(0, 0)",
           interactable: true,
         });
+        openingTimer = globalThis.setTimeout(() => {
+          phoneDebug("open-show-timeout", {
+            mountEpoch,
+            uiVisible: ctx.ui.isVisible("phone"),
+          });
+          releaseOpening("timeout");
+        }, NORMAL_PHONE_OPEN_TIMEOUT_MS);
+
         void Promise.resolve(shown)
           .then(async () => {
             if (!isCurrentPhoneMount(mountEpoch) && ctx.ui.isVisible("phone")) {
               await ctx.ui.hide("phone");
             }
+            releaseOpening("shown");
           })
           .catch((error: unknown) => {
             console.error("[phone] 打开手机失败", error);
-          })
-          .finally(() => {
-            PhoneExtension.opening = false;
+            releaseOpening("error");
           });
       } catch (error) {
-        PhoneExtension.opening = false;
         console.error("[phone] 打开手机失败", error);
+        releaseOpening("error");
       }
     });
   }

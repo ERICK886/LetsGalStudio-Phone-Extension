@@ -336,6 +336,7 @@
 [data-phone-root="ext-7a9373"] .phone-story-message {
   -ms-overflow-style: none;
   scrollbar-width: none;
+  overscroll-behavior: contain;
 }
 
 [data-phone-root="ext-7a9373"] .phone-app-grid::-webkit-scrollbar,

@@ -516,6 +516,12 @@ const PhoneUIContent: React.FC<PhoneUIProps> = ({
     }
   };
 
+  const handleWheelCapture = (event: React.WheelEvent<HTMLDivElement>) => {
+    // 保留手机内部 overflow 容器的默认滚动；只阻止 wheel 到达底层剧情输入处理器。
+    event.stopPropagation();
+    event.nativeEvent.stopImmediatePropagation();
+  };
+
   const handleOutsidePointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (event.target === event.currentTarget) void closeWithAnimation();
   };
@@ -666,6 +672,7 @@ const PhoneUIContent: React.FC<PhoneUIProps> = ({
       data-phone-awaiting-advance={awaitingStoryAdvance ? "true" : "false"}
       style={rootStyle}
       onKeyDownCapture={handleKeyDown}
+      onWheelCapture={handleWheelCapture}
       onPointerDownCapture={messageMode ? handleStoryAdvancePointerDown : undefined}
       onMouseDownCapture={messageMode ? suppressStoryMouseEvent : undefined}
       onClickCapture={messageMode ? suppressStoryMouseEvent : undefined}

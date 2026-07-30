@@ -138,7 +138,7 @@ function nonEmptyString(value: unknown, max = 256): value is string {
 function isProgramUiRef(value: unknown): value is string {
   if (!nonEmptyString(value) || value.startsWith("@") || value !== value.trim()) return false;
   try {
-    resolveUIRef(value, "ext-7a9373");
+    resolveUIRef(value, "ink.zenly.ext-7a9373");
     return true;
   } catch {
     return false;

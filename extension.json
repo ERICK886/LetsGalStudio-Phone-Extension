@@ -1,9 +1,9 @@
 {
-  "id": "ext-7a9373",
-  "name": "手机",
-  "description": "可自定义化的手机组件",
+  "id": "ink.zenly.ext-7a9373",
+  "name": "自定义手机扩展",
+  "description": "为 LetsGal Studio 游戏运行时提供可挂载的自定义手机界面：玩家可通过快捷键打开四列应用桌面，使用方向键、鼠标或 Enter/Space 启动应用；作者可配置程序 UI、可视化 UI、系统界面与安全内部命令，并控制玩家个性化权限。支持 shared 存档保存背景、颜色、图标、应用名称和动作绑定，以及在剧情 Fragment 中逐条推进、可跨多个方法块接续的角色手机消息与立绘头像显示。", 
   "author": "池水三两升",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "entry": "dist/index.mjs",
-  "sdkVersion": "^1.0.0"
+  "sdkVersion": ">=1.9.0"
 }
