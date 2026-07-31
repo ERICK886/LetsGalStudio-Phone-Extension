@@ -167,6 +167,75 @@
   background: #172036 center / cover no-repeat;
 }
 
+/* 手机外观预设：默认苹果风格使用灵动岛；安卓风格使用更紧凑的圆角和顶部听筒。 */
+[data-phone-root="ext-7a9373"][data-phone-style-preset="apple"] .phone-shell::before {
+  position: absolute;
+  z-index: 3;
+  top: 7px;
+  left: 50%;
+  width: 112px;
+  height: 29px;
+  content: "";
+  border-radius: 999px;
+  background: #050507;
+  box-shadow: 0 1px 1px rgba(255, 255, 255, 0.08);
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+
+[data-phone-root="ext-7a9373"][data-phone-style-preset="apple"] .phone-status {
+  padding-top: 12px;
+}
+
+[data-phone-root="ext-7a9373"][data-phone-style-preset="android"] .phone-shell {
+  width: min(400px, calc(100vw - 40px));
+  height: min(760px, calc(100vh - 40px));
+  border-width: 7px;
+  border-radius: 29px;
+  box-shadow: 0 22px 62px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+[data-phone-root="ext-7a9373"][data-phone-style-preset="android"] .phone-screen {
+  border-radius: 22px;
+}
+
+[data-phone-root="ext-7a9373"][data-phone-style-preset="android"] .phone-shell::before {
+  position: absolute;
+  z-index: 3;
+  top: 8px;
+  left: 50%;
+  width: 46px;
+  height: 4px;
+  content: "";
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.78);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.06);
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+
+[data-phone-root="ext-7a9373"][data-phone-style-preset="android"] .phone-status {
+  min-height: 40px;
+  padding: 8px 17px 4px;
+  font-size: 11px;
+}
+
+[data-phone-root="ext-7a9373"][data-phone-style-preset="android"] .phone-toolbar {
+  padding: 5px 16px 12px;
+}
+
+[data-phone-root="ext-7a9373"][data-phone-style-preset="android"] .phone-app-icon {
+  border-radius: 14px;
+}
+
+[data-phone-root="ext-7a9373"][data-phone-style-preset="android"] .phone-story-bubble {
+  border-radius: 14px 14px 14px 4px;
+}
+
+[data-phone-root="ext-7a9373"][data-phone-style-preset="android"] .phone-story-message-row[data-direction="outgoing"] .phone-story-bubble {
+  border-radius: 14px 14px 4px 14px;
+}
+
 /* 剧情消息仅在手机屏幕内部压暗背景，避免干扰手机外部画面。 */
 [data-phone-root="ext-7a9373"][data-phone-message-mode="true"] .phone-screen::before {
   position: absolute;

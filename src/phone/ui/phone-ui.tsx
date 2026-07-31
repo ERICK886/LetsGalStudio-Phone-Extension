@@ -131,6 +131,9 @@ const PhoneUIContent: React.FC<PhoneUIProps> = ({
   const messageMode = storyMessages !== undefined || awaitingStoryAdvance || displayStoryMessages.length > 0;
   const [storedPreferences, setStoredPreferences] = useState<readonly PlayerPhonePreferences[]>([]);
   const phoneTitle = ctx.settings.get<string>("phoneTitle");
+  const phoneStylePreset = ctx.settings.get<string>("phoneStylePreset") === "android"
+    ? "android"
+    : "apple";
   const popupPosition = normalizePhonePopupPosition(
     ctx.settings.get<string>("popupPosition"),
   );
@@ -659,6 +662,7 @@ const PhoneUIContent: React.FC<PhoneUIProps> = ({
   return (
     <div
       data-phone-root="ext-7a9373"
+      data-phone-style-preset={phoneStylePreset}
       data-phone-position={messageMode ? displayStoryPopupPosition : popupPosition}
       data-phone-closing={closing ? "true" : "false"}
       data-phone-message-mode={messageMode ? "true" : "false"}

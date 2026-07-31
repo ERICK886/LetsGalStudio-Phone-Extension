@@ -881,6 +881,13 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
 
   static settings = settings((s) => ({
     phoneTitle: s.string("手机标题").default("手机"),
+    phoneStylePreset: s.enum("手机样式预设", ["apple", "android"] as const)
+      .default("apple")
+      .labels({
+        apple: "苹果手机（iPhone）",
+        android: "安卓手机（Android）",
+      })
+      .describe("切换手机外壳、顶部开孔/听筒、圆角与应用气泡的预设样式；背景、强调色和外壳颜色仍使用下方作者设置。"),
     popupPosition: s.enum("手机弹出位置", PHONE_POPUP_POSITIONS)
       .default("bottom-right")
       .labels({
