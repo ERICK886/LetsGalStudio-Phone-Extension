@@ -1,6 +1,6 @@
 # LetsGal Studio 自定义手机扩展
 > 扩展 ID：`ink.zenly.ext-7a9373` ｜ 程序 UI：`phone`
-> Manifest 版本：`0.1.2` ｜ 要求 SDK：`>=1.9.0`
+> Manifest 版本：`0.1.3` ｜ 要求 SDK：`>=1.9.0`
 
 这是 LetsGal Studio 游戏运行时的可挂载手机扩展：提供四列应用桌面、受限动作目录、shared 玩家个性化，以及可由剧情 Fragment 逐条推进并可跨多个方法块接续的聊天消息。
 
