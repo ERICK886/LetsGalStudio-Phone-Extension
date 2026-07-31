@@ -4,6 +4,7 @@ import {
   defineSave,
   extension,
   method,
+  normalizeShortcut,
   settings,
   type ExtensionContext,
   type ExtensionProps,
@@ -19,6 +20,7 @@ import {
 import { PhoneUI } from "../ui/phone-ui";
 
 const OPEN_PHONE_ACTION = "ink.zenly.ext-7a9373.open-phone";
+const DEFAULT_OPEN_PHONE_SHORTCUT = "ArrowUp";
 /** 宿主未完成 show 时的保险释放时间，避免一次异常显示永久阻塞后续打开动作。 */
 const NORMAL_PHONE_OPEN_TIMEOUT_MS = 1_200;
 const PHONE_POPUP_POSITIONS = [
@@ -77,6 +79,17 @@ function debugSnapshot(
 function phoneDebug(event: string, details?: unknown): void {
   if (details === undefined) console.log(PHONE_DEBUG_PREFIX, event);
   else console.log(PHONE_DEBUG_PREFIX, event, debugSnapshot(details));
+}
+
+/** 将作者设置或旧项目中的快捷键安全归一化；无效值回退为默认上箭头。 */
+function normalizeOpenPhoneShortcut(value: unknown): string {
+  if (typeof value !== "string") return DEFAULT_OPEN_PHONE_SHORTCUT;
+  try {
+    return normalizeShortcut(value);
+  } catch (error) {
+    console.warn("[phone] 打开手机快捷键无效，已回退 ArrowUp", value, error);
+    return DEFAULT_OPEN_PHONE_SHORTCUT;
+  }
 }
 
 type PhoneSaveMap = {
@@ -1260,6 +1273,12 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
 
   static settings = settings((s) => ({
     phoneTitle: s.string("手机标题").default("手机"),
+    openPhoneShortcut: s
+      .shortcut("打开手机快捷键")
+      .default(DEFAULT_OPEN_PHONE_SHORTCUT)
+      .describe(
+        "普通手机未显示时用于打开手机的默认按键，例如 ArrowUp、KeyP 或 Ctrl+KeyP。消息手机显示时不会触发打开。",
+      ),
     phoneStylePreset: s
       .enum("手机样式预设", ["apple", "android"] as const)
       .default("apple")
@@ -1494,15 +1513,31 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
   });
 
   /**
-   * 在扩展注册时声明全局“打开手机”语义动作，并绑定默认 ArrowUp。
+   * 在扩展注册时声明全局“打开手机”语义动作。作者设置提供默认快捷键（默认 ArrowUp），
+   * Studio 的输入按键映射仍可在此基础上重映射。设置变更时重新声明默认键，不影响已注册的动作处理器。
    * 门控诊断会记录未挂载、正在打开、剧情消息占用和 UI 已显示等静默忽略原因；宿主 show 未 settle 时，
    * 保险计时器会释放 `opening` 锁，避免一次异常显示永久阻塞之后的打开动作。
    */
   static onRegister(ctx: ExtensionContext): void {
-    ctx.input.registerAction({
-      id: OPEN_PHONE_ACTION,
-      label: "打开手机",
-      defaultKeys: ["ArrowUp"],
+    let registeredShortcut = normalizeOpenPhoneShortcut(
+      ctx.settings.get<unknown>("openPhoneShortcut"),
+    );
+    const registerOpenPhoneAction = (shortcut: string) => {
+      ctx.input.registerAction({
+        id: OPEN_PHONE_ACTION,
+        label: "打开手机",
+        defaultKeys: [shortcut],
+      });
+    };
+    registerOpenPhoneAction(registeredShortcut);
+
+    // `registerAction` 会覆盖同 ID 的默认键但保留已订阅的语义动作；借此让作者在设置面板改键后立即生效。
+    ctx.settings.subscribe<unknown>("openPhoneShortcut", (value) => {
+      const nextShortcut = normalizeOpenPhoneShortcut(value);
+      if (nextShortcut === registeredShortcut) return;
+      registeredShortcut = nextShortcut;
+      registerOpenPhoneAction(nextShortcut);
+      phoneDebug("open-shortcut-updated", { shortcut: nextShortcut });
     });
 
     ctx.input.onAction(OPEN_PHONE_ACTION, () => {
