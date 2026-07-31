@@ -344,6 +344,11 @@ pnpm run build
 ```
 然后重载扩展或重启 Preview。当前 `show-message` 表单应包含 `presetId`、`message`、`direction`、`status`、`blockedHint`、`storyBackground` 及其第 2～8 条对应字段。
 
+### 实验性：编辑器内联方法卡片
+扩展会尝试将剧情编辑器中的“调用扩展方法”块显示为紫色摘要卡片，效果与内置块的紧凑样式接近。当前会识别“挂载手机”“卸载手机”“添加或删除手机 APP”“禁用或解禁手机 APP”和“显示手机消息”；卡片会展示 APP 操作、APP ID、首条消息、消息数量、接续/关闭方式及自定义背景等摘要。
+
+这不是 SDK 的正式自定义 block-renderer 接口，而是受限的 Studio DOM/Fiber 兼容层：它不修改 Fragment 数据、不执行参数写回，也不阻止原生编辑器事件。点击卡片后仍在 Inspector 中编辑全部参数；参数改变并触发 Studio 重渲染后，摘要会自动刷新。若 Studio 更新导致 DOM 结构不兼容，扩展会静默保留原生“参数在 Inspector 编辑”块，不影响剧情运行或玩家端手机 UI。修改后需重新构建并重载扩展。
+
 ## 11. 调试、验收与常见问题
 ### 发布前验收清单
 - [ ] 游戏流程中已在适当位置调用 `mount-phone`。
