@@ -125,12 +125,12 @@ mount-phone
        └─ 不再允许使用时卸载手机（unmount-phone）
 ```
 
-| 方法 | 固定 ID | 正常播放 | 即时执行 / 快进 |
+| 方法 | 固定 ID | 正常播放 | 即时执行 / 快进 / 跳过 |
 | --- | --- | --- | --- |
 | 挂载手机 | `mount-phone` | 启用手机，不自动显示 UI。 | 同样启用。 |
 | 卸载手机 | `unmount-phone` | 关闭普通/消息手机、结束等待并禁用功能。 | 同样卸载。 |
-| 添加或删除手机 APP | `manage-installed-apps` | 修改已配置 APP 的安装状态。 | 同样修改 shared 状态。 |
-| 禁用或解禁手机 APP | `manage-app-enabled-state` | 修改已配置 APP 的可用状态。 | 同样修改 shared 状态。 |
+| 添加或删除手机 APP | `manage-installed-apps` | 修改 shared 安装状态；开启通知时显示 Toast。 | 修改状态，但不显示 Toast。 |
+| 禁用或解禁手机 APP | `manage-app-enabled-state` | 修改 shared 可用状态；开启通知时显示 Toast。 | 修改状态，但不显示 Toast。 |
 | 显示手机消息 | `show-message` | 显示消息并等待玩家逐条确认。 | 不显示、不等待。 |
 
 `unmount-phone` 不会删除背景、图标、颜色、名称、动作绑定或 APP 剧情状态；再次 `mount-phone` 后，已有 shared 数据仍会生效。
@@ -187,7 +187,7 @@ CSS 背景只能是单个背景值：不能包含 `url()`、`;`、`{}` 或 `@` �
 | 应用图标 | 作者默认图标；玩家有权限时可覆盖。 |
 | 默认排序 | `0`～`9999` 的整数；数字越小越靠前，相同数值保持设置表格行顺序。 |
 | 游戏开始默认预装 | 新游戏默认是否安装此 APP。关闭后，需剧情“添加到手机”才会出现。 |
-| 作者默认可用 | 已安装时默认是否显示。关闭后，需剧情“解禁 APP”才会出现。 |
+| 作者默认可用 | 已安装 APP 的初始交互状态。关闭后仍显示暗化图标，需剧情“解禁 APP”才能恢复启动。 |
 | 锁定玩家编辑 | 开启后，玩家不能修改该 APP 的名称、图标或动作绑定。 |
 | 默认动作 ID | 必须引用一个已配置的动作 ID。无效引用会回退到首个可用动作。 |
 
@@ -196,28 +196,48 @@ CSS 背景只能是单个背景值：不能包含 `url()`、`;`、`{}` 或 `@` �
 ### 5.4 内置目录回退
 没有有效的作者 APP 目录时，扩展会回退到内置目录：存档、读档、设置、历史、鉴赏和快捷工具。作者使用同 ID 创建动作时可覆盖相应内置动作。该回退仅为保证手机可用，不应代替正式项目配置。
 
-## 6. 剧情管理 APP 的安装与可用性
-APP 是否显示需要同时满足：**已安装**且**可用**。作者设置给出新游戏默认值；剧情方法会在 shared 中记录覆盖值。
+## 6. 剧情管理 APP 与 Toast 通知
+APP 的安装状态与可用状态彼此独立：**删除**会把 APP 从桌面移除；**禁用**会保留已安装图标，但图标和名称变暗、不可启动。作者设置提供新游戏默认值，剧情方法把覆盖值写入 `appAvailability` shared 存档。
 
 | 状态 | 作者设置字段 | 剧情方法 | 效果 |
 | --- | --- | --- | --- |
-| 已安装 | 游戏开始默认预装 | 添加或删除手机 APP | 决定 APP 是否属于玩家手机。 |
-| 可用 | 作者默认可用 | 禁用或解禁手机 APP | 决定已安装 APP 是否显示。 |
+| 已安装 | 游戏开始默认预装 | 添加或删除手机 APP | 决定 APP 是否属于玩家手机；删除后不显示。 |
+| 可用 | 作者默认可用 | 禁用或解禁手机 APP | 禁用后仍显示暗化图标；解禁后恢复亮度和交互。 |
 
-### 使用“添加或删除手机 APP”
+### 6.1 添加或删除手机 APP
 1. 在 Fragment 中选择 **调用扩展方法 → 添加或删除手机 APP**。
 2. `操作`选择“添加到手机”或“从手机删除”。
-3. 在第 1～8 个 APP ID 字段中填入“手机应用目录”的应用 ID。
-4. 运行后，只会修改目录中真实存在的 APP；未知 ID 会被忽略并写入调试日志。
+3. 在第 1～8 个 APP ID 中填写“手机应用目录”的应用 ID。
+4. 运行到该 Block 时才修改状态；未知 ID 会被忽略并写入调试日志。
 
-删除 APP 不会清除玩家保存的名称、图标或动作绑定；之后重新安装时这些偏好仍可恢复。
+删除 APP 不会清除玩家保存的名称、图标或动作绑定；之后重新安装时这些偏好仍可恢复。若不希望 APP 在剧情安装前出现，请关闭该目录项的“游戏开始默认预装”，并使用新存档测试或先执行一次删除。
 
-### 使用“禁用或解禁手机 APP”
+### 6.2 禁用或解禁手机 APP
 1. 在 Fragment 中选择 **调用扩展方法 → 禁用或解禁手机 APP**。
 2. `操作`选择“禁用 APP”或“解禁 APP”。
 3. 填写第 1～8 个 APP ID。
 
-禁用不等于删除：禁用后 APP 已安装但不显示；解禁不会重新安装此前已删除的 APP。两个 APP 管理方法可在手机未挂载时执行，玩家下次打开手机即可看到结果。
+禁用不等于删除：禁用后 APP 仍保留在桌面，但图标和名称变暗，点击不会启动目标；解禁后恢复正常。解禁不会重新安装此前已删除的 APP。两个 APP 管理方法可在手机未挂载时执行，玩家下次打开手机即可看到结果。
+
+### 6.3 可选 Toast 通知
+两个 APP 管理方法都可在 Inspector 开启 **显示 Toast 通知**。Toast 由独立程序 UI `phone-toast` 渲染，不依赖普通手机是否打开，不拦截鼠标，也不会阻塞剧情。
+
+| Inspector 字段 | 默认值 | 说明 |
+| --- | --- | --- |
+| 显示 Toast 通知 | 关闭 | 开启后，正常剧情运行到此 Block 时显示操作结果。 |
+| Toast 位置 | 中上 | 左上、中上、右上、左中、中部、右中、左下、中下、右下。 |
+| Toast 入场动画 | 滑入 `slide-in` | 淡入、缩入、滑入、弹入。 |
+| Toast 退场动画 | 滑出 `slide-out` | 淡出、缩出、滑出、弹出。 |
+| 后续 Toast 显示于 | 下方 | 同一位置连续通知时，新 Toast 插入前一条的上方或下方。 |
+
+Toast 文案使用“手机应用目录”中的**应用名称**，例如 `APP「设置界面」已添加到手机`；仅在目录名称无法解析时回退到应用 ID。一次操作多个 APP 时显示数量摘要。每条 Toast 独立计时，显示约 2.6 秒后先播放退场动画，再从队列移除。
+
+为避免快进时大量通知遮挡界面：
+- 正常 `run`：按 Inspector 设置显示 Toast。
+- `runImmediately` / 快进：仍更新 APP 状态，但不显示 Toast。
+- `skip` / 跳过：仍更新 APP 状态，但不显示 Toast。
+
+编辑器内联卡会摘要显示 APP 操作、数量，以及 `Toast：显示/不显示`、位置、入场、退场和后续堆叠方向。所有参数仍以 Inspector 中保存的值为准。
 
 ## 7. 玩家个性化与 shared 存档
 ### 作者控制开关
@@ -344,43 +364,67 @@ APP 是否显示需要同时满足：**已安装**且**可用**。作者设置�
 ```powershell
 pnpm run build
 ```
-然后重载扩展或重启 Preview。当前 `show-message` 表单应包含 `presetId`、`message`、`direction`、`status`、`blockedHint`、`storyBackground` 及其第 2～8 条对应字段。
+然后重载扩展或重启 Preview。当前 APP 管理方法表单应包含 Toast 开关、九宫格位置、入场动画、退场动画和上下堆叠方向；`show-message` 表单应包含 `presetId`、`message`、`direction`、`status`、`blockedHint`、`storyBackground` 及其第 2～8 条对应字段。
 
 ### 实验性：编辑器内联方法卡片
-扩展会尝试将剧情编辑器中的“调用扩展方法”块显示为紫色摘要卡片，效果与内置块的紧凑样式接近。当前会识别“挂载手机”“卸载手机”“添加或删除手机 APP”“禁用或解禁手机 APP”和“显示手机消息”；卡片会展示 APP 操作、APP ID、首条消息、消息数量、接续/关闭方式及自定义背景等摘要。
+扩展会尝试将剧情编辑器中的“调用扩展方法”块显示为摘要卡片。当前会识别“挂载手机”“卸载手机”“添加或删除手机 APP”“禁用或解禁手机 APP”和“显示手机消息”。APP 管理卡会显示操作、APP ID、数量以及 Toast 的开关、位置、入场动画、退场动画和后续堆叠方向；消息卡会显示首条消息、消息数量、接续/关闭方式及自定义背景等摘要。
 
-这不是 SDK 的正式自定义 block-renderer 接口，而是受限的 Studio DOM/Fiber 兼容层：它不修改 Fragment 数据、不执行参数写回，也不阻止原生编辑器事件。点击卡片后仍在 Inspector 中编辑全部参数；参数改变并触发 Studio 重渲染后，摘要会自动刷新。若 Studio 更新导致 DOM 结构不兼容，扩展会静默保留原生“参数在 Inspector 编辑”块，不影响剧情运行或玩家端手机 UI。修改后需重新构建并重载扩展。
+这不是 SDK 的正式自定义 block-renderer 接口，而是受限的 Studio DOM/Fiber 兼容层：它不修改 Fragment 数据、不执行参数写回，也不阻止原生编辑器事件。点击卡片后仍在 Inspector 中编辑全部参数；卡片按当前 Block ID 读取参数，并在 Inspector 输入或选择变化后刷新。若 Studio 更新导致 DOM 结构不兼容，扩展会静默保留原生“参数在 Inspector 编辑”块，不影响剧情运行或玩家端手机/Toast UI。修改后需重新构建并重载扩展。
+
+## 11. 调试、验收与常见问题
+### 发布前验收清单
+- [ ] 游戏流程中已在适当位置调用 `mount-phone`。
+- [ ] 未挂载时快捷键不打开手机；挂载后可以正常打开和关闭。
+- [ ] 方向键、鼠标、`Enter` / `Space` 都能选择或启动同一个 APP。
+- [ ] APP 的默认动作 ID 都指向有效动作。
+- [ ] 安装/删除、禁用/解禁后的状态正确：删除会移除 APP，禁用只会暗化并阻止启动。
+- [ ] 开启 Toast 的管理块能显示应用名称、正确位置、上下堆叠及所选入场/退场动画。
+- [ ] 快进或跳过 APP 管理块时状态仍更新，但不会产生 Toast。
+- [ ] 玩家个性化开关、锁定 APP 和图片大小限制符合预期。
+- [ ] 消息可逐条推进；多组接续、背景替换与留空回退符合预期。
+- [ ] 程序 Preview 能显示默认桌面；剧本 Preview 能执行完整剧情流程。
 
 ### 常见问题
 | 现象 | 优先检查项 |
 | --- | --- |
-| 打开手机快捷键没有反应 | 当前剧情是否已执行 `mount-phone`；扩展设置的“打开手机快捷键”格式是否有效；Studio 输入按键中是否存在更高优先级映射；是否已有普通/消息手机显示。 |
-| APP 没有出现 | 检查“游戏开始默认预装”“作者默认可用”，以及是否被剧情删除或禁用。 |
+| 打开手机快捷键没有反应 | 当前剧情是否已执行 `mount-phone`；快捷键格式是否有效；Studio 是否存在更高优先级映射；是否已有普通/消息手机显示。 |
+| APP 没有出现 | 检查是否默认预装、是否被剧情删除，以及默认动作 ID 是否有效。禁用不会移除图标，只会暗化。 |
+| APP 图标变暗且不能点击 | 该 APP 已被禁用；运行“解禁 APP”恢复。 |
 | APP 点击后无目标 | 检查“默认动作 ID”是否和动作 ID 完全一致，动作引用格式是否正确。 |
+| Toast 没有显示 | Inspector 是否开启“显示 Toast 通知”；是否为正常剧情 `run`；快进、`runImmediately` 和 `skip` 会主动抑制 Toast；是否已重载包含 `phone-toast` 的新构建。 |
+| Toast 仍显示 APP ID | 检查“手机应用目录”中该 ID 对应的应用名称；无法解析名称时才回退到 ID。 |
+| Toast 动画或 Block 摘要没有更新 | 执行 `pnpm run build`，重载扩展并重启 Preview；旧值 `fade/scale/slide/bounce` 会兼容映射到新入退场值。 |
 | `show-message` 没有界面 | 已挂载；第 1 条预设 ID 存在；内容非空；正在剧本 Preview 运行。 |
 | 接续组没有附加 | 前一组必须为“不关闭”，本组必须开启 `appendToExisting`，组间不能卸载手机。 |
-| 最后一条后剧情停住 | 这是正常确认步骤；再点击消息区域或按 `Enter`/`Space`。 |
-| 聊天背景没有恢复 | 当前接续块需要将 `storyBackground` 留空；若 Studio 表单仍旧，先构建并重载扩展。 |
+| 最后一条后剧情停住 | 这是正常确认步骤；再点击消息区域或按 `Enter` / `Space`。 |
 | 头像只显示首字 | 检查角色、头像来源、素材 ID、素材 URI；查看 `[phone-avatar] image-load-failed`。 |
-| 程序 Preview 黑屏、字段陈旧 | 执行构建并重载扩展/重启 Preview，清除 UI 或 schema 热更新缓存。 |
+| 程序 Preview 黑屏、字段陈旧 | 重新构建并重载扩展/重启 Preview，清除 UI 或 schema 热更新缓存。 |
 
 ### 日志说明
 控制台会输出 `[phone-debug]` 与 `[phone-avatar]`：
 - 会话问题请保留同一时间段的 `phone-mounted`、`runtime-resolved`、`sequence-request`、`sequence-created`、`ui-show-start`、`listener-subscribe`、`sequence-publish`、`advance-received`、`sequence-error`、`sequence-finally`，并保留对应的 `scopeId`。
-- APP 状态问题请保留 `[phone-debug] app-availability-updated`。
+- APP 状态问题请保留 `app-management-request` 与 `app-availability-updated`；重点检查 `operation`、`appliedIds` 和 `ignoredIds`。
+- Toast UI 挂载失败时会记录 `app-notification-show-failed`。
 - 头像问题请保留 `image-load-failed` 的 `rawUri`、`resolvedUrl` 和图片尺寸。
 
 ## 12. 源码结构
 ```text
 src/
-├─ index.tsx                                      # 扩展入口
-└─ phone/
-   ├─ core/catalog.ts                             # 目录、排序、APP 状态、目标校验与启动
-   ├─ extension/phone-extension.tsx              # Extension、设置、保存、剧情方法与消息运行时
-   ├─ styles/phone.css                            # 手机外壳、消息与响应式样式
-   └─ ui/
-      ├─ phone-ui.tsx                            # 普通/消息 UI 状态、输入与个性化编辑器
-      ├─ asset-utils.ts                           # 图片读取与 Studio 素材 URI 解析
-      └─ components/story-message-item.tsx       # 头像回退与单条消息渲染
+├─ index.tsx                                      # 扩展入口，同时导出 PhoneExtension 与 ToastExtension
+├─ studio/
+│  └─ phone-inline-cards.ts                       # Studio 方法 Block 摘要兼容层
+├─ phone/
+│  ├─ core/catalog.ts                             # 目录、排序、APP 状态、目标校验与启动
+│  ├─ extension/phone-extension.tsx              # 手机设置、存档、剧情方法、消息与 Toast 入队
+│  ├─ styles/phone.css                            # 手机外壳、APP、消息与响应式样式
+│  └─ ui/
+│     ├─ phone-ui.tsx                            # 普通/消息 UI、输入与个性化编辑器
+│     ├─ asset-utils.ts                           # 图片读取与 Studio 素材 URI 解析
+│     └─ components/story-message-item.tsx       # 头像回退与单条消息渲染
+└─ toast/
+   ├─ core/toast-runtime.ts                       # 独立 Toast 队列、计时、进出场状态与订阅
+   ├─ extension/toast-extension.tsx              # 独立 phone-toast 程序 UI 模块
+   ├─ styles/toast.css                            # 九宫格堆叠及入场/退场动画
+   └─ ui/toast-ui.tsx                             # Toast 队列 React UI 与公开类型
 sdk/                                               # 本项目使用的 SDK 类型定义；不要直接修改
 ```
