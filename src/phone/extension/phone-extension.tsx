@@ -202,63 +202,156 @@ interface PendingStorySequence {
   readonly resolve: () => void;
 }
 
-let activeStoryMessages: readonly PhoneStoryMessage[] = [];
-let activeStoryPopupPosition: PhonePopupPosition = "bottom-right";
-let storyMessageSessionVisible = false;
-let pendingStorySequence: PendingStorySequence | undefined;
-const storyMessageListeners = new Set<PhoneStoryMessageListener>();
-
-/**
- * 手机功能的运行时挂载状态。它故意不写入 saveSchema：卸载只禁用能力，不删除玩家偏好或作者配置。
- * 每次挂载/卸载都推进 epoch，使已经开始的异步 show/message 请求失效。
- */
-let phoneMounted = false;
-let phoneMountEpoch = 0;
-
-function isCurrentPhoneMount(epoch: number): boolean {
-  return phoneMounted && epoch === phoneMountEpoch;
+interface PhoneRuntime {
+  readonly debugScopeId: number;
+  activeStoryMessages: readonly PhoneStoryMessage[];
+  activeStoryPopupPosition: PhonePopupPosition;
+  storyMessageSessionVisible: boolean;
+  pendingStorySequence: PendingStorySequence | undefined;
+  readonly storyMessageListeners: Set<PhoneStoryMessageListener>;
+  phoneMounted: boolean;
+  phoneMountEpoch: number;
+  opening: boolean;
 }
 
-function publishStoryMessages(): void {
-  const awaitingAdvance = pendingStorySequence !== undefined;
-  phoneDebug("sequence-publish", {
-    sequenceId: pendingStorySequence?.debugId ?? null,
-    awaitingAdvance,
-    messageCount: activeStoryMessages.length,
-    nextIndex: pendingStorySequence?.nextIndex ?? null,
-    totalCount: pendingStorySequence?.messages.length ?? null,
-    listenerCount: storyMessageListeners.size,
+/**
+ * Studio 的多个 Preview 可复用同一扩展 bundle。运行时状态必须按宿主上下文分区，
+ * 不能保存在模块级变量中，否则一个 Preview 的 pending Promise 会阻塞另一个 Preview。
+ */
+const phoneRuntimes = new WeakMap<object, PhoneRuntime>();
+let nextPhoneRuntimeDebugScopeId = 1;
+
+type RuntimeKeySource = "flow.signal" | "host" | "ui" | "ui.show" | "ui.hide" | "ui.isVisible" | "context";
+interface RuntimeKeyCandidate {
+  readonly source: RuntimeKeySource;
+  readonly key: object;
+}
+
+function isRuntimeKey(value: unknown): value is object {
+  return value !== null && (typeof value === "object" || typeof value === "function");
+}
+
+/**
+ * Method、注册回调和 React render 会获得不同的 Context/host 包装对象。
+ * `ui` 及其回调由具体 Preview 的 UI 容器实现，作为主锚点；同时把所有可用身份映射到同一 runtime，
+ * 使后续任一路径只要共享其中一个宿主对象即可命中。settings 等项目级共享 API 不可作 key，以免串 Preview。
+ */
+function collectPhoneRuntimeKeys(ctx: ExtensionContext): readonly RuntimeKeyCandidate[] {
+  const candidates: RuntimeKeyCandidate[] = [];
+  const add = (source: RuntimeKeySource, value: unknown) => {
+    if (!isRuntimeKey(value) || candidates.some((candidate) => candidate.key === value)) return;
+    candidates.push({ source, key: value });
+  };
+
+  // 运行周期的 AbortSignal 在同一次 Preview 剧本执行中保持稳定，softReset/destroy 时才会更换。
+  add("flow.signal", ctx.flow.signal);
+  try {
+    add("host", ctx.getHost());
+  } catch (error) {
+    console.warn("[phone] 无法读取运行时宿主", error);
+  }
+  add("ui", ctx.ui);
+  add("ui.show", ctx.ui.show);
+  add("ui.hide", ctx.ui.hide);
+  add("ui.isVisible", ctx.ui.isVisible);
+  add("context", ctx);
+  return candidates;
+}
+
+function bindPhoneRuntimeKeys(
+  runtime: PhoneRuntime,
+  candidates: readonly RuntimeKeyCandidate[],
+): void {
+  for (const candidate of candidates) phoneRuntimes.set(candidate.key, runtime);
+}
+
+function getPhoneRuntime(ctx: ExtensionContext): PhoneRuntime {
+  const candidates = collectPhoneRuntimeKeys(ctx);
+  for (const candidate of candidates) {
+    const existing = phoneRuntimes.get(candidate.key);
+    if (!existing) continue;
+    bindPhoneRuntimeKeys(existing, candidates);
+    phoneDebug("runtime-resolved", {
+      scopeId: existing.debugScopeId,
+      matchedBy: candidate.source,
+    });
+    return existing;
+  }
+
+  const runtime: PhoneRuntime = {
+    debugScopeId: nextPhoneRuntimeDebugScopeId++,
+    activeStoryMessages: [],
+    activeStoryPopupPosition: "bottom-right",
+    storyMessageSessionVisible: false,
+    pendingStorySequence: undefined,
+    storyMessageListeners: new Set<PhoneStoryMessageListener>(),
+    phoneMounted: false,
+    phoneMountEpoch: 0,
+    opening: false,
+  };
+  bindPhoneRuntimeKeys(runtime, candidates);
+  phoneDebug("runtime-created", {
+    scopeId: runtime.debugScopeId,
+    keySources: candidates.map((candidate) => candidate.source),
   });
-  for (const listener of storyMessageListeners) {
-    listener(activeStoryMessages, awaitingAdvance, activeStoryPopupPosition);
+  return runtime;
+}
+
+function runtimeDebug(runtime: PhoneRuntime, event: string, details?: unknown): void {
+  if (details === undefined) {
+    phoneDebug(event, { scopeId: runtime.debugScopeId });
+    return;
+  }
+  phoneDebug(event, isRecord(details)
+    ? { scopeId: runtime.debugScopeId, ...details }
+    : { scopeId: runtime.debugScopeId, details });
+}
+
+function isCurrentPhoneMount(runtime: PhoneRuntime, epoch: number): boolean {
+  return runtime.phoneMounted && epoch === runtime.phoneMountEpoch;
+}
+
+function publishStoryMessages(runtime: PhoneRuntime): void {
+  const awaitingAdvance = runtime.pendingStorySequence !== undefined;
+  runtimeDebug(runtime, "sequence-publish", {
+    sequenceId: runtime.pendingStorySequence?.debugId ?? null,
+    awaitingAdvance,
+    messageCount: runtime.activeStoryMessages.length,
+    nextIndex: runtime.pendingStorySequence?.nextIndex ?? null,
+    totalCount: runtime.pendingStorySequence?.messages.length ?? null,
+    listenerCount: runtime.storyMessageListeners.size,
+  });
+  for (const listener of runtime.storyMessageListeners) {
+    listener(runtime.activeStoryMessages, awaitingAdvance, runtime.activeStoryPopupPosition);
   }
 }
 
-/** 启用运行时手机能力；不自动打开 UI，也不改动任何存档数据。 */
-function activatePhoneRuntime(): void {
-  if (phoneMounted) return;
-  phoneMounted = true;
-  phoneMountEpoch += 1;
-  phoneDebug("phone-mounted", { epoch: phoneMountEpoch });
+/** 启用一个 Preview 的手机能力；不自动打开 UI，也不改动任何存档数据。 */
+function activatePhoneRuntime(runtime: PhoneRuntime): void {
+  if (runtime.phoneMounted) return;
+  runtime.phoneMounted = true;
+  runtime.phoneMountEpoch += 1;
+  runtimeDebug(runtime, "phone-mounted", { epoch: runtime.phoneMountEpoch });
 }
 
-/**
- * 立即让所有手机入口失效，并清理临时消息会话。
- * pending Promise 必须被 resolve，避免已调用 show-message 的 Fragment 永久等待；preferences 等 SaveAPI 数据不会触碰。
- */
-async function deactivatePhoneRuntime(ctx: ExtensionContext): Promise<void> {
-  phoneMounted = false;
-  phoneMountEpoch += 1;
+/** 立即让当前 Preview 的手机入口失效，并清理其临时消息会话。 */
+async function deactivatePhoneRuntime(ctx: ExtensionContext, runtime: PhoneRuntime): Promise<void> {
+  runtime.phoneMounted = false;
+  runtime.phoneMountEpoch += 1;
+  runtime.opening = false;
 
-  const pending = pendingStorySequence;
-  pendingStorySequence = undefined;
-  storyMessageSessionVisible = false;
-  activeStoryMessages = [];
-  activeStoryPopupPosition = "bottom-right";
-  publishStoryMessages();
+  const pending = runtime.pendingStorySequence;
+  runtime.pendingStorySequence = undefined;
+  runtime.storyMessageSessionVisible = false;
+  runtime.activeStoryMessages = [];
+  runtime.activeStoryPopupPosition = "bottom-right";
+  publishStoryMessages(runtime);
   pending?.resolve();
 
-  phoneDebug("phone-unmounted", { epoch: phoneMountEpoch, hadPendingSequence: Boolean(pending) });
+  runtimeDebug(runtime, "phone-unmounted", {
+    epoch: runtime.phoneMountEpoch,
+    hadPendingSequence: Boolean(pending),
+  });
   if (!ctx.ui.isVisible("phone")) return;
   try {
     await ctx.ui.hide("phone");
@@ -267,39 +360,43 @@ async function deactivatePhoneRuntime(ctx: ExtensionContext): Promise<void> {
   }
 }
 
-function subscribeStoryMessages(listener: PhoneStoryMessageListener): () => void {
-  storyMessageListeners.add(listener);
-  phoneDebug("listener-subscribe", { listenerCount: storyMessageListeners.size });
-  listener(activeStoryMessages, pendingStorySequence !== undefined, activeStoryPopupPosition);
+function subscribeStoryMessages(
+  runtime: PhoneRuntime,
+  listener: PhoneStoryMessageListener,
+): () => void {
+  runtime.storyMessageListeners.add(listener);
+  runtimeDebug(runtime, "listener-subscribe", { listenerCount: runtime.storyMessageListeners.size });
+  listener(
+    runtime.activeStoryMessages,
+    runtime.pendingStorySequence !== undefined,
+    runtime.activeStoryPopupPosition,
+  );
   return () => {
-    storyMessageListeners.delete(listener);
-    phoneDebug("listener-unsubscribe", { listenerCount: storyMessageListeners.size });
+    runtime.storyMessageListeners.delete(listener);
+    runtimeDebug(runtime, "listener-unsubscribe", { listenerCount: runtime.storyMessageListeners.size });
   };
 }
 
 const STORY_UI_SUBSCRIPTION_TIMEOUT_MS = 320;
 
-/**
- * 等待 React 手机 UI 建立消息订阅。
- * `ctx.ui.show()` 的完成只代表宿主已接受显示请求，不保证 React effect 已执行；首次剧情消息必须等待该订阅，
- * 才能避免场景/黑场转场期间出现“方法正在等待、手机却没有显示”的孤立会话。
- */
-async function waitForStoryMessageSubscriber(timeoutMs = STORY_UI_SUBSCRIPTION_TIMEOUT_MS): Promise<boolean> {
+/** 等待当前 Preview 的 React 手机 UI 建立消息订阅。 */
+async function waitForStoryMessageSubscriber(
+  runtime: PhoneRuntime,
+  timeoutMs = STORY_UI_SUBSCRIPTION_TIMEOUT_MS,
+): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
-  while (storyMessageListeners.size === 0 && Date.now() < deadline) {
+  while (runtime.storyMessageListeners.size === 0 && Date.now() < deadline) {
     await new Promise<void>((resolve) => {
       globalThis.setTimeout(resolve, 16);
     });
   }
-  return storyMessageListeners.size > 0;
+  return runtime.storyMessageListeners.size > 0;
 }
 
-/**
- * 以单次受控重试挂载消息手机。
- * 初次 show 未产生 React 订阅时，先完整 hide 已注册但不可用的容器，再重新 show；不会直接重复注册同一容器。
- */
+/** 以单次受控重试挂载当前 Preview 的消息手机。 */
 async function showStoryMessageUi(
   ctx: ExtensionContext,
+  runtime: PhoneRuntime,
   storyMessages: readonly PhoneStoryMessage[],
   storyPopupPosition: PhonePopupPosition,
   sequenceId: number,
@@ -314,59 +411,54 @@ async function showStoryMessageUi(
   });
 
   await show();
-  if (await waitForStoryMessageSubscriber()) return;
+  if (await waitForStoryMessageSubscriber(runtime)) return;
 
-  phoneDebug("ui-show-no-subscriber", { sequenceId, attempt: 1 });
+  runtimeDebug(runtime, "ui-show-no-subscriber", { sequenceId, attempt: 1 });
   await ctx.ui.hide("phone");
-  // 等待宿主卸载旧容器，防止下一次 show 命中“容器已经被注册”。
   await new Promise<void>((resolve) => {
     globalThis.setTimeout(resolve, 0);
   });
 
   await show();
-  if (await waitForStoryMessageSubscriber()) return;
+  if (await waitForStoryMessageSubscriber(runtime)) return;
 
-  phoneDebug("ui-show-no-subscriber", { sequenceId, attempt: 2 });
+  runtimeDebug(runtime, "ui-show-no-subscriber", { sequenceId, attempt: 2 });
   throw new Error("手机剧情消息界面未能完成挂载");
 }
 
-function finishStoryMessageSequence(reason = "unspecified"): boolean {
-  const sequence = pendingStorySequence;
+function finishStoryMessageSequence(runtime: PhoneRuntime, reason = "unspecified"): boolean {
+  const sequence = runtime.pendingStorySequence;
   if (!sequence) {
-    phoneDebug("sequence-finish-ignored", { reason, pending: false });
+    runtimeDebug(runtime, "sequence-finish-ignored", { reason, pending: false });
     return false;
   }
 
-  phoneDebug("sequence-finish", {
+  runtimeDebug(runtime, "sequence-finish", {
     sequenceId: sequence.debugId,
     reason,
     nextIndex: sequence.nextIndex,
     totalCount: sequence.messages.length,
-    visibleMessageCount: activeStoryMessages.length,
+    visibleMessageCount: runtime.activeStoryMessages.length,
   });
-  pendingStorySequence = undefined;
-  publishStoryMessages();
+  runtime.pendingStorySequence = undefined;
+  publishStoryMessages(runtime);
   sequence.resolve();
   return true;
 }
 
-/**
- * 推进当前消息会话一次。
- * 有下一条时追加并返回 `appended`；非关闭组的末条会 resolve 会话并返回 `finished`；关闭组的末条返回 `close`，
- * 由 UI 播放退出动画后调用 closePhone 完成 Promise。无活动会话时返回 false，调用方必须安全忽略。
- */
-function advanceStoryMessage(): PhoneStoryAdvanceResult {
-  const sequence = pendingStorySequence;
+/** 推进当前 Preview 中的消息会话一次。 */
+function advanceStoryMessage(runtime: PhoneRuntime): PhoneStoryAdvanceResult {
+  const sequence = runtime.pendingStorySequence;
   if (!sequence) {
-    phoneDebug("advance-ignored", { pending: false });
+    runtimeDebug(runtime, "advance-ignored", { pending: false });
     return false;
   }
 
-  phoneDebug("advance-received", {
+  runtimeDebug(runtime, "advance-received", {
     sequenceId: sequence.debugId,
     nextIndex: sequence.nextIndex,
     totalCount: sequence.messages.length,
-    visibleMessageCount: activeStoryMessages.length,
+    visibleMessageCount: runtime.activeStoryMessages.length,
     closeAfterMessages: sequence.closeAfterMessages,
   });
 
@@ -374,137 +466,123 @@ function advanceStoryMessage(): PhoneStoryAdvanceResult {
   if (nextMessage) {
     const appendedIndex = sequence.nextIndex;
     sequence.nextIndex += 1;
-    activeStoryMessages = [...activeStoryMessages, nextMessage];
-    phoneDebug("advance-appended", {
+    runtime.activeStoryMessages = [...runtime.activeStoryMessages, nextMessage];
+    runtimeDebug(runtime, "advance-appended", {
       sequenceId: sequence.debugId,
       appendedIndex,
       nextIndex: sequence.nextIndex,
       message: nextMessage,
-      visibleMessageCount: activeStoryMessages.length,
+      visibleMessageCount: runtime.activeStoryMessages.length,
     });
-    publishStoryMessages();
+    publishStoryMessages(runtime);
     return "appended";
   }
 
   if (sequence.closeAfterMessages) {
-    phoneDebug("advance-close-requested", {
+    runtimeDebug(runtime, "advance-close-requested", {
       sequenceId: sequence.debugId,
       nextIndex: sequence.nextIndex,
       totalCount: sequence.messages.length,
     });
     return "close";
   }
-  finishStoryMessageSequence("group-finished-without-close");
+  finishStoryMessageSequence(runtime, "group-finished-without-close");
   return "finished";
 }
 
 /**
- * 创建、接续或排队一组剧情手机消息。
- *
- * 该函数维护模块级 pending Promise：相同请求复用同一等待结果，其他请求等待上一组结束；首次消息模式会在必要时关闭普通手机，
- * 后续组只发布新快照而不重复 `ctx.ui.show("phone")`。它不会在最后一条时自行关闭或 resolve，必须等待 UI 调用
- * `advanceStoryMessage` 并在需要时执行 `closePhone`，从而保证“最后一条显示后再点一次才关闭”的交互契约。
+ * 创建、接续或排队一组剧情手机消息。排队、订阅和 pending Promise 均严格限制在当前 Preview 的 runtime。
  */
 async function showStoryMessages(
   ctx: ExtensionContext,
+  runtime: PhoneRuntime,
   messages: readonly PhoneStoryMessage[],
   appendToExisting: boolean,
   closeAfterMessages: boolean,
   popupPosition: PhonePopupPosition,
 ): Promise<void> {
-  const mountEpoch = phoneMountEpoch;
-  if (!isCurrentPhoneMount(mountEpoch)) {
-    phoneDebug("sequence-request-ignored-unmounted", { messageCount: messages.length });
+  const mountEpoch = runtime.phoneMountEpoch;
+  if (!isCurrentPhoneMount(runtime, mountEpoch)) {
+    runtimeDebug(runtime, "sequence-request-ignored-unmounted", { messageCount: messages.length });
     return;
   }
 
   if (messages.length === 0) {
-    phoneDebug("sequence-request-empty", { appendToExisting, closeAfterMessages });
+    runtimeDebug(runtime, "sequence-request-empty", { appendToExisting, closeAfterMessages });
     return;
   }
 
-  const sequenceKey = JSON.stringify({
-    messages,
-    appendToExisting,
-    closeAfterMessages,
-    popupPosition,
-  });
-  phoneDebug("sequence-request", {
+  const sequenceKey = JSON.stringify({ messages, appendToExisting, closeAfterMessages, popupPosition });
+  runtimeDebug(runtime, "sequence-request", {
     sequenceKey,
     messageCount: messages.length,
     messages,
     appendToExisting,
     closeAfterMessages,
     popupPosition,
-    existingSequenceId: pendingStorySequence?.debugId ?? null,
+    existingSequenceId: runtime.pendingStorySequence?.debugId ?? null,
     uiVisible: ctx.ui.isVisible("phone"),
-    storyMessageSessionVisible,
+    storyMessageSessionVisible: runtime.storyMessageSessionVisible,
   });
-  while (pendingStorySequence) {
-    const pending = pendingStorySequence;
-    const uiAttached = ctx.ui.isVisible("phone") || storyMessageListeners.size > 0;
+  while (runtime.pendingStorySequence) {
+    const pending = runtime.pendingStorySequence;
+    const uiAttached = ctx.ui.isVisible("phone") || runtime.storyMessageListeners.size > 0;
 
-    // UI 已卸载且没有任何订阅者时，逻辑会话已无法继续显示。不能复用它，
-    // 否则重新执行相同方法块只会返回旧 Promise，永远不会再次调用 ctx.ui.show。
     if (!uiAttached) {
-      phoneDebug("sequence-request-recover-stale", {
+      runtimeDebug(runtime, "sequence-request-recover-stale", {
         staleSequenceId: pending.debugId,
         sameSequenceKey: pending.key === sequenceKey,
         uiVisible: ctx.ui.isVisible("phone"),
-        listenerCount: storyMessageListeners.size,
+        listenerCount: runtime.storyMessageListeners.size,
       });
-      pendingStorySequence = undefined;
-      storyMessageSessionVisible = false;
-      activeStoryMessages = [];
-      activeStoryPopupPosition = "bottom-right";
-      publishStoryMessages();
+      runtime.pendingStorySequence = undefined;
+      runtime.storyMessageSessionVisible = false;
+      runtime.activeStoryMessages = [];
+      runtime.activeStoryPopupPosition = "bottom-right";
+      publishStoryMessages(runtime);
       pending.resolve();
       continue;
     }
 
     if (pending.key === sequenceKey) {
-      phoneDebug("sequence-request-reused", {
+      runtimeDebug(runtime, "sequence-request-reused", {
         sequenceId: pending.debugId,
         sequenceKey,
       });
       return pending.promise;
     }
-    phoneDebug("sequence-request-queued", {
+    runtimeDebug(runtime, "sequence-request-queued", {
       waitingForSequenceId: pending.debugId,
       nextSequenceKey: sequenceKey,
     });
     await pending.promise;
   }
 
-  if (!isCurrentPhoneMount(mountEpoch)) {
-    phoneDebug("sequence-request-cancelled-unmounted", { stage: "after-queue" });
+  if (!isCurrentPhoneMount(runtime, mountEpoch)) {
+    runtimeDebug(runtime, "sequence-request-cancelled-unmounted", { stage: "after-queue" });
     return;
   }
 
   const uiVisible = ctx.ui.isVisible("phone");
-  const hasStorySession = storyMessageSessionVisible;
-  // Studio 的 isVisible 只表示当前可见层，不表示容器是否已注册；接续组以逻辑会话为唯一复用依据。
+  const hasStorySession = runtime.storyMessageSessionVisible;
   const shouldCreateStoryUi = !hasStorySession;
-  const continuingSession = appendToExisting && activeStoryMessages.length > 0;
-  if (!hasStorySession && uiVisible) {
-    await ctx.ui.hide("phone");
-  }
-  if (!isCurrentPhoneMount(mountEpoch)) {
-    phoneDebug("sequence-request-cancelled-unmounted", { stage: "after-hide" });
+  const continuingSession = appendToExisting && runtime.activeStoryMessages.length > 0;
+  if (!hasStorySession && uiVisible) await ctx.ui.hide("phone");
+  if (!isCurrentPhoneMount(runtime, mountEpoch)) {
+    runtimeDebug(runtime, "sequence-request-cancelled-unmounted", { stage: "after-hide" });
     return;
   }
 
-  // 接续以扩展自身会话状态为准；宿主短暂重建 UI 时仍保留上一组消息。
-  activeStoryPopupPosition = popupPosition;
-  activeStoryMessages = continuingSession
-    ? [...activeStoryMessages, messages[0]]
+  runtime.activeStoryPopupPosition = popupPosition;
+  runtime.activeStoryMessages = continuingSession
+    ? [...runtime.activeStoryMessages, messages[0]]
     : [messages[0]];
   const debugId = nextStorySequenceDebugId++;
   let resolveSequence!: () => void;
   const sequencePromise = new Promise<void>((resolve) => {
     resolveSequence = resolve;
   });
-  pendingStorySequence = {
+  runtime.pendingStorySequence = {
     debugId,
     key: sequenceKey,
     messages,
@@ -513,7 +591,7 @@ async function showStoryMessages(
     promise: sequencePromise,
     resolve: resolveSequence,
   };
-  phoneDebug("sequence-created", {
+  runtimeDebug(runtime, "sequence-created", {
     sequenceId: debugId,
     uiVisible,
     hasStorySession,
@@ -521,53 +599,54 @@ async function showStoryMessages(
     appendToExisting,
     closeAfterMessages,
     popupPosition,
-    activeMessageCount: activeStoryMessages.length,
+    activeMessageCount: runtime.activeStoryMessages.length,
     totalCount: messages.length,
     messages,
   });
-  publishStoryMessages();
+  publishStoryMessages(runtime);
 
   try {
     if (shouldCreateStoryUi) {
-      storyMessageSessionVisible = true;
-      phoneDebug("ui-show-start", {
+      runtime.storyMessageSessionVisible = true;
+      runtimeDebug(runtime, "ui-show-start", {
         sequenceId: debugId,
-        activeMessageCount: activeStoryMessages.length,
+        activeMessageCount: runtime.activeStoryMessages.length,
         reportedUiVisible: uiVisible,
       });
       await showStoryMessageUi(
         ctx,
-        activeStoryMessages,
-        activeStoryPopupPosition,
+        runtime,
+        runtime.activeStoryMessages,
+        runtime.activeStoryPopupPosition,
         debugId,
       );
-      if (!isCurrentPhoneMount(mountEpoch)) {
-        phoneDebug("sequence-request-cancelled-unmounted", { stage: "after-show" });
+      if (!isCurrentPhoneMount(runtime, mountEpoch)) {
+        runtimeDebug(runtime, "sequence-request-cancelled-unmounted", { stage: "after-show" });
         if (ctx.ui.isVisible("phone")) await ctx.ui.hide("phone");
         return;
       }
-      phoneDebug("ui-show-complete", { sequenceId: debugId });
+      runtimeDebug(runtime, "ui-show-complete", { sequenceId: debugId });
     } else {
-      phoneDebug("ui-show-reused", { sequenceId: debugId, reportedUiVisible: uiVisible });
+      runtimeDebug(runtime, "ui-show-reused", { sequenceId: debugId, reportedUiVisible: uiVisible });
     }
 
-    phoneDebug("sequence-await-start", { sequenceId: debugId });
+    runtimeDebug(runtime, "sequence-await-start", { sequenceId: debugId });
     await sequencePromise;
-    phoneDebug("sequence-await-resolved", { sequenceId: debugId });
+    runtimeDebug(runtime, "sequence-await-resolved", { sequenceId: debugId });
   } catch (error) {
-    phoneDebug("sequence-error", {
+    runtimeDebug(runtime, "sequence-error", {
       sequenceId: debugId,
       error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : error,
     });
-    storyMessageSessionVisible = false;
-    finishStoryMessageSequence("show-or-wait-error");
+    runtime.storyMessageSessionVisible = false;
+    finishStoryMessageSequence(runtime, "show-or-wait-error");
     throw error;
   } finally {
-    const stillOwnsPending = pendingStorySequence?.resolve === resolveSequence;
-    phoneDebug("sequence-finally", { sequenceId: debugId, stillOwnsPending });
+    const stillOwnsPending = runtime.pendingStorySequence?.resolve === resolveSequence;
+    runtimeDebug(runtime, "sequence-finally", { sequenceId: debugId, stillOwnsPending });
     if (stillOwnsPending) {
-      pendingStorySequence = undefined;
-      publishStoryMessages();
+      runtime.pendingStorySequence = undefined;
+      publishStoryMessages(runtime);
     }
   }
 }
@@ -726,8 +805,6 @@ function createStoryMessageSchema() {
  */
 @extension({ id: "phone", label: "手机", category: "游戏系统" })
 export class PhoneExtension extends Extension<PhoneUIProps> {
-  private static opening = false;
-
   /**
    * Fragment 方法：启用本次运行中的手机功能（method id: `mount-phone`）。
    * 挂载不会自动弹出手机，也不会重置玩家个性化、应用绑定或任何其他保存数据。
@@ -736,33 +813,33 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
     id: "mount-phone",
     title: "挂载手机",
     description: "启用手机功能。挂载后可通过快捷键打开手机或调用“显示手机消息”。不会自动打开手机。",
-    run() {
-      activatePhoneRuntime();
+    run(ctx) {
+      activatePhoneRuntime(getPhoneRuntime(ctx));
     },
-    runImmediately() {
-      activatePhoneRuntime();
+    runImmediately(ctx) {
+      activatePhoneRuntime(getPhoneRuntime(ctx));
     },
-    skip() {
-      activatePhoneRuntime();
+    skip(ctx) {
+      activatePhoneRuntime(getPhoneRuntime(ctx));
     },
   });
 
   /**
    * Fragment 方法：禁用本次运行中的手机功能（method id: `unmount-phone`）。
-   * 会立即结束等待中的消息序列并关闭当前手机 UI，但不清除 shared preferences 或作者配置；再次挂载可继续使用已有数据。
+   * 会立即结束当前 Preview 等待中的消息序列并关闭其手机 UI，但不清除 shared preferences 或作者配置。
    */
   static unmountPhone = method({
     id: "unmount-phone",
     title: "卸载手机",
     description: "关闭并禁用手机功能，不删除玩家已保存的手机个性化与应用配置。",
     async run(ctx) {
-      await deactivatePhoneRuntime(ctx);
+      await deactivatePhoneRuntime(ctx, getPhoneRuntime(ctx));
     },
     async runImmediately(ctx) {
-      await deactivatePhoneRuntime(ctx);
+      await deactivatePhoneRuntime(ctx, getPhoneRuntime(ctx));
     },
     async skip(ctx) {
-      await deactivatePhoneRuntime(ctx);
+      await deactivatePhoneRuntime(ctx, getPhoneRuntime(ctx));
     },
   });
 
@@ -770,9 +847,8 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
    * Studio Fragment 可调用的剧情消息方法（method id 固定为 `show-message`）。
    *
    * 一个块最多读取 8 条消息：空内容或无有效角色的槽位会跳过，后续消息缺少角色时继承第一条角色。
-   * 首组默认重新创建列表；`appendToExisting` 仅在活动会话已有消息时追加到旧 UI。方法返回的 Promise 会等待
+   * 首组默认重新创建列表；`appendToExisting` 仅在当前 Preview 的活动会话已有消息时追加到旧 UI。方法返回的 Promise 会等待
    * 玩家逐条推进：显示最后一条后，若 `closeAfterMessages` 为 true，需再点击一次由 UI 执行关闭动画。
-   * 相同请求会复用当前等待 Promise，不同请求则按调用顺序排队，避免重复注册 `phone` UI 容器。
    */
   static showMessage = method({
     id: "show-message",
@@ -782,6 +858,7 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
     run(ctx, params) {
       return showStoryMessages(
         ctx,
+        getPhoneRuntime(ctx),
         collectStoryMessages(
           params as Record<string, unknown>,
           ctx.settings.get<unknown[]>("chatRolePresets"),
@@ -792,17 +869,11 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
         normalizeStoryPopupPosition(params.popupPosition),
       );
     },
-    /**
-     * Studio 的即时执行路径（例如“运行到当前行”）。
-     * 消息方法的正常 run 会等待玩家逐条确认，因此此路径必须保持同步且无副作用：
-     * 不打开手机、不创建 pending sequence，也不等待 UI 关闭。
-     */
+    /** Studio 的即时执行路径不打开纯展示型消息 UI。 */
     runImmediately() {
       // Intentionally empty: 立即执行时跳过纯展示型剧情消息。
     },
-    /**
-     * Ctrl 快进路径。与 runImmediately 一样跳过纯展示型消息，避免快进过程中被手机 UI 阻塞。
-     */
+    /** Ctrl 快进路径不打开纯展示型消息 UI。 */
     skip() {
       // Intentionally empty: 快进不弹出手机。
     },
@@ -974,53 +1045,54 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
     });
 
     ctx.input.onAction(OPEN_PHONE_ACTION, () => {
+      const runtime = getPhoneRuntime(ctx);
       const uiVisible = ctx.ui.isVisible("phone");
-      phoneDebug("open-action-received", {
-        phoneMounted,
-        opening: PhoneExtension.opening,
-        storyMessageSessionVisible,
+      runtimeDebug(runtime, "open-action-received", {
+        phoneMounted: runtime.phoneMounted,
+        opening: runtime.opening,
+        storyMessageSessionVisible: runtime.storyMessageSessionVisible,
         uiVisible,
-        mountEpoch: phoneMountEpoch,
+        mountEpoch: runtime.phoneMountEpoch,
       });
 
-      // 剧情消息正在请求/显示时，ArrowUp 不能抢占同一个 phone 容器并把普通手机关闭回调误用于结束剧情序列。
-      if (!phoneMounted || PhoneExtension.opening || storyMessageSessionVisible || uiVisible) {
-        const reason = !phoneMounted
+      // 剧情消息正在请求/显示时，ArrowUp 不能抢占当前 Preview 的 phone 容器。
+      if (!runtime.phoneMounted || runtime.opening || runtime.storyMessageSessionVisible || uiVisible) {
+        const reason = !runtime.phoneMounted
           ? "unmounted"
-          : PhoneExtension.opening
+          : runtime.opening
             ? "opening"
-            : storyMessageSessionVisible
+            : runtime.storyMessageSessionVisible
               ? "story-message-session"
               : "ui-visible";
-        phoneDebug("open-ignored", { reason, mountEpoch: phoneMountEpoch });
+        runtimeDebug(runtime, "open-ignored", { reason, mountEpoch: runtime.phoneMountEpoch });
         return;
       }
 
-      const mountEpoch = phoneMountEpoch;
+      const mountEpoch = runtime.phoneMountEpoch;
       let settled = false;
       let openingTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
       const releaseOpening = (outcome: "shown" | "error" | "timeout") => {
         if (settled) return;
         settled = true;
         if (openingTimer !== undefined) globalThis.clearTimeout(openingTimer);
-        PhoneExtension.opening = false;
-        phoneDebug("open-lock-released", {
+        runtime.opening = false;
+        runtimeDebug(runtime, "open-lock-released", {
           outcome,
           mountEpoch,
           uiVisible: ctx.ui.isVisible("phone"),
         });
       };
 
-      PhoneExtension.opening = true;
+      runtime.opening = true;
       try {
-        phoneDebug("open-show-start", { mountEpoch });
+        runtimeDebug(runtime, "open-show-start", { mountEpoch });
         const shown = ctx.ui.show("phone", undefined, {
           size: "(100%, 100%)",
           position: "(0, 0)",
           interactable: true,
         });
         openingTimer = globalThis.setTimeout(() => {
-          phoneDebug("open-show-timeout", {
+          runtimeDebug(runtime, "open-show-timeout", {
             mountEpoch,
             uiVisible: ctx.ui.isVisible("phone"),
           });
@@ -1029,7 +1101,7 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
 
         void Promise.resolve(shown)
           .then(async () => {
-            if (!isCurrentPhoneMount(mountEpoch) && ctx.ui.isVisible("phone")) {
+            if (!isCurrentPhoneMount(runtime, mountEpoch) && ctx.ui.isVisible("phone")) {
               await ctx.ui.hide("phone");
             }
             releaseOpening("shown");
@@ -1051,6 +1123,8 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
    * `closePhone` 先 resolve 所有等待中的剧情序列，再销毁 UI，避免 Fragment 永久停在扩展方法块。
    */
   render(): ExtensionRenderData<PhoneUIProps> {
+    // render 实例的 context 与 method/onRegister 使用同一宿主上下文，闭包只操作该 Preview 的 runtime。
+    const runtime = getPhoneRuntime(this.context);
     const inputMessages = this.data?.storyMessages;
     const storyPopupPosition = normalizeStoryPopupPosition(this.data?.storyPopupPosition);
     const storyMessages = Array.isArray(inputMessages)
@@ -1096,18 +1170,18 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
           (this.save as unknown as SaveAPI<PhoneSaveMap>).get("preferences"),
         savePreferences: (value) =>
           (this.save as unknown as SaveAPI<PhoneSaveMap>).set("preferences", value),
-        isPhoneMounted: () => phoneMounted,
+        isPhoneMounted: () => runtime.phoneMounted,
         closePhone: () => {
-          finishStoryMessageSequence();
-          storyMessageSessionVisible = false;
-          activeStoryMessages = [];
-          activeStoryPopupPosition = "bottom-right";
-          publishStoryMessages();
+          finishStoryMessageSequence(runtime, "ui-close");
+          runtime.storyMessageSessionVisible = false;
+          runtime.activeStoryMessages = [];
+          runtime.activeStoryPopupPosition = "bottom-right";
+          publishStoryMessages(runtime);
           this.close();
         },
         // 不依赖 ctx.ui.show() 的初始 data：首次 render 若尚未拿到消息快照，UI 也能订阅并回放当前会话。
-        subscribeStoryMessages,
-        advanceStoryMessage,
+        subscribeStoryMessages: (listener) => subscribeStoryMessages(runtime, listener),
+        advanceStoryMessage: () => advanceStoryMessage(runtime),
         ...(storyMessages ? { storyMessages, storyPopupPosition } : {}),
       },
     };

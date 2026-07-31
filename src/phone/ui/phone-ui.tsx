@@ -652,16 +652,9 @@ const PhoneUIContent: React.FC<PhoneUIProps> = ({
     }
   };
 
-  /**
-   * `phone` 也可能被通用的程序 UI 动作直接显示。此处再次校验挂载状态，
-   * 避免该路径绕过 Extension 对快捷键和剧情消息入口的运行期门控。
-   */
-  useEffect(() => {
-    if (!isPhoneMounted()) closePhone();
-  }, [closePhone, isPhoneMounted]);
-
-  // 未挂载时不渲染任何手机内容；副作用会立即请求宿主移除该直接显示的 UI。
-  if (!isPhoneMounted()) return null;
+  // 宿主显式打开 `phone`（包括 Studio 的“程序预览”）时始终渲染默认手机。
+  // `mount-phone` 仍门控 ArrowUp、show-message 和应用启动，不允许未挂载状态绕过剧情能力。
+  // 卸载路径会主动 hide UI，因此这里不应因未挂载而将程序预览关闭。
 
   return (
     <div
