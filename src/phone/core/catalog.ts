@@ -49,6 +49,11 @@ export interface PhoneAppDefinition {
   id: string;
   name: string;
   icon?: string;
+  /** 数字越小越靠前；相同数字保持作者在设置数组中的行顺序。 */
+  order: number;
+  /** 作者配置的游戏开始默认安装状态；旧目录缺省时按 true 兼容。 */
+  preinstalled?: boolean;
+  /** 作者定义的基础可用状态；剧情禁用/解禁可在其上建立玩家运行时覆盖。 */
   enabled: boolean;
   locked: boolean;
   defaultActionId: string;
@@ -71,9 +76,21 @@ export interface PlayerPhonePreferences {
   backgroundCss?: string;
   accentColor?: string;
   shellColor?: string;
+  /** 兼容旧 shared 存档的历史字段；当前版本不读取它来重排桌面。 */
+  appOrder: string[];
   appOverrides: Array<{ appId: string; name?: string; imageDataUrl?: string }>;
   actionBindings: Array<{ appId: string; actionId: string }>;
   actionOverrides: PhoneActionDefinition[];
+}
+
+/**
+ * 剧情控制的 APP 状态覆盖，独立于玩家个性化偏好。
+ * 字段缺省时回退到作者目录的 `preinstalled` / `enabled` 默认值。
+ */
+export interface PhoneAppAvailabilityOverride {
+  appId: string;
+  installed?: boolean;
+  enabled?: boolean;
 }
 
 /** 已合并作者目录与玩家偏好、可直接交给 React 桌面渲染的应用视图模型。 */
@@ -103,12 +120,12 @@ const DEFAULT_CATALOG: PhoneCatalog = {
     { id: "fullscreen", name: "切换全屏", target: { kind: "local-command", commandId: "toggle-fullscreen" } },
   ],
   apps: [
-    { id: "save", name: "存档", enabled: true, locked: false, defaultActionId: "save" },
-    { id: "load", name: "读档", enabled: true, locked: false, defaultActionId: "load" },
-    { id: "settings", name: "设置", enabled: true, locked: false, defaultActionId: "settings" },
-    { id: "history", name: "历史", enabled: true, locked: false, defaultActionId: "history" },
-    { id: "gallery", name: "鉴赏", enabled: true, locked: false, defaultActionId: "gallery" },
-    { id: "utility", name: "快捷工具", enabled: true, locked: false, defaultActionId: "fullscreen" },
+    { id: "save", name: "存档", order: 0, enabled: true, locked: false, defaultActionId: "save" },
+    { id: "load", name: "读档", order: 0, enabled: true, locked: false, defaultActionId: "load" },
+    { id: "settings", name: "设置", order: 0, enabled: true, locked: false, defaultActionId: "settings" },
+    { id: "history", name: "历史", order: 0, enabled: true, locked: false, defaultActionId: "history" },
+    { id: "gallery", name: "鉴赏", order: 0, enabled: true, locked: false, defaultActionId: "gallery" },
+    { id: "utility", name: "快捷工具", order: 0, enabled: true, locked: false, defaultActionId: "fullscreen" },
   ],
 };
 
@@ -120,7 +137,7 @@ export const DEFAULT_CATALOG_JSON = JSON.stringify(DEFAULT_CATALOG, null, 2);
  * 每次调用均返回新的数组，调用方可安全进行不可变草稿更新。
  */
 export function emptyPreferences(): PlayerPhonePreferences {
-  return { version: 1, appOverrides: [], actionBindings: [], actionOverrides: [] };
+  return { version: 1, appOrder: [], appOverrides: [], actionBindings: [], actionOverrides: [] };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -129,6 +146,42 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isSafeId(value: unknown): value is string {
   return typeof value === "string" && /^[a-z0-9][a-z0-9-]{0,63}$/.test(value);
+}
+
+function normalizeAppOrder(value: unknown): number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 9999
+    ? value
+    : 0;
+}
+
+/** 数值排序相同时保持输入行顺序，避免旧项目在升级后出现意外的桌面重排。 */
+function sortAppsByOrder(apps: readonly PhoneAppDefinition[]): PhoneAppDefinition[] {
+  return apps
+    .map((app, index) => ({ app, index }))
+    .sort((left, right) => left.app.order - right.app.order || left.index - right.index)
+    .map(({ app }) => app);
+}
+
+/** 净化 shared 存档里的剧情 APP 状态覆盖；未知 APP 会在目录解析阶段安全忽略。 */
+export function normalizePhoneAppAvailability(
+  value: readonly PhoneAppAvailabilityOverride[] | unknown,
+): PhoneAppAvailabilityOverride[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const normalized: PhoneAppAvailabilityOverride[] = [];
+  for (const raw of value.slice(0, 40)) {
+    if (!isRecord(raw) || !isSafeId(raw.appId) || seen.has(raw.appId)) continue;
+    const installed = typeof raw.installed === "boolean" ? raw.installed : undefined;
+    const enabled = typeof raw.enabled === "boolean" ? raw.enabled : undefined;
+    if (installed === undefined && enabled === undefined) continue;
+    seen.add(raw.appId);
+    normalized.push({
+      appId: raw.appId,
+      ...(installed === undefined ? {} : { installed }),
+      ...(enabled === undefined ? {} : { enabled }),
+    });
+  }
+  return normalized;
 }
 
 function nonEmptyString(value: unknown, max = 256): value is string {
@@ -255,13 +308,15 @@ function readCatalog(value: unknown): PhoneCatalog | null {
       id: raw.id,
       name: raw.name.trim(),
       ...(nonEmptyString(raw.icon, 512) ? { icon: raw.icon } : {}),
+      order: normalizeAppOrder(raw.order),
+      preinstalled: raw.preinstalled !== false,
       enabled: raw.enabled !== false,
       locked: raw.locked === true,
       defaultActionId,
     });
   }
   if (apps.length === 0) return null;
-  return { version: 1, actions, apps };
+  return { version: 1, actions, apps: sortAppsByOrder(apps) };
 }
 
 export interface ActionSettingsRow {
@@ -292,6 +347,8 @@ export interface AppSettingsRow {
   id?: string;
   name?: string;
   icon?: string;
+  order?: number;
+  preinstalled?: boolean;
   enabled?: boolean;
   locked?: boolean;
   defaultActionId?: string;
@@ -392,23 +449,28 @@ function appsFromSettingsRows(
   if (!Array.isArray(value) || actions.length === 0) return [];
   const actionIds = new Set(actions.map((action) => action.id));
   const appIds = new Set<string>();
+  const apps: PhoneAppDefinition[] = [];
 
-  return value.slice(0, 40).flatMap((raw) => {
+  for (const raw of value.slice(0, 40)) {
     if (!isRecord(raw) || !isSafeId(raw.id) || appIds.has(raw.id) || !nonEmptyString(raw.name, 24)) {
-      return [];
+      continue;
     }
     appIds.add(raw.id);
-    return [{
+    apps.push({
       id: raw.id,
       name: raw.name.trim(),
       ...(nonEmptyString(raw.icon, 512) ? { icon: raw.icon } : {}),
+      order: normalizeAppOrder(raw.order),
+      preinstalled: raw.preinstalled !== false,
       enabled: raw.enabled !== false,
       locked: raw.locked === true,
       defaultActionId: typeof raw.defaultActionId === "string" && actionIds.has(raw.defaultActionId)
         ? raw.defaultActionId
         : actions[0].id,
-    }];
-  });
+    });
+  }
+
+  return sortAppsByOrder(apps);
 }
 
 /**
@@ -450,6 +512,7 @@ export function catalogFromSettingsRows(
     apps: apps.length > 0 ? apps : [{
       id: "phone",
       name: "手机",
+      order: 0,
       enabled: true,
       locked: false,
       defaultActionId: actions[0].id,
@@ -523,6 +586,8 @@ export function normalizePreferences(
     ...(sanitizeBackgroundCss(raw.backgroundCss) ? { backgroundCss: sanitizeBackgroundCss(raw.backgroundCss) } : {}),
     ...(validColor(raw.accentColor) ? { accentColor: raw.accentColor } : {}),
     ...(validColor(raw.shellColor) ? { shellColor: raw.shellColor } : {}),
+    // 玩家拖拽已取消；升级后统一清空旧顺序，桌面仅使用作者默认排序。
+    appOrder: [],
     appOverrides,
     actionBindings,
     actionOverrides,
@@ -544,19 +609,28 @@ export function mergePhoneCatalog(
 }
 
 /**
- * 将目录与偏好解析为桌面实际展示的应用。
- * 会过滤 `enabled: false` 的应用，按有效玩家绑定或 `defaultActionId` 选择动作，叠加玩家名称/图标覆盖。
- * 如果目标动作已被删除，应用会被省略；`locked` 标记保留给编辑器决定是否允许修改。
+ * 将目录、玩家偏好与剧情 APP 状态解析为桌面实际展示的应用。
+ * 作者 `preinstalled` / `enabled` 是新游戏默认值；剧情覆盖分别控制是否已安装和是否可用。
+ * 无效、未知或已删除 APP 的覆盖会被安全忽略，`locked` 只决定玩家端是否可编辑。
  */
 export function resolvePhoneApps(
   catalog: PhoneCatalog,
   preferences: PlayerPhonePreferences,
+  availabilityOverrides: readonly PhoneAppAvailabilityOverride[] = [],
 ): ResolvedPhoneApp[] {
   const actions = new Map(catalog.actions.map((action) => [action.id, action]));
   const overrides = new Map(preferences.appOverrides.map((item) => [item.appId, item]));
   const bindings = new Map(preferences.actionBindings.map((item) => [item.appId, item.actionId]));
+  const availability = new Map(
+    normalizePhoneAppAvailability(availabilityOverrides).map((item) => [item.appId, item]),
+  );
 
-  return catalog.apps.filter((app) => app.enabled).flatMap((app) => {
+  const resolved = catalog.apps.flatMap((app) => {
+    const state = availability.get(app.id);
+    const installed = state?.installed ?? app.preinstalled !== false;
+    const enabled = state?.enabled ?? app.enabled;
+    if (!installed || !enabled) return [];
+
     const override = overrides.get(app.id);
     const requestedActionId = bindings.get(app.id);
     const actionId = requestedActionId && actions.has(requestedActionId)
@@ -572,6 +646,8 @@ export function resolvePhoneApps(
       action,
     }];
   });
+
+  return resolved;
 }
 
 /**

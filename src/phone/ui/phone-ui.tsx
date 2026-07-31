@@ -24,11 +24,13 @@ import {
   getPhoneActionValidationError,
   launchPhoneTarget,
   mergePhoneCatalog,
+  normalizePhoneAppAvailability,
   normalizePreferences,
   resolvePhoneApps,
   sanitizeBackgroundCss,
   type LocalCommandId,
   type PhoneActionDefinition,
+  type PhoneAppAvailabilityOverride,
   type PhoneTarget,
   type PlayerPhonePreferences,
   type ResolvedPhoneApp,
@@ -52,7 +54,24 @@ const PHONE_POPUP_POSITIONS = [
   "center",
 ] as const;
 const PHONE_CLOSE_ANIMATION_MS = 220;
+// 保留旧 shared 数据的兼容解析路径；普通桌面不再绑定这些拖拽处理器。
+const APP_REORDER_LONG_PRESS_MS = 450;
+const APP_REORDER_MOVEMENT_PX = 8;
 const PROCESSED_STORY_POINTER_EVENTS = new WeakSet<Event>();
+
+type AppDropPlacement = "before" | "after";
+
+interface AppDropTarget {
+  appId: string;
+  placement: AppDropPlacement;
+}
+
+interface AppDragStart {
+  appId: string;
+  pointerId: number;
+  clientX: number;
+  clientY: number;
+}
 
 type LocalPhonePopupPosition = (typeof PHONE_POPUP_POSITIONS)[number];
 
@@ -100,6 +119,11 @@ function isTextInput(target: EventTarget | null): boolean {
   );
 }
 
+/** 普通手机桌面应用排序的运行时诊断；用于确认长按、落点命中和 shared 保存是否完整发生。 */
+function appReorderDebug(event: string, details: Record<string, unknown>): void {
+  console.log(`[phone-debug] app-reorder-${event}`, details);
+}
+
 /**
  * 手机程序 UI 的状态编排根组件。
  *
@@ -110,10 +134,12 @@ function isTextInput(target: EventTarget | null): boolean {
 const PhoneUIContent: React.FC<PhoneUIProps> = ({
   loadPreferences,
   savePreferences,
+  loadAppAvailability,
   isPhoneMounted,
   closePhone,
   storyMessages,
   storyPopupPosition,
+  storyBackground,
   subscribeStoryMessages,
   advanceStoryMessage,
 }) => {
@@ -124,12 +150,16 @@ const PhoneUIContent: React.FC<PhoneUIProps> = ({
   const [displayStoryPopupPosition, setDisplayStoryPopupPosition] = useState<PhonePopupPosition>(
     () => normalizePhonePopupPosition(storyPopupPosition),
   );
+  const [displayStoryBackground, setDisplayStoryBackground] = useState<string | undefined>(
+    () => storyBackground,
+  );
   const [awaitingStoryAdvance, setAwaitingStoryAdvance] = useState(
     () => storyMessages !== undefined,
   );
   // 首次 render 可能尚未接收到 ctx.ui.show 的 data；订阅回放到达后仍必须切换到消息模式。
   const messageMode = storyMessages !== undefined || awaitingStoryAdvance || displayStoryMessages.length > 0;
   const [storedPreferences, setStoredPreferences] = useState<readonly PlayerPhonePreferences[]>([]);
+  const [appAvailability, setAppAvailability] = useState<readonly PhoneAppAvailabilityOverride[]>([]);
   const phoneTitle = ctx.settings.get<string>("phoneTitle");
   const phoneStylePreset = ctx.settings.get<string>("phoneStylePreset") === "android"
     ? "android"
@@ -154,6 +184,8 @@ const PhoneUIContent: React.FC<PhoneUIProps> = ({
   const allowPlayerWallpaper = ctx.settings.get<boolean>("allowPlayerWallpaper");
   const allowPlayerIcons = ctx.settings.get<boolean>("allowPlayerIcons");
   const playerCustomizationEnabled = allowPlayerCustomization !== false;
+  // 兼容已构建的旧拖拽处理器；普通桌面已不再绑定这些事件。
+  const playerAppSortingEnabled = false;
 
   const baseCatalog = useMemo(
     () => catalogFromSettingsRows(
@@ -188,6 +220,8 @@ const PhoneUIContent: React.FC<PhoneUIProps> = ({
   const [focusedAppId, setFocusedAppId] = useState("");
   const [busy, setBusy] = useState(false);
   const [closing, setClosing] = useState(false);
+  const [draggedAppId, setDraggedAppId] = useState<string>();
+  const [appDropTarget, setAppDropTarget] = useState<AppDropTarget>();
   const [message, setMessage] = useState("");
   const [clock, setClock] = useState(() => new Date());
   const appRefs = useRef(new Map<string, HTMLButtonElement>());
@@ -195,6 +229,15 @@ const PhoneUIContent: React.FC<PhoneUIProps> = ({
   const messageTimer = useRef<number | undefined>();
   const closeTimer = useRef<number | undefined>();
   const closePromise = useRef<Promise<void> | null>(null);
+  const appDragTimer = useRef<number | undefined>();
+  const appDragStart = useRef<AppDragStart | null>(null);
+  const activeAppDrag = useRef<{ appId: string; pointerId: number } | null>(null);
+  const appDropTargetRef = useRef<AppDropTarget | undefined>();
+  const suppressAppClick = useRef(false);
+  const suppressAppClickTimer = useRef<number | undefined>();
+  const mouseDragListenerCleanup = useRef<(() => void) | undefined>();
+  const mousePointerCancelled = useRef(false);
+  const appDropSettleTimer = useRef<number | undefined>();
 
   const activePreferences = useMemo(
     () => playerCustomizationEnabled
@@ -207,8 +250,8 @@ const PhoneUIContent: React.FC<PhoneUIProps> = ({
     [baseCatalog, activePreferences],
   );
   const apps = useMemo(
-    () => resolvePhoneApps(catalog, activePreferences),
-    [catalog, activePreferences],
+    () => resolvePhoneApps(catalog, activePreferences, appAvailability),
+    [catalog, activePreferences, appAvailability],
   );
   const selectedApp = apps.find((app) => app.id === selectedAppId) ?? apps[0];
   const selectedAction = catalog.actions.find((action) => action.id === selectedActionId)
@@ -222,7 +265,11 @@ const PhoneUIContent: React.FC<PhoneUIProps> = ({
     const load = () => {
       try {
         const value = loadPreferences();
-        if (!cancelled) setStoredPreferences(Array.isArray(value) ? value : []);
+        const availability = loadAppAvailability();
+        if (!cancelled) {
+          setStoredPreferences(Array.isArray(value) ? value : []);
+          setAppAvailability(normalizePhoneAppAvailability(availability));
+        }
       } catch (error) {
         attempts += 1;
         if (!cancelled && attempts < 4) {
@@ -238,7 +285,7 @@ const PhoneUIContent: React.FC<PhoneUIProps> = ({
       cancelled = true;
       if (retryTimer !== undefined) window.clearTimeout(retryTimer);
     };
-  }, [loadPreferences]);
+  }, [loadPreferences, loadAppAvailability]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setClock(new Date()), 30_000);
@@ -248,10 +295,11 @@ const PhoneUIContent: React.FC<PhoneUIProps> = ({
   useEffect(() => {
     // 订阅函数会立即回放模块级当前快照，因此即便 UI 首次以普通 props 挂载，也不会漏掉初始化阶段的首条消息。
     if (!subscribeStoryMessages) return undefined;
-    return subscribeStoryMessages((messages, awaitingAdvance, popupPosition) => {
+    return subscribeStoryMessages((messages, awaitingAdvance, popupPosition, nextStoryBackground) => {
       setDisplayStoryMessages(messages);
       setAwaitingStoryAdvance(awaitingAdvance);
       setDisplayStoryPopupPosition(popupPosition);
+      setDisplayStoryBackground(nextStoryBackground);
     });
   }, [subscribeStoryMessages]);
 
@@ -271,6 +319,11 @@ const PhoneUIContent: React.FC<PhoneUIProps> = ({
   useEffect(() => () => {
     if (messageTimer.current !== undefined) window.clearTimeout(messageTimer.current);
     if (closeTimer.current !== undefined) window.clearTimeout(closeTimer.current);
+    if (appDragTimer.current !== undefined) window.clearTimeout(appDragTimer.current);
+    if (suppressAppClickTimer.current !== undefined) window.clearTimeout(suppressAppClickTimer.current);
+    if (appDropSettleTimer.current !== undefined) window.clearTimeout(appDropSettleTimer.current);
+    mouseDragListenerCleanup.current?.();
+    mouseDragListenerCleanup.current = undefined;
   }, []);
 
   useEffect(() => {
@@ -322,6 +375,391 @@ const PhoneUIContent: React.FC<PhoneUIProps> = ({
     }
   };
 
+  const clearAppDragTimer = () => {
+    if (appDragTimer.current !== undefined) {
+      window.clearTimeout(appDragTimer.current);
+      appDragTimer.current = undefined;
+    }
+  };
+
+  const clearAppDropSettleTimer = () => {
+    if (appDropSettleTimer.current !== undefined) {
+      window.clearTimeout(appDropSettleTimer.current);
+      appDropSettleTimer.current = undefined;
+    }
+  };
+
+  const suppressNextAppClick = () => {
+    suppressAppClick.current = true;
+    if (suppressAppClickTimer.current !== undefined) {
+      window.clearTimeout(suppressAppClickTimer.current);
+    }
+    suppressAppClickTimer.current = window.setTimeout(() => {
+      suppressAppClick.current = false;
+      suppressAppClickTimer.current = undefined;
+    }, 0);
+  };
+
+  const clearMouseDragListeners = () => {
+    mouseDragListenerCleanup.current?.();
+    mouseDragListenerCleanup.current = undefined;
+  };
+
+  const resetAppDrag = (suppressClick = false) => {
+    const wasDragging = activeAppDrag.current !== null;
+    clearAppDragTimer();
+    clearAppDropSettleTimer();
+    clearMouseDragListeners();
+    mousePointerCancelled.current = false;
+    appDragStart.current = null;
+    activeAppDrag.current = null;
+    appDropTargetRef.current = undefined;
+    setDraggedAppId(undefined);
+    setAppDropTarget(undefined);
+    if (suppressClick && wasDragging) suppressNextAppClick();
+  };
+
+  /** 将拖动位置写入完整作者目录顺序，禁用或未安装的 APP 也会保留在 shared 顺序中。 */
+  const persistAppOrder = (sourceId: string, target: AppDropTarget) => {
+    const catalogAppIds = catalog.apps.map((app) => app.id);
+    const knownIds = new Set(catalogAppIds);
+    const seenIds = new Set<string>();
+    const fullOrder = [
+      ...preferences.appOrder.filter((appId) => knownIds.has(appId)),
+      ...catalogAppIds,
+    ].filter((appId) => {
+      if (seenIds.has(appId)) return false;
+      seenIds.add(appId);
+      return true;
+    });
+    const sourceIndex = fullOrder.indexOf(sourceId);
+    const targetIndex = fullOrder.indexOf(target.appId);
+    if (sourceIndex < 0 || targetIndex < 0 || sourceId === target.appId) {
+      appReorderDebug("save-skipped", {
+        reason: sourceId === target.appId ? "same-app" : "source-or-target-not-in-catalog",
+        sourceId,
+        target,
+        fullOrder,
+      });
+      return;
+    }
+
+    const previousOrder = [...fullOrder];
+    fullOrder.splice(sourceIndex, 1);
+    const insertionTargetIndex = fullOrder.indexOf(target.appId);
+    const insertAt = insertionTargetIndex + (target.placement === "after" ? 1 : 0);
+    fullOrder.splice(insertAt, 0, sourceId);
+    if (fullOrder.every((appId, index) => appId === preferences.appOrder[index])) {
+      appReorderDebug("save-skipped", {
+        reason: "order-unchanged",
+        sourceId,
+        target,
+        previousOrder,
+        nextOrder: fullOrder,
+      });
+      return;
+    }
+
+    appReorderDebug("save", {
+      sourceId,
+      target,
+      previousOrder,
+      nextOrder: fullOrder,
+    });
+    persistPreferences([normalizePreferences([{ ...preferences, appOrder: fullOrder }])]);
+    setFocusedAppId(sourceId);
+  };
+
+  const updateAppDropTarget = (pointerId: number, clientX: number, clientY: number): boolean => {
+    const activeDrag = activeAppDrag.current;
+    if (!activeDrag || activeDrag.pointerId !== pointerId) return false;
+
+    const element = document.elementFromPoint(clientX, clientY);
+    const appButton = element instanceof Element
+      ? element.closest<HTMLElement>("[data-app-id]")
+      : null;
+    const targetAppId = appButton?.dataset.appId;
+    if (!targetAppId || targetAppId === activeDrag.appId || !apps.some((app) => app.id === targetAppId)) {
+      if (appDropTargetRef.current) {
+        appReorderDebug("drop-target-cleared", {
+          sourceId: activeDrag.appId,
+          pointerId,
+          previousTarget: appDropTargetRef.current,
+          reason: !targetAppId ? "not-over-app" : targetAppId === activeDrag.appId ? "over-source" : "not-visible-app",
+        });
+        appDropTargetRef.current = undefined;
+        clearAppDropSettleTimer();
+        setAppDropTarget(undefined);
+      }
+      return true;
+    }
+
+    const bounds = appButton.getBoundingClientRect();
+    const target: AppDropTarget = {
+      appId: targetAppId,
+      placement: clientX >= bounds.left + bounds.width / 2 ? "after" : "before",
+    };
+    const previousTarget = appDropTargetRef.current;
+    if (previousTarget?.appId === target.appId && previousTarget.placement === target.placement) return true;
+    appDropTargetRef.current = target;
+    setAppDropTarget(target);
+    appReorderDebug("drop-target", {
+      sourceId: activeDrag.appId,
+      pointerId,
+      target,
+      clientX,
+      clientY,
+    });
+    return true;
+  };
+
+  const finishAppDrag = (pointerId: number, eventSource: "pointer" | "window-mouse" | "auto-settle") => {
+    const activeDrag = activeAppDrag.current;
+    if (!activeDrag || activeDrag.pointerId !== pointerId) return false;
+
+    const target = appDropTargetRef.current;
+    appReorderDebug("pointer-up", {
+      sourceId: activeDrag.appId,
+      pointerId,
+      eventSource,
+      target: target ?? null,
+    });
+    resetAppDrag(true);
+    if (target) persistAppOrder(activeDrag.appId, target);
+    else appReorderDebug("save-skipped", { reason: "no-drop-target", sourceId: activeDrag.appId });
+    return true;
+  };
+
+  const scheduleMouseDropFallback = (pointerId: number) => {
+    if (!mousePointerCancelled.current || !appDropTargetRef.current) return;
+    const activeDrag = activeAppDrag.current;
+    const target = appDropTargetRef.current;
+    if (!activeDrag || activeDrag.pointerId !== pointerId) return;
+
+    clearAppDropSettleTimer();
+    appDropSettleTimer.current = window.setTimeout(() => {
+      const currentDrag = activeAppDrag.current;
+      const currentTarget = appDropTargetRef.current;
+      if (
+        !mousePointerCancelled.current ||
+        !currentDrag ||
+        currentDrag.pointerId !== pointerId ||
+        currentTarget?.appId !== target.appId ||
+        currentTarget.placement !== target.placement
+      ) return;
+      appReorderDebug("auto-settle", {
+        sourceId: currentDrag.appId,
+        pointerId,
+        target: currentTarget,
+        delayMs: 180,
+      });
+      finishAppDrag(pointerId, "auto-settle");
+    }, 180);
+  };
+
+  const handleAppPointerDown = (event: PointerEvent<HTMLButtonElement>, app: ResolvedPhoneApp) => {
+    const pointerId = event.pointerId;
+    const pointerType = event.pointerType;
+    const previousMouseDrag = pointerType === "mouse" ? activeAppDrag.current : null;
+    if (previousMouseDrag) {
+      appReorderDebug("implicit-release", {
+        previousSourceId: previousMouseDrag.appId,
+        previousPointerId: previousMouseDrag.pointerId,
+        target: appDropTargetRef.current ?? null,
+      });
+      finishAppDrag(previousMouseDrag.pointerId, "auto-settle");
+    }
+    const blockedReason = !playerAppSortingEnabled
+      ? "sorting-disabled"
+      : app.locked
+        ? "app-locked"
+        : busy
+          ? "phone-busy"
+          : closing
+            ? "phone-closing"
+            : messageMode
+              ? "message-mode"
+              : pointerType === "mouse" && event.button !== 0
+                ? "non-primary-mouse-button"
+                : undefined;
+    if (blockedReason) {
+      appReorderDebug("pointer-down-blocked", {
+        appId: app.id,
+        blockedReason,
+        pointerId,
+        pointerType,
+        button: event.button,
+        sortingEnabled: playerAppSortingEnabled,
+        locked: app.locked,
+        busy,
+        closing,
+        messageMode,
+      });
+      return;
+    }
+
+    appReorderDebug("pointer-down", {
+      appId: app.id,
+      pointerId,
+      pointerType: event.pointerType,
+      clientX: event.clientX,
+      clientY: event.clientY,
+      longPressMs: APP_REORDER_LONG_PRESS_MS,
+    });
+    clearAppDragTimer();
+    appDragStart.current = {
+      appId: app.id,
+      pointerId,
+      clientX: event.clientX,
+      clientY: event.clientY,
+    };
+    const button = event.currentTarget;
+    appDragTimer.current = window.setTimeout(() => {
+      const start = appDragStart.current;
+      if (!start) {
+        appReorderDebug("long-press-skipped", { appId: app.id, pointerId, reason: "start-cleared" });
+        return;
+      }
+      if (start.appId !== app.id || start.pointerId !== pointerId) {
+        appReorderDebug("long-press-skipped", {
+          appId: app.id,
+          pointerId,
+          reason: "different-active-pointer",
+          activeStart: start,
+        });
+        return;
+      }
+      if (!button.isConnected) {
+        appReorderDebug("long-press-skipped", { appId: app.id, pointerId, reason: "button-disconnected" });
+        return;
+      }
+      try {
+        // Studio Preview 的鼠标 Pointer Capture 会立即派发 pointercancel；鼠标改为由各应用按钮冒泡的 pointer 事件接力追踪。
+        if (pointerType !== "mouse") button.setPointerCapture(pointerId);
+      } catch (error) {
+        appReorderDebug("long-press-capture-failed", {
+          appId: app.id,
+          pointerId,
+          pointerType,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        return;
+      }
+      appDragTimer.current = undefined;
+      activeAppDrag.current = { appId: app.id, pointerId };
+      mousePointerCancelled.current = false;
+      clearAppDropSettleTimer();
+      appDropTargetRef.current = undefined;
+      setDraggedAppId(app.id);
+      setAppDropTarget(undefined);
+      if (pointerType === "mouse") {
+        const handleMouseMove = (mouseEvent: MouseEvent) => {
+          if (!updateAppDropTarget(pointerId, mouseEvent.clientX, mouseEvent.clientY)) return;
+          scheduleMouseDropFallback(pointerId);
+          mouseEvent.preventDefault();
+        };
+        const handleMouseUp = (mouseEvent: MouseEvent) => {
+          if (!finishAppDrag(pointerId, "window-mouse")) return;
+          mouseEvent.preventDefault();
+          mouseEvent.stopPropagation();
+        };
+        clearMouseDragListeners();
+        window.addEventListener("mousemove", handleMouseMove, true);
+        window.addEventListener("mouseup", handleMouseUp, true);
+        mouseDragListenerCleanup.current = () => {
+          window.removeEventListener("mousemove", handleMouseMove, true);
+          window.removeEventListener("mouseup", handleMouseUp, true);
+        };
+      }
+      appReorderDebug("drag-started", {
+        appId: app.id,
+        pointerId,
+        pointerType,
+        tracking: pointerType === "mouse" ? "window-mouse-fallback" : "pointer-capture",
+      });
+    }, APP_REORDER_LONG_PRESS_MS);
+  };
+
+  const handleAppPointerMove = (event: PointerEvent<HTMLButtonElement>) => {
+    const start = appDragStart.current;
+    const activeDrag = activeAppDrag.current;
+    if (!activeDrag) {
+      if (start?.pointerId === event.pointerId) {
+        const distance = Math.hypot(event.clientX - start.clientX, event.clientY - start.clientY);
+        if (distance > APP_REORDER_MOVEMENT_PX) {
+          appReorderDebug("long-press-cancelled", {
+            appId: start.appId,
+            pointerId: event.pointerId,
+            reason: "movement-before-threshold",
+            distance,
+            threshold: APP_REORDER_MOVEMENT_PX,
+          });
+          clearAppDragTimer();
+          appDragStart.current = null;
+        }
+      }
+      return;
+    }
+    if (activeDrag.pointerId !== event.pointerId) return;
+
+    event.preventDefault();
+    updateAppDropTarget(event.pointerId, event.clientX, event.clientY);
+    if (event.pointerType === "mouse") scheduleMouseDropFallback(event.pointerId);
+  };
+
+  const handleAppPointerUp = (event: PointerEvent<HTMLButtonElement>) => {
+    const activeDrag = activeAppDrag.current;
+    if (!activeDrag || activeDrag.pointerId !== event.pointerId) {
+      if (appDragStart.current?.pointerId === event.pointerId) {
+        appReorderDebug("long-press-cancelled", {
+          appId: appDragStart.current.appId,
+          pointerId: event.pointerId,
+          reason: "released-before-threshold",
+        });
+        clearAppDragTimer();
+        appDragStart.current = null;
+      }
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    finishAppDrag(event.pointerId, "pointer");
+  };
+
+  const handleAppPointerCancel = (event: PointerEvent<HTMLButtonElement>) => {
+    const start = appDragStart.current;
+    const activeDrag = activeAppDrag.current;
+    if (event.pointerType === "mouse" && activeDrag?.pointerId === event.pointerId) {
+      mousePointerCancelled.current = true;
+      appReorderDebug("pointer-cancel-ignored", {
+        eventType: event.type,
+        pointerId: event.pointerId,
+        sourceId: activeDrag.appId,
+        reason: "window-mouse-fallback-active",
+      });
+      scheduleMouseDropFallback(event.pointerId);
+      return;
+    }
+    if (start?.pointerId === event.pointerId || activeDrag?.pointerId === event.pointerId) {
+      appReorderDebug("cancelled", {
+        eventType: event.type,
+        pointerId: event.pointerId,
+        sourceId: activeDrag?.appId ?? start?.appId ?? null,
+        hadActiveDrag: Boolean(activeDrag),
+        target: appDropTargetRef.current ?? null,
+      });
+      resetAppDrag(true);
+    }
+  };
+
+  const storyBackgroundUrl = useMemo(
+    () => resolveAssetUrl(ctx, displayStoryBackground),
+    [ctx, displayStoryBackground],
+  );
   const authorWallpaperUrl = useMemo(
     () => resolveAssetUrl(ctx, defaultBackgroundImage),
     [ctx, defaultBackgroundImage],
@@ -329,14 +767,19 @@ const PhoneUIContent: React.FC<PhoneUIProps> = ({
   const backgroundCss = sanitizeBackgroundCss(activePreferences.backgroundCss)
     ?? sanitizeBackgroundCss(defaultBackgroundCss);
   const wallpaperUrl = activePreferences.wallpaperDataUrl ?? authorWallpaperUrl;
-  const screenStyle: CSSProperties = backgroundCss
-    ? { background: backgroundCss }
-    : wallpaperUrl
-      ? {
-          backgroundColor: defaultBackgroundColor ?? "#172036",
-          backgroundImage: `linear-gradient(rgba(4, 8, 16, .08), rgba(4, 8, 16, .24)), url(${JSON.stringify(wallpaperUrl)})`,
-        }
-      : { background: defaultBackgroundColor ?? "#172036" };
+  const screenStyle: CSSProperties = messageMode && storyBackgroundUrl
+    ? {
+        backgroundColor: defaultBackgroundColor ?? "#172036",
+        backgroundImage: `linear-gradient(rgba(4, 8, 16, .08), rgba(4, 8, 16, .24)), url(${JSON.stringify(storyBackgroundUrl)})`,
+      }
+    : backgroundCss
+      ? { background: backgroundCss }
+      : wallpaperUrl
+        ? {
+            backgroundColor: defaultBackgroundColor ?? "#172036",
+            backgroundImage: `linear-gradient(rgba(4, 8, 16, .08), rgba(4, 8, 16, .24)), url(${JSON.stringify(wallpaperUrl)})`,
+          }
+        : { background: defaultBackgroundColor ?? "#172036" };
   const rootStyle = {
     "--phone-accent": activePreferences.accentColor ?? defaultAccentColor ?? "#79c7ff",
     "--phone-shell": activePreferences.shellColor ?? defaultShellColor ?? "#11151f",
@@ -661,7 +1104,7 @@ const PhoneUIContent: React.FC<PhoneUIProps> = ({
 
   return (
     <div
-      data-phone-root="ext-7a9373"
+      data-phone-root="ink.zenly.ext-7a9373"
       data-phone-style-preset={phoneStylePreset}
       data-phone-position={messageMode ? displayStoryPopupPosition : popupPosition}
       data-phone-closing={closing ? "true" : "false"}
@@ -806,7 +1249,7 @@ const PhoneUIContent: React.FC<PhoneUIProps> = ({
                     onFocus={() => setFocusedAppId(app.id)}
                     onMouseEnter={() => setFocusedAppId(app.id)}
                     onClick={() => void launchApp(app)}
-                    disabled={busy}
+                    disabled={busy || closing}
                   >
                     <span className="phone-app-icon" aria-hidden="true">
                       {iconUrl ? <img src={iconUrl} alt="" /> : firstGlyph(app.displayName)}

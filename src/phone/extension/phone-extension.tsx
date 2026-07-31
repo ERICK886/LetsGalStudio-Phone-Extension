@@ -10,7 +10,12 @@ import {
   type ExtensionRenderData,
   type SaveAPI,
 } from "@avg-studio/sdk";
-import { type PlayerPhonePreferences } from "../core/catalog";
+import {
+  catalogFromSettingsRows,
+  normalizePhoneAppAvailability,
+  type PhoneAppAvailabilityOverride,
+  type PlayerPhonePreferences,
+} from "../core/catalog";
 import { PhoneUI } from "../ui/phone-ui";
 
 const OPEN_PHONE_ACTION = "ink.zenly.ext-7a9373.open-phone";
@@ -26,7 +31,11 @@ const PHONE_POPUP_POSITIONS = [
   "center",
 ] as const;
 export type PhonePopupPosition = (typeof PHONE_POPUP_POSITIONS)[number];
-const LOCAL_COMMAND_IDS = ["quick-save", "quick-load", "toggle-fullscreen"] as const;
+const LOCAL_COMMAND_IDS = [
+  "quick-save",
+  "quick-load",
+  "toggle-fullscreen",
+] as const;
 const SYSTEM_SLOT_IDS = [
   INTERNAL_SYSTEM_SLOT.Title,
   INTERNAL_SYSTEM_SLOT.Toolbar,
@@ -40,7 +49,11 @@ const SYSTEM_SLOT_IDS = [
 const PHONE_DEBUG_PREFIX = "[phone-debug]";
 let nextStorySequenceDebugId = 1;
 
-function debugSnapshot(value: unknown, depth = 0, seen = new WeakSet<object>()): unknown {
+function debugSnapshot(
+  value: unknown,
+  depth = 0,
+  seen = new WeakSet<object>(),
+): unknown {
   if (value === null || typeof value !== "object") return value;
   if (depth >= 4) return "[max-depth]";
   if (seen.has(value)) return "[circular]";
@@ -68,14 +81,33 @@ function phoneDebug(event: string, details?: unknown): void {
 
 type PhoneSaveMap = {
   preferences: readonly PlayerPhonePreferences[];
+  appAvailability: readonly PhoneAppAvailabilityOverride[];
 };
 
 export type PhoneMessageDirection = "incoming" | "outgoing";
-export type PhoneMessageStatus = "sending" | "unread" | "read" | "failed" | "blocked";
-export type ChatRoleAvatarSource = "first-portrait" | "character-avatar" | "asset";
+export type PhoneMessageStatus =
+  | "sending"
+  | "unread"
+  | "read"
+  | "failed"
+  | "blocked";
+export type ChatRoleAvatarSource =
+  | "first-portrait"
+  | "character-avatar"
+  | "asset";
 
-const CHAT_ROLE_AVATAR_SOURCES = ["first-portrait", "character-avatar", "asset"] as const;
-const OUTGOING_MESSAGE_STATUSES = ["sending", "unread", "read", "failed", "blocked"] as const;
+const CHAT_ROLE_AVATAR_SOURCES = [
+  "first-portrait",
+  "character-avatar",
+  "asset",
+] as const;
+const OUTGOING_MESSAGE_STATUSES = [
+  "sending",
+  "unread",
+  "read",
+  "failed",
+  "blocked",
+] as const;
 const DEFAULT_BLOCKED_HINT = "您的消息已发送，但被对方拒收";
 
 interface ChatRolePreset {
@@ -95,7 +127,122 @@ function nonEmptyString(value: unknown, maxLength = 1024): string | undefined {
   return normalized && normalized.length <= maxLength ? normalized : undefined;
 }
 
-function normalizeChatAvatarAssets(value: unknown): ReadonlyMap<string, string> {
+type AppAvailabilityField = "installed" | "enabled";
+
+/** 当前上下文的作者应用目录；方法执行时用它验证 APP ID，绝不相信方法表单中的任意字符串。 */
+function catalogFromPhoneSettings(ctx: ExtensionContext) {
+  return catalogFromSettingsRows(
+    ctx.settings.get<unknown[]>("catalogActions"),
+    ctx.settings.get<unknown[]>("catalogApps"),
+    ctx.settings.get<string>("appCatalogJson"),
+    {
+      programUiActions: ctx.settings.get<unknown[]>("programUiActions"),
+      visualUiActions: ctx.settings.get<unknown[]>("visualUiActions"),
+      systemSlotActions: ctx.settings.get<unknown[]>("systemSlotActions"),
+      internalMethodActions: ctx.settings.get<unknown[]>(
+        "internalMethodActions",
+      ),
+    },
+  );
+}
+
+/** 静态 schema 不支持动态多选，故为一个 APP 管理块提供固定的 1–8 号 ID 槽位。 */
+function createAppAvailabilitySchema(
+  operationOptions: Array<{ label: string; value: string }>,
+) {
+  return {
+    operation: {
+      type: "enum",
+      label: "操作",
+      options: operationOptions,
+      default: operationOptions[0]?.value ?? "",
+      required: true,
+    } as const,
+    ...Object.fromEntries(
+      Array.from({ length: 8 }, (_, offset) => {
+        const index = offset + 1;
+        const suffix = index === 1 ? "" : String(index);
+        return [
+          [
+            `appId${suffix}`,
+            {
+              type: "string",
+              label: `第 ${index} 个 APP ID`,
+              required: index === 1,
+              suggestions: { key: "phone-app-id" },
+            } as const,
+          ],
+        ];
+      }).flat(),
+    ),
+  };
+}
+
+function collectAppIds(params: Record<string, unknown>): string[] {
+  const ids: string[] = [];
+  const seen = new Set<string>();
+  for (let index = 1; index <= 8; index += 1) {
+    const suffix = index === 1 ? "" : String(index);
+    const id = nonEmptyString(params[`appId${suffix}`], 64);
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    ids.push(id);
+  }
+  return ids;
+}
+
+function updatePhoneAppAvailability(
+  save: SaveAPI<PhoneSaveMap>,
+  ctx: ExtensionContext,
+  params: Record<string, unknown>,
+  field: AppAvailabilityField,
+  value: boolean,
+  operation: string,
+): void {
+  const catalog = catalogFromPhoneSettings(ctx);
+  const knownIds = new Set(catalog.apps.map((app) => app.id));
+  const requestedIds = collectAppIds(params);
+  const existing = normalizePhoneAppAvailability(save.get("appAvailability"));
+  const states = new Map(
+    existing
+      .filter((state) => knownIds.has(state.appId))
+      .map((state) => [state.appId, state]),
+  );
+  const appliedIds: string[] = [];
+  const ignoredIds: string[] = [];
+
+  for (const appId of requestedIds) {
+    if (!knownIds.has(appId)) {
+      ignoredIds.push(appId);
+      continue;
+    }
+    const nextState: PhoneAppAvailabilityOverride = {
+      ...(states.get(appId) ?? {}),
+      appId,
+      [field]: value,
+    };
+    states.set(appId, nextState);
+    appliedIds.push(appId);
+  }
+
+  const next = catalog.apps.flatMap((app) => {
+    const state = states.get(app.id);
+    return state ? [state] : [];
+  });
+  save.set("appAvailability", next);
+  phoneDebug("app-availability-updated", {
+    operation,
+    field,
+    value,
+    requestedIds,
+    appliedIds,
+    ignoredIds,
+  });
+}
+
+function normalizeChatAvatarAssets(
+  value: unknown,
+): ReadonlyMap<string, string> {
   const assets = new Map<string, string>();
   if (!Array.isArray(value)) return assets;
 
@@ -121,15 +268,19 @@ function normalizeChatRolePresets(
     const id = nonEmptyString(raw.id, 80);
     const characterId = nonEmptyString(raw.characterId, 160);
     if (!id || !characterId || presets.has(id)) continue;
-    const avatarSource = (CHAT_ROLE_AVATAR_SOURCES as readonly unknown[]).includes(raw.avatarSource)
-      ? raw.avatarSource as ChatRoleAvatarSource
+    const avatarSource = (
+      CHAT_ROLE_AVATAR_SOURCES as readonly unknown[]
+    ).includes(raw.avatarSource)
+      ? (raw.avatarSource as ChatRoleAvatarSource)
       : "first-portrait";
     const avatarAssetId = nonEmptyString(raw.avatarAssetId, 80);
     // avatarAsset 是旧版同表字段；保留读取以便已有项目迁移后仍可显示头像。
     const legacyAvatarAsset = nonEmptyString(raw.avatarAsset, 4096);
-    const avatarAsset = avatarSource === "asset"
-      ? (avatarAssetId ? avatarAssets.get(avatarAssetId) : undefined) ?? legacyAvatarAsset
-      : undefined;
+    const avatarAsset =
+      avatarSource === "asset"
+        ? ((avatarAssetId ? avatarAssets.get(avatarAssetId) : undefined) ??
+          legacyAvatarAsset)
+        : undefined;
     presets.set(id, {
       id,
       characterId,
@@ -140,17 +291,20 @@ function normalizeChatRolePresets(
   return presets;
 }
 
-function normalizeMessageStatus(value: unknown, direction: PhoneMessageDirection): PhoneMessageStatus {
+function normalizeMessageStatus(
+  value: unknown,
+  direction: PhoneMessageDirection,
+): PhoneMessageStatus {
   // 对方消息固定已读；我方消息未指定或非法时也默认显示已读。
   if (direction === "incoming") return "read";
   return (OUTGOING_MESSAGE_STATUSES as readonly unknown[]).includes(value)
-    ? value as PhoneMessageStatus
+    ? (value as PhoneMessageStatus)
     : "read";
 }
 
 function normalizeStoryPopupPosition(value: unknown): PhonePopupPosition {
   return (PHONE_POPUP_POSITIONS as readonly unknown[]).includes(value)
-    ? value as PhonePopupPosition
+    ? (value as PhonePopupPosition)
     : "bottom-right";
 }
 
@@ -176,6 +330,7 @@ type PhoneStoryMessageListener = (
   messages: readonly PhoneStoryMessage[],
   awaitingAdvance: boolean,
   popupPosition: PhonePopupPosition,
+  storyBackground?: string,
 ) => void;
 
 export type PhoneStoryAdvanceResult = "appended" | "finished" | "close" | false;
@@ -183,11 +338,15 @@ export type PhoneStoryAdvanceResult = "appended" | "finished" | "close" | false;
 export interface PhoneUIProps extends ExtensionProps {
   loadPreferences: () => readonly PlayerPhonePreferences[];
   savePreferences: (value: readonly PlayerPhonePreferences[]) => void;
+  /** 剧情控制的已安装/可用覆盖；独立于玩家个性化设置。 */
+  loadAppAvailability: () => readonly PhoneAppAvailabilityOverride[];
   /** 读取当前运行时挂载状态；UI 在异步关闭后据此阻止继续启动动作。 */
   isPhoneMounted: () => boolean;
   closePhone: () => void;
   storyMessages?: readonly PhoneStoryMessage[];
   storyPopupPosition?: PhonePopupPosition;
+  /** 当前剧情消息组的可选屏幕背景素材；空值回退普通手机背景。 */
+  storyBackground?: string;
   subscribeStoryMessages?: (listener: PhoneStoryMessageListener) => () => void;
   advanceStoryMessage?: () => PhoneStoryAdvanceResult;
 }
@@ -206,6 +365,8 @@ interface PhoneRuntime {
   readonly debugScopeId: number;
   activeStoryMessages: readonly PhoneStoryMessage[];
   activeStoryPopupPosition: PhonePopupPosition;
+  /** 当前剧情消息组的背景，不写入 shared 存档。 */
+  activeStoryBackground: string | undefined;
   storyMessageSessionVisible: boolean;
   pendingStorySequence: PendingStorySequence | undefined;
   readonly storyMessageListeners: Set<PhoneStoryMessageListener>;
@@ -221,14 +382,23 @@ interface PhoneRuntime {
 const phoneRuntimes = new WeakMap<object, PhoneRuntime>();
 let nextPhoneRuntimeDebugScopeId = 1;
 
-type RuntimeKeySource = "flow.signal" | "host" | "ui" | "ui.show" | "ui.hide" | "ui.isVisible" | "context";
+type RuntimeKeySource =
+  | "flow.signal"
+  | "host"
+  | "ui"
+  | "ui.show"
+  | "ui.hide"
+  | "ui.isVisible"
+  | "context";
 interface RuntimeKeyCandidate {
   readonly source: RuntimeKeySource;
   readonly key: object;
 }
 
 function isRuntimeKey(value: unknown): value is object {
-  return value !== null && (typeof value === "object" || typeof value === "function");
+  return (
+    value !== null && (typeof value === "object" || typeof value === "function")
+  );
 }
 
 /**
@@ -236,10 +406,16 @@ function isRuntimeKey(value: unknown): value is object {
  * `ui` 及其回调由具体 Preview 的 UI 容器实现，作为主锚点；同时把所有可用身份映射到同一 runtime，
  * 使后续任一路径只要共享其中一个宿主对象即可命中。settings 等项目级共享 API 不可作 key，以免串 Preview。
  */
-function collectPhoneRuntimeKeys(ctx: ExtensionContext): readonly RuntimeKeyCandidate[] {
+function collectPhoneRuntimeKeys(
+  ctx: ExtensionContext,
+): readonly RuntimeKeyCandidate[] {
   const candidates: RuntimeKeyCandidate[] = [];
   const add = (source: RuntimeKeySource, value: unknown) => {
-    if (!isRuntimeKey(value) || candidates.some((candidate) => candidate.key === value)) return;
+    if (
+      !isRuntimeKey(value) ||
+      candidates.some((candidate) => candidate.key === value)
+    )
+      return;
     candidates.push({ source, key: value });
   };
 
@@ -282,6 +458,7 @@ function getPhoneRuntime(ctx: ExtensionContext): PhoneRuntime {
     debugScopeId: nextPhoneRuntimeDebugScopeId++,
     activeStoryMessages: [],
     activeStoryPopupPosition: "bottom-right",
+    activeStoryBackground: undefined,
     storyMessageSessionVisible: false,
     pendingStorySequence: undefined,
     storyMessageListeners: new Set<PhoneStoryMessageListener>(),
@@ -297,14 +474,21 @@ function getPhoneRuntime(ctx: ExtensionContext): PhoneRuntime {
   return runtime;
 }
 
-function runtimeDebug(runtime: PhoneRuntime, event: string, details?: unknown): void {
+function runtimeDebug(
+  runtime: PhoneRuntime,
+  event: string,
+  details?: unknown,
+): void {
   if (details === undefined) {
     phoneDebug(event, { scopeId: runtime.debugScopeId });
     return;
   }
-  phoneDebug(event, isRecord(details)
-    ? { scopeId: runtime.debugScopeId, ...details }
-    : { scopeId: runtime.debugScopeId, details });
+  phoneDebug(
+    event,
+    isRecord(details)
+      ? { scopeId: runtime.debugScopeId, ...details }
+      : { scopeId: runtime.debugScopeId, details },
+  );
 }
 
 function isCurrentPhoneMount(runtime: PhoneRuntime, epoch: number): boolean {
@@ -319,10 +503,17 @@ function publishStoryMessages(runtime: PhoneRuntime): void {
     messageCount: runtime.activeStoryMessages.length,
     nextIndex: runtime.pendingStorySequence?.nextIndex ?? null,
     totalCount: runtime.pendingStorySequence?.messages.length ?? null,
+    popupPosition: runtime.activeStoryPopupPosition,
+    hasStoryBackground: Boolean(runtime.activeStoryBackground),
     listenerCount: runtime.storyMessageListeners.size,
   });
   for (const listener of runtime.storyMessageListeners) {
-    listener(runtime.activeStoryMessages, awaitingAdvance, runtime.activeStoryPopupPosition);
+    listener(
+      runtime.activeStoryMessages,
+      awaitingAdvance,
+      runtime.activeStoryPopupPosition,
+      runtime.activeStoryBackground,
+    );
   }
 }
 
@@ -335,7 +526,10 @@ function activatePhoneRuntime(runtime: PhoneRuntime): void {
 }
 
 /** 立即让当前 Preview 的手机入口失效，并清理其临时消息会话。 */
-async function deactivatePhoneRuntime(ctx: ExtensionContext, runtime: PhoneRuntime): Promise<void> {
+async function deactivatePhoneRuntime(
+  ctx: ExtensionContext,
+  runtime: PhoneRuntime,
+): Promise<void> {
   runtime.phoneMounted = false;
   runtime.phoneMountEpoch += 1;
   runtime.opening = false;
@@ -345,6 +539,7 @@ async function deactivatePhoneRuntime(ctx: ExtensionContext, runtime: PhoneRunti
   runtime.storyMessageSessionVisible = false;
   runtime.activeStoryMessages = [];
   runtime.activeStoryPopupPosition = "bottom-right";
+  runtime.activeStoryBackground = undefined;
   publishStoryMessages(runtime);
   pending?.resolve();
 
@@ -365,15 +560,20 @@ function subscribeStoryMessages(
   listener: PhoneStoryMessageListener,
 ): () => void {
   runtime.storyMessageListeners.add(listener);
-  runtimeDebug(runtime, "listener-subscribe", { listenerCount: runtime.storyMessageListeners.size });
+  runtimeDebug(runtime, "listener-subscribe", {
+    listenerCount: runtime.storyMessageListeners.size,
+  });
   listener(
     runtime.activeStoryMessages,
     runtime.pendingStorySequence !== undefined,
     runtime.activeStoryPopupPosition,
+    runtime.activeStoryBackground,
   );
   return () => {
     runtime.storyMessageListeners.delete(listener);
-    runtimeDebug(runtime, "listener-unsubscribe", { listenerCount: runtime.storyMessageListeners.size });
+    runtimeDebug(runtime, "listener-unsubscribe", {
+      listenerCount: runtime.storyMessageListeners.size,
+    });
   };
 }
 
@@ -399,16 +599,23 @@ async function showStoryMessageUi(
   runtime: PhoneRuntime,
   storyMessages: readonly PhoneStoryMessage[],
   storyPopupPosition: PhonePopupPosition,
+  storyBackground: string | undefined,
   sequenceId: number,
 ): Promise<void> {
-  const show = () => ctx.ui.show("phone", {
-    storyMessages,
-    storyPopupPosition,
-  }, {
-    size: "(100%, 100%)",
-    position: "(0, 0)",
-    interactable: true,
-  });
+  const show = () =>
+    ctx.ui.show(
+      "phone",
+      {
+        storyMessages,
+        storyPopupPosition,
+        ...(storyBackground ? { storyBackground } : {}),
+      },
+      {
+        size: "(100%, 100%)",
+        position: "(0, 0)",
+        interactable: true,
+      },
+    );
 
   await show();
   if (await waitForStoryMessageSubscriber(runtime)) return;
@@ -426,10 +633,16 @@ async function showStoryMessageUi(
   throw new Error("手机剧情消息界面未能完成挂载");
 }
 
-function finishStoryMessageSequence(runtime: PhoneRuntime, reason = "unspecified"): boolean {
+function finishStoryMessageSequence(
+  runtime: PhoneRuntime,
+  reason = "unspecified",
+): boolean {
   const sequence = runtime.pendingStorySequence;
   if (!sequence) {
-    runtimeDebug(runtime, "sequence-finish-ignored", { reason, pending: false });
+    runtimeDebug(runtime, "sequence-finish-ignored", {
+      reason,
+      pending: false,
+    });
     return false;
   }
 
@@ -500,19 +713,31 @@ async function showStoryMessages(
   appendToExisting: boolean,
   closeAfterMessages: boolean,
   popupPosition: PhonePopupPosition,
+  storyBackground: string | undefined,
 ): Promise<void> {
   const mountEpoch = runtime.phoneMountEpoch;
   if (!isCurrentPhoneMount(runtime, mountEpoch)) {
-    runtimeDebug(runtime, "sequence-request-ignored-unmounted", { messageCount: messages.length });
+    runtimeDebug(runtime, "sequence-request-ignored-unmounted", {
+      messageCount: messages.length,
+    });
     return;
   }
 
   if (messages.length === 0) {
-    runtimeDebug(runtime, "sequence-request-empty", { appendToExisting, closeAfterMessages });
+    runtimeDebug(runtime, "sequence-request-empty", {
+      appendToExisting,
+      closeAfterMessages,
+    });
     return;
   }
 
-  const sequenceKey = JSON.stringify({ messages, appendToExisting, closeAfterMessages, popupPosition });
+  const sequenceKey = JSON.stringify({
+    messages,
+    appendToExisting,
+    closeAfterMessages,
+    popupPosition,
+    storyBackground,
+  });
   runtimeDebug(runtime, "sequence-request", {
     sequenceKey,
     messageCount: messages.length,
@@ -520,13 +745,15 @@ async function showStoryMessages(
     appendToExisting,
     closeAfterMessages,
     popupPosition,
+    hasStoryBackground: Boolean(storyBackground),
     existingSequenceId: runtime.pendingStorySequence?.debugId ?? null,
     uiVisible: ctx.ui.isVisible("phone"),
     storyMessageSessionVisible: runtime.storyMessageSessionVisible,
   });
   while (runtime.pendingStorySequence) {
     const pending = runtime.pendingStorySequence;
-    const uiAttached = ctx.ui.isVisible("phone") || runtime.storyMessageListeners.size > 0;
+    const uiAttached =
+      ctx.ui.isVisible("phone") || runtime.storyMessageListeners.size > 0;
 
     if (!uiAttached) {
       runtimeDebug(runtime, "sequence-request-recover-stale", {
@@ -539,6 +766,7 @@ async function showStoryMessages(
       runtime.storyMessageSessionVisible = false;
       runtime.activeStoryMessages = [];
       runtime.activeStoryPopupPosition = "bottom-right";
+      runtime.activeStoryBackground = undefined;
       publishStoryMessages(runtime);
       pending.resolve();
       continue;
@@ -559,21 +787,28 @@ async function showStoryMessages(
   }
 
   if (!isCurrentPhoneMount(runtime, mountEpoch)) {
-    runtimeDebug(runtime, "sequence-request-cancelled-unmounted", { stage: "after-queue" });
+    runtimeDebug(runtime, "sequence-request-cancelled-unmounted", {
+      stage: "after-queue",
+    });
     return;
   }
 
   const uiVisible = ctx.ui.isVisible("phone");
   const hasStorySession = runtime.storyMessageSessionVisible;
   const shouldCreateStoryUi = !hasStorySession;
-  const continuingSession = appendToExisting && runtime.activeStoryMessages.length > 0;
+  const continuingSession =
+    appendToExisting && runtime.activeStoryMessages.length > 0;
   if (!hasStorySession && uiVisible) await ctx.ui.hide("phone");
   if (!isCurrentPhoneMount(runtime, mountEpoch)) {
-    runtimeDebug(runtime, "sequence-request-cancelled-unmounted", { stage: "after-hide" });
+    runtimeDebug(runtime, "sequence-request-cancelled-unmounted", {
+      stage: "after-hide",
+    });
     return;
   }
 
   runtime.activeStoryPopupPosition = popupPosition;
+  // 每个方法块都决定本组会话背景；未设置时清空上组背景并回退普通手机背景。
+  runtime.activeStoryBackground = storyBackground;
   runtime.activeStoryMessages = continuingSession
     ? [...runtime.activeStoryMessages, messages[0]]
     : [messages[0]];
@@ -599,6 +834,7 @@ async function showStoryMessages(
     appendToExisting,
     closeAfterMessages,
     popupPosition,
+    hasStoryBackground: Boolean(storyBackground),
     activeMessageCount: runtime.activeStoryMessages.length,
     totalCount: messages.length,
     messages,
@@ -618,16 +854,22 @@ async function showStoryMessages(
         runtime,
         runtime.activeStoryMessages,
         runtime.activeStoryPopupPosition,
+        runtime.activeStoryBackground,
         debugId,
       );
       if (!isCurrentPhoneMount(runtime, mountEpoch)) {
-        runtimeDebug(runtime, "sequence-request-cancelled-unmounted", { stage: "after-show" });
+        runtimeDebug(runtime, "sequence-request-cancelled-unmounted", {
+          stage: "after-show",
+        });
         if (ctx.ui.isVisible("phone")) await ctx.ui.hide("phone");
         return;
       }
       runtimeDebug(runtime, "ui-show-complete", { sequenceId: debugId });
     } else {
-      runtimeDebug(runtime, "ui-show-reused", { sequenceId: debugId, reportedUiVisible: uiVisible });
+      runtimeDebug(runtime, "ui-show-reused", {
+        sequenceId: debugId,
+        reportedUiVisible: uiVisible,
+      });
     }
 
     runtimeDebug(runtime, "sequence-await-start", { sequenceId: debugId });
@@ -636,14 +878,21 @@ async function showStoryMessages(
   } catch (error) {
     runtimeDebug(runtime, "sequence-error", {
       sequenceId: debugId,
-      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : error,
+      error:
+        error instanceof Error
+          ? { name: error.name, message: error.message, stack: error.stack }
+          : error,
     });
     runtime.storyMessageSessionVisible = false;
     finishStoryMessageSequence(runtime, "show-or-wait-error");
     throw error;
   } finally {
-    const stillOwnsPending = runtime.pendingStorySequence?.resolve === resolveSequence;
-    runtimeDebug(runtime, "sequence-finally", { sequenceId: debugId, stillOwnsPending });
+    const stillOwnsPending =
+      runtime.pendingStorySequence?.resolve === resolveSequence;
+    runtimeDebug(runtime, "sequence-finally", {
+      sequenceId: debugId,
+      stillOwnsPending,
+    });
     if (stillOwnsPending) {
       runtime.pendingStorySequence = undefined;
       publishStoryMessages(runtime);
@@ -661,7 +910,10 @@ function collectStoryMessages(
   chatRolePresetRows: unknown,
   chatAvatarAssetRows: unknown,
 ): PhoneStoryMessage[] {
-  const presets = normalizeChatRolePresets(chatRolePresetRows, chatAvatarAssetRows);
+  const presets = normalizeChatRolePresets(
+    chatRolePresetRows,
+    chatAvatarAssetRows,
+  );
   const slots = Array.from({ length: 8 }, (_, offset) => {
     const index = offset + 1;
     const suffix = index === 1 ? "" : String(index);
@@ -687,20 +939,22 @@ function collectStoryMessages(
     const rawMessage = params[`message${suffix}`];
     if (typeof rawMessage !== "string" || rawMessage.trim() === "") continue;
 
-    const presetId = nonEmptyString(params[`presetId${suffix}`], 80) ?? defaultPresetId;
+    const presetId =
+      nonEmptyString(params[`presetId${suffix}`], 80) ?? defaultPresetId;
     const preset = presetId ? presets.get(presetId) : undefined;
     if (!preset) {
       phoneDebug("message-skipped-invalid-chat-role", { index, presetId });
       continue;
     }
 
-    const direction: PhoneMessageDirection = params[`direction${suffix}`] === "outgoing"
-      ? "outgoing"
-      : "incoming";
+    const direction: PhoneMessageDirection =
+      params[`direction${suffix}`] === "outgoing" ? "outgoing" : "incoming";
     const status = normalizeMessageStatus(params[`status${suffix}`], direction);
-    const blockedHint = status === "blocked"
-      ? nonEmptyString(params[`blockedHint${suffix}`], 240) ?? DEFAULT_BLOCKED_HINT
-      : undefined;
+    const blockedHint =
+      status === "blocked"
+        ? (nonEmptyString(params[`blockedHint${suffix}`], 240) ??
+          DEFAULT_BLOCKED_HINT)
+        : undefined;
     messages.push({
       characterId: preset.characterId,
       chatRoleId: preset.id,
@@ -738,8 +992,16 @@ function createStoryMessageSchema() {
   ] as const;
 
   return {
-    appendToExisting: { type: "boolean", label: "接续上一组消息", default: false } as const,
-    closeAfterMessages: { type: "boolean", label: "本组结束后关闭手机", default: true } as const,
+    appendToExisting: {
+      type: "boolean",
+      label: "接续上一组消息",
+      default: false,
+    } as const,
+    closeAfterMessages: {
+      type: "boolean",
+      label: "本组结束后关闭手机",
+      default: true,
+    } as const,
     popupPosition: {
       type: "enum",
       label: "手机消息显示位置",
@@ -755,44 +1017,66 @@ function createStoryMessageSchema() {
       default: "bottom-right",
       required: true,
     } as const,
-    ...Object.fromEntries(Array.from({ length: 8 }, (_, offset) => {
-      const index = offset + 1;
-      const suffix = index === 1 ? "" : String(index);
-      const required = index === 1;
-      return [
-        [`presetId${suffix}`, {
-          type: "string",
-          label: `第 ${index} 条 · 聊天角色预设 ID`,
-          required,
-          suggestions: { key: "phone-chat-role-preset" },
-        } as const],
-        [`message${suffix}`, {
-          type: "string",
-          label: `第 ${index} 条 · 内容`,
-          multiline: true,
-          required,
-        } as const],
-        [`direction${suffix}`, {
-          type: "enum",
-          label: `第 ${index} 条 · 发送方`,
-          options: directionOptions,
-          default: "incoming",
-          required,
-        } as const],
-        [`status${suffix}`, {
-          type: "enum",
-          label: `第 ${index} 条 · 消息状态`,
-          options: statusOptions,
-          default: "read",
-          required,
-        } as const],
-        [`blockedHint${suffix}`, {
-          type: "string",
-          label: `第 ${index} 条 · 被拉黑提示文本`,
-          multiline: true,
-        } as const],
-      ];
-    }).flat()),
+    storyBackground: {
+      type: "asset",
+      label: "聊天手机背景图（可选）",
+      assetType: "image",
+    } as const,
+    ...Object.fromEntries(
+      Array.from({ length: 8 }, (_, offset) => {
+        const index = offset + 1;
+        const suffix = index === 1 ? "" : String(index);
+        const required = index === 1;
+        return [
+          [
+            `presetId${suffix}`,
+            {
+              type: "string",
+              label: `第 ${index} 条 · 聊天角色预设 ID`,
+              required,
+              suggestions: { key: "phone-chat-role-preset" },
+            } as const,
+          ],
+          [
+            `message${suffix}`,
+            {
+              type: "string",
+              label: `第 ${index} 条 · 内容`,
+              multiline: true,
+              required,
+            } as const,
+          ],
+          [
+            `direction${suffix}`,
+            {
+              type: "enum",
+              label: `第 ${index} 条 · 发送方`,
+              options: directionOptions,
+              default: "incoming",
+              required,
+            } as const,
+          ],
+          [
+            `status${suffix}`,
+            {
+              type: "enum",
+              label: `第 ${index} 条 · 消息状态`,
+              options: statusOptions,
+              default: "read",
+              required,
+            } as const,
+          ],
+          [
+            `blockedHint${suffix}`,
+            {
+              type: "string",
+              label: `第 ${index} 条 · 被拉黑提示文本`,
+              multiline: true,
+            } as const,
+          ],
+        ];
+      }).flat(),
+    ),
   };
 }
 
@@ -812,7 +1096,8 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
   static mountPhone = method({
     id: "mount-phone",
     title: "挂载手机",
-    description: "启用手机功能。挂载后可通过快捷键打开手机或调用“显示手机消息”。不会自动打开手机。",
+    description:
+      "启用手机功能。挂载后可通过快捷键打开手机或调用“显示手机消息”。不会自动打开手机。",
     run(ctx) {
       activatePhoneRuntime(getPhoneRuntime(ctx));
     },
@@ -844,6 +1129,98 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
   });
 
   /**
+   * 剧情方法：把已配置 APP 安装到手机，或从手机删除。一次最多处理 8 个 APP ID。
+   * 方法只修改玩家 shared APP 状态，不改作者应用目录；不存在的 ID 会安全忽略并写入调试日志。
+   */
+  static manageInstalledApps = method({
+    id: "manage-installed-apps",
+    title: "添加或删除手机 APP",
+    description:
+      "对已配置的 APP 执行添加到手机或从手机删除。每块最多填写 8 个 APP ID。",
+    schema: createAppAvailabilitySchema([
+      { label: "添加到手机", value: "install" },
+      { label: "从手机删除", value: "remove" },
+    ]),
+    run(ctx, params) {
+      const operation = params.operation === "remove" ? "remove" : "install";
+      updatePhoneAppAvailability(
+        this.save as unknown as SaveAPI<PhoneSaveMap>,
+        ctx,
+        params as Record<string, unknown>,
+        "installed",
+        operation === "install",
+        operation,
+      );
+    },
+    runImmediately(ctx, params) {
+      const operation = params.operation === "remove" ? "remove" : "install";
+      updatePhoneAppAvailability(
+        this.save as unknown as SaveAPI<PhoneSaveMap>,
+        ctx,
+        params as Record<string, unknown>,
+        "installed",
+        operation === "install",
+        operation,
+      );
+    },
+    skip(ctx, params) {
+      const operation = params.operation === "remove" ? "remove" : "install";
+      updatePhoneAppAvailability(
+        this.save as unknown as SaveAPI<PhoneSaveMap>,
+        ctx,
+        params as Record<string, unknown>,
+        "installed",
+        operation === "install",
+        operation,
+      );
+    },
+  });
+
+  /** 剧情方法：禁用或解禁已配置 APP；禁用不等同删除，解禁后仍保留安装状态。 */
+  static manageAppEnabledState = method({
+    id: "manage-app-enabled-state",
+    title: "禁用或解禁手机 APP",
+    description: "对已配置的 APP 执行禁用或解禁。每块最多填写 8 个 APP ID。",
+    schema: createAppAvailabilitySchema([
+      { label: "禁用 APP", value: "disable" },
+      { label: "解禁 APP", value: "enable" },
+    ]),
+    run(ctx, params) {
+      const operation = params.operation === "disable" ? "disable" : "enable";
+      updatePhoneAppAvailability(
+        this.save as unknown as SaveAPI<PhoneSaveMap>,
+        ctx,
+        params as Record<string, unknown>,
+        "enabled",
+        operation === "enable",
+        operation,
+      );
+    },
+    runImmediately(ctx, params) {
+      const operation = params.operation === "disable" ? "disable" : "enable";
+      updatePhoneAppAvailability(
+        this.save as unknown as SaveAPI<PhoneSaveMap>,
+        ctx,
+        params as Record<string, unknown>,
+        "enabled",
+        operation === "enable",
+        operation,
+      );
+    },
+    skip(ctx, params) {
+      const operation = params.operation === "disable" ? "disable" : "enable";
+      updatePhoneAppAvailability(
+        this.save as unknown as SaveAPI<PhoneSaveMap>,
+        ctx,
+        params as Record<string, unknown>,
+        "enabled",
+        operation === "enable",
+        operation,
+      );
+    },
+  });
+
+  /**
    * Studio Fragment 可调用的剧情消息方法（method id 固定为 `show-message`）。
    *
    * 一个块最多读取 8 条消息：空内容或无有效角色的槽位会跳过，后续消息缺少角色时继承第一条角色。
@@ -853,7 +1230,8 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
   static showMessage = method({
     id: "show-message",
     title: "显示手机消息",
-    description: "每块最多 8 条。每条填写在扩展设置中定义的聊天角色预设 ID；最后一组显示完并确认后自动关闭手机。",
+    description:
+      "每块最多 8 条。每条填写在扩展设置中定义的聊天角色预设 ID；最后一组显示完并确认后自动关闭手机。",
     schema: createStoryMessageSchema(),
     run(ctx, params) {
       return showStoryMessages(
@@ -867,6 +1245,7 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
         params.appendToExisting === true,
         params.closeAfterMessages !== false,
         normalizeStoryPopupPosition(params.popupPosition),
+        nonEmptyString(params.storyBackground),
       );
     },
     /** Studio 的即时执行路径不打开纯展示型消息 UI。 */
@@ -881,14 +1260,18 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
 
   static settings = settings((s) => ({
     phoneTitle: s.string("手机标题").default("手机"),
-    phoneStylePreset: s.enum("手机样式预设", ["apple", "android"] as const)
+    phoneStylePreset: s
+      .enum("手机样式预设", ["apple", "android"] as const)
       .default("apple")
       .labels({
         apple: "苹果手机（iPhone）",
         android: "安卓手机（Android）",
       })
-      .describe("切换手机外壳、顶部开孔/听筒、圆角与应用气泡的预设样式；背景、强调色和外壳颜色仍使用下方作者设置。"),
-    popupPosition: s.enum("手机弹出位置", PHONE_POPUP_POSITIONS)
+      .describe(
+        "切换手机外壳、顶部开孔/听筒、圆角与应用气泡的预设样式；背景、强调色和外壳颜色仍使用下方作者设置。",
+      ),
+    popupPosition: s
+      .enum("手机弹出位置", PHONE_POPUP_POSITIONS)
       .default("bottom-right")
       .labels({
         "top-left": "左上",
@@ -899,28 +1282,35 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
         "bottom-right": "右下",
         center: "中部",
       })
-      .describe("选择手机贴近视口的弹出位置；打开时从该方向滑入并淡入，关闭时反向滑出。"),
-    chatAvatarAssets: s.array("聊天头像素材库", (item) => ({
-      id: item.string("素材 ID").default("new-chat-avatar"),
-      asset: item.asset("头像素材").accepts("image"),
-    }))
+      .describe(
+        "选择手机贴近视口的弹出位置；打开时从该方向滑入并淡入，关闭时反向滑出。",
+      ),
+    chatAvatarAssets: s
+      .array("聊天头像素材库", (item) => ({
+        id: item.string("素材 ID").default("new-chat-avatar"),
+        asset: item.asset("头像素材").accepts("image"),
+      }))
       .itemDefault({ id: "new-chat-avatar" })
       .maxItems(80)
       .addLabel("添加头像素材")
       .emptyHint("仅在聊天角色使用“新扩展素材”头像时添加。")
-      .describe("自定义头像集中在此处选择，避免素材预览撑高聊天角色预设表格。记录素材 ID 后，将它填入对应角色预设的“头像素材 ID”。"),
-    chatRolePresets: s.array("聊天角色预设", (item) => ({
-      id: item.string("预设 ID").default("new-chat-role"),
-      characterId: item.character("资产角色"),
-      avatarSource: item.enum("头像来源", CHAT_ROLE_AVATAR_SOURCES)
-        .default("first-portrait")
-        .labels({
-          "first-portrait": "第一张立绘（默认）",
-          "character-avatar": "角色默认头像",
-          asset: "扩展素材库",
-        }),
-      avatarAssetId: item.string("头像素材 ID").default(""),
-    }))
+      .describe(
+        "自定义头像集中在此处选择，避免素材预览撑高聊天角色预设表格。记录素材 ID 后，将它填入对应角色预设的“头像素材 ID”。",
+      ),
+    chatRolePresets: s
+      .array("聊天角色预设", (item) => ({
+        id: item.string("预设 ID").default("new-chat-role"),
+        characterId: item.character("资产角色"),
+        avatarSource: item
+          .enum("头像来源", CHAT_ROLE_AVATAR_SOURCES)
+          .default("first-portrait")
+          .labels({
+            "first-portrait": "第一张立绘（默认）",
+            "character-avatar": "角色默认头像",
+            asset: "扩展素材库",
+          }),
+        avatarAssetId: item.string("头像素材 ID").default(""),
+      }))
       .itemDefault({
         id: "new-chat-role",
         avatarSource: "first-portrait",
@@ -929,81 +1319,130 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
       .maxItems(80)
       .addLabel("添加聊天角色预设")
       .emptyHint("未配置聊天角色预设时，显示手机消息会跳过对应消息。")
-      .describe("每条预设绑定一个项目资产角色。消息块填写预设 ID；角色名可覆盖资产角色名。只有选择“扩展素材库”时，才需要填写上方素材库的素材 ID。"),
-    programUiActions: s.array("动作 · 程序 UI", (item) => ({
-      id: item.string("ID").default("new-program-ui"),
-      name: item.string("名称").default("新程序界面"),
-      programUiRef: item.string("UI 引用")
-        .describe("本扩展填 ui-id；跨扩展填 extension-id/ui-id，不要加 @。"),
-      description: item.string("说明"),
-    }))
-      .itemDefault({ id: "new-program-ui", name: "新程序界面", programUiRef: "", description: "" })
+      .describe(
+        "每条预设绑定一个项目资产角色。消息块填写预设 ID；角色名可覆盖资产角色名。只有选择“扩展素材库”时，才需要填写上方素材库的素材 ID。",
+      ),
+    programUiActions: s
+      .array("动作 · 程序 UI", (item) => ({
+        id: item.string("ID").default("new-program-ui"),
+        name: item.string("名称").default("新程序界面"),
+        programUiRef: item
+          .string("UI 引用")
+          .describe("本扩展填 ui-id；跨扩展填 extension-id/ui-id，不要加 @。"),
+        description: item.string("说明"),
+      }))
+      .itemDefault({
+        id: "new-program-ui",
+        name: "新程序界面",
+        programUiRef: "",
+        description: "",
+      })
       .maxItems(40)
       .addLabel("添加程序 UI 动作")
       .emptyHint("没有程序 UI 动作。")
-      .describe("操作：①点击“添加程序 UI 动作”；②填写唯一 ID 和名称；③本扩展 UI 填 ui-id，跨扩展填 extension-id/ui-id（不要加 @）；④在“手机应用目录”的默认动作 ID 中填写同一 ID。"),
-    visualUiActions: s.array("动作 · 可视化 UI", (item) => ({
-      id: item.string("ID").default("new-visual-ui"),
-      name: item.string("名称").default("新可视化界面"),
-      visualUiName: item.string("界面名称")
-        .describe("项目界面填 ui-name；扩展界面填 @extension-id/ui-name。"),
-      modal: item.boolean("模态").default(true),
-      description: item.string("说明"),
-    }))
-      .itemDefault({ id: "new-visual-ui", name: "新可视化界面", visualUiName: "", modal: true, description: "" })
+      .describe(
+        "操作：①点击“添加程序 UI 动作”；②填写唯一 ID 和名称；③本扩展 UI 填 ui-id，跨扩展填 extension-id/ui-id（不要加 @）；④在“手机应用目录”的默认动作 ID 中填写同一 ID。",
+      ),
+    visualUiActions: s
+      .array("动作 · 可视化 UI", (item) => ({
+        id: item.string("ID").default("new-visual-ui"),
+        name: item.string("名称").default("新可视化界面"),
+        visualUiName: item
+          .string("界面名称")
+          .describe("项目界面填 ui-name；扩展界面填 @extension-id/ui-name。"),
+        modal: item.boolean("模态").default(true),
+        description: item.string("说明"),
+      }))
+      .itemDefault({
+        id: "new-visual-ui",
+        name: "新可视化界面",
+        visualUiName: "",
+        modal: true,
+        description: "",
+      })
       .maxItems(40)
       .addLabel("添加可视化 UI 动作")
       .emptyHint("没有可视化 UI 动作。")
-      .describe("操作：①点击“添加可视化 UI 动作”；②填写唯一 ID 和名称；③项目界面填 ui-name，扩展界面填 @extension-id/ui-name；④按需开启模态；⑤在应用目录中绑定该 ID。"),
-    systemSlotActions: s.array("动作 · 内置系统界面", (item) => ({
-      id: item.string("ID").default("new-system-ui"),
-      name: item.string("名称").default("新系统界面"),
-      systemSlot: item.enum("系统界面", SYSTEM_SLOT_IDS)
-        .default(INTERNAL_SYSTEM_SLOT.Settings)
-        .labels({
-          [INTERNAL_SYSTEM_SLOT.Title]: "标题画面",
-          [INTERNAL_SYSTEM_SLOT.Toolbar]: "对话工具栏",
-          [INTERNAL_SYSTEM_SLOT.Save]: "存档界面",
-          [INTERNAL_SYSTEM_SLOT.Load]: "读档界面",
-          [INTERNAL_SYSTEM_SLOT.Settings]: "设置界面",
-          [INTERNAL_SYSTEM_SLOT.History]: "历史记录",
-          [INTERNAL_SYSTEM_SLOT.Gallery]: "鉴赏界面",
-        }),
-      description: item.string("说明"),
-    }))
-      .itemDefault({ id: "new-system-ui", name: "新系统界面", systemSlot: INTERNAL_SYSTEM_SLOT.Settings, description: "" })
+      .describe(
+        "操作：①点击“添加可视化 UI 动作”；②填写唯一 ID 和名称；③项目界面填 ui-name，扩展界面填 @extension-id/ui-name；④按需开启模态；⑤在应用目录中绑定该 ID。",
+      ),
+    systemSlotActions: s
+      .array("动作 · 内置系统界面", (item) => ({
+        id: item.string("ID").default("new-system-ui"),
+        name: item.string("名称").default("新系统界面"),
+        systemSlot: item
+          .enum("系统界面", SYSTEM_SLOT_IDS)
+          .default(INTERNAL_SYSTEM_SLOT.Settings)
+          .labels({
+            [INTERNAL_SYSTEM_SLOT.Title]: "标题画面",
+            [INTERNAL_SYSTEM_SLOT.Toolbar]: "对话工具栏",
+            [INTERNAL_SYSTEM_SLOT.Save]: "存档界面",
+            [INTERNAL_SYSTEM_SLOT.Load]: "读档界面",
+            [INTERNAL_SYSTEM_SLOT.Settings]: "设置界面",
+            [INTERNAL_SYSTEM_SLOT.History]: "历史记录",
+            [INTERNAL_SYSTEM_SLOT.Gallery]: "鉴赏界面",
+          }),
+        description: item.string("说明"),
+      }))
+      .itemDefault({
+        id: "new-system-ui",
+        name: "新系统界面",
+        systemSlot: INTERNAL_SYSTEM_SLOT.Settings,
+        description: "",
+      })
       .maxItems(40)
       .addLabel("添加系统界面动作")
       .emptyHint("没有额外的系统界面动作。")
-      .describe("操作：①点击“添加系统界面动作”；②填写唯一 ID 和名称；③从下拉框选择标题、存档、读档、设置、历史或鉴赏界面；④在应用目录中绑定该 ID。"),
-    internalMethodActions: s.array("动作 · 手机内部方法", (item) => ({
-      id: item.string("ID").default("new-internal-method"),
-      name: item.string("名称").default("新内部方法"),
-      commandId: item.enum("内部方法", LOCAL_COMMAND_IDS)
-        .default("quick-save")
-        .labels({
-          "quick-save": "快速存档",
-          "quick-load": "快速读档",
-          "toggle-fullscreen": "切换全屏",
-        }),
-      description: item.string("说明"),
-    }))
-      .itemDefault({ id: "new-internal-method", name: "新内部方法", commandId: "quick-save", description: "" })
+      .describe(
+        "操作：①点击“添加系统界面动作”；②填写唯一 ID 和名称；③从下拉框选择标题、存档、读档、设置、历史或鉴赏界面；④在应用目录中绑定该 ID。",
+      ),
+    internalMethodActions: s
+      .array("动作 · 手机内部方法", (item) => ({
+        id: item.string("ID").default("new-internal-method"),
+        name: item.string("名称").default("新内部方法"),
+        commandId: item
+          .enum("内部方法", LOCAL_COMMAND_IDS)
+          .default("quick-save")
+          .labels({
+            "quick-save": "快速存档",
+            "quick-load": "快速读档",
+            "toggle-fullscreen": "切换全屏",
+          }),
+        description: item.string("说明"),
+      }))
+      .itemDefault({
+        id: "new-internal-method",
+        name: "新内部方法",
+        commandId: "quick-save",
+        description: "",
+      })
       .maxItems(40)
       .addLabel("添加内部方法动作")
       .emptyHint("没有额外的手机内部方法动作。")
-      .describe("操作：①点击“添加内部方法动作”；②填写唯一 ID 和名称；③从下拉框选择快速存档、快速读档或切换全屏；④在应用目录中绑定该 ID。只能选择插件预注册的安全方法。"),
-    catalogApps: s.array("手机应用目录", (item) => ({
-      id: item.string("应用 ID").default("new-app"),
-      name: item.string("应用名称").default("新应用"),
-      icon: item.asset("应用图标").accepts("image"),
-      enabled: item.boolean("启用").default(true),
-      locked: item.boolean("锁定玩家编辑").default(false),
-      defaultActionId: item.string("默认动作 ID").default("settings"),
-    }))
+      .describe(
+        "操作：①点击“添加内部方法动作”；②填写唯一 ID 和名称；③从下拉框选择快速存档、快速读档或切换全屏；④在应用目录中绑定该 ID。只能选择插件预注册的安全方法。",
+      ),
+    catalogApps: s
+      .array("手机应用目录", (item) => ({
+        id: item.string("应用 ID").default("new-app"),
+        name: item.string("应用名称").default("新应用"),
+        icon: item.asset("应用图标").accepts("image"),
+        order: item
+          .number("默认排序")
+          .default(0)
+          .range(0, 9999)
+          .step(1)
+          .describe("仅整数；数字越小越靠前，相同时按本目录的行顺序。"),
+        preinstalled: item.boolean("游戏开始默认预装").default(true),
+        enabled: item.boolean("作者默认可用").default(true),
+        locked: item.boolean("锁定玩家编辑").default(false),
+        defaultActionId: item.string("默认动作 ID").default("settings"),
+      }))
       .itemDefault({
         id: "new-app",
         name: "新应用",
+        order: 0,
+        preinstalled: true,
         enabled: true,
         locked: false,
         defaultActionId: "settings",
@@ -1011,21 +1450,30 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
       .maxItems(40)
       .addLabel("添加应用")
       .emptyHint("未配置应用时使用插件内置应用目录。")
-      .describe("操作：①先在上方任一动作分组中添加动作并记下其 ID；②点击“添加应用”；③填写唯一应用 ID、名称并选择图标；④把动作 ID 原样填入“默认动作 ID”；⑤按需启用或锁定玩家编辑。"),
+      .describe(
+        "操作：①先在上方任一动作分组中添加动作并记下其 ID；②点击“添加应用”；③填写唯一应用 ID、名称并选择图标；④填写仅整数的“默认排序”，数字越小越靠前，相同时按本目录行顺序；⑤勾选“游戏开始默认预装”决定新游戏是否拥有该 APP；⑥“作者默认可用”决定其初始能否显示；⑦把动作 ID 原样填入“默认动作 ID”。剧情可再通过 APP 管理方法安装、删除、禁用或解禁。",
+      ),
     backgroundColor: s.string("默认背景色").default("#172036"),
     backgroundImage: s.asset("默认背景图").accepts("image"),
-    backgroundCss: s.string("默认 CSS 背景值")
+    backgroundCss: s
+      .string("默认 CSS 背景值")
       .default("")
       .describe("例如 linear-gradient(135deg, #182848, #4b6cb7)"),
     accentColor: s.string("默认强调色").default("#79c7ff"),
     shellColor: s.string("默认外壳颜色").default("#11151f"),
-    allowPlayerCustomization: s.boolean("允许玩家个性化手机")
+    allowPlayerCustomization: s
+      .boolean("允许玩家个性化手机")
       .default(true)
-      .describe("关闭后隐藏玩家端个性化入口，并忽略玩家保存的名称、图标、背景、颜色、动作覆盖和应用绑定；数据不会删除，重新开启后恢复生效。"),
-    allowPlayerWallpaper: s.boolean("允许玩家更换背景")
+      .describe(
+        "关闭后隐藏玩家端个性化入口，并忽略玩家保存的名称、图标、背景、颜色、动作覆盖和应用绑定；数据不会删除，重新开启后恢复生效。",
+      ),
+
+    allowPlayerWallpaper: s
+      .boolean("允许玩家更换背景")
       .default(true)
       .enabledWhen("allowPlayerCustomization", true),
-    allowPlayerIcons: s.boolean("允许玩家更换图标")
+    allowPlayerIcons: s
+      .boolean("允许玩家更换图标")
       .default(true)
       .enabledWhen("allowPlayerCustomization", true),
   }));
@@ -1036,6 +1484,12 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
       persistence: "shared",
       default: [] as PlayerPhonePreferences[],
       label: "玩家手机个性化配置",
+    },
+    appAvailability: {
+      type: "list",
+      persistence: "shared",
+      default: [] as PhoneAppAvailabilityOverride[],
+      label: "剧情 APP 安装与可用状态",
     },
   });
 
@@ -1063,7 +1517,12 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
       });
 
       // 剧情消息正在请求/显示时，ArrowUp 不能抢占当前 Preview 的 phone 容器。
-      if (!runtime.phoneMounted || runtime.opening || runtime.storyMessageSessionVisible || uiVisible) {
+      if (
+        !runtime.phoneMounted ||
+        runtime.opening ||
+        runtime.storyMessageSessionVisible ||
+        uiVisible
+      ) {
         const reason = !runtime.phoneMounted
           ? "unmounted"
           : runtime.opening
@@ -1071,7 +1530,10 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
             : runtime.storyMessageSessionVisible
               ? "story-message-session"
               : "ui-visible";
-        runtimeDebug(runtime, "open-ignored", { reason, mountEpoch: runtime.phoneMountEpoch });
+        runtimeDebug(runtime, "open-ignored", {
+          reason,
+          mountEpoch: runtime.phoneMountEpoch,
+        });
         return;
       }
 
@@ -1108,7 +1570,10 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
 
         void Promise.resolve(shown)
           .then(async () => {
-            if (!isCurrentPhoneMount(runtime, mountEpoch) && ctx.ui.isVisible("phone")) {
+            if (
+              !isCurrentPhoneMount(runtime, mountEpoch) &&
+              ctx.ui.isVisible("phone")
+            ) {
               await ctx.ui.hide("phone");
             }
             releaseOpening("shown");
@@ -1133,39 +1598,54 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
     // render 实例的 context 与 method/onRegister 使用同一宿主上下文，闭包只操作该 Preview 的 runtime。
     const runtime = getPhoneRuntime(this.context);
     const inputMessages = this.data?.storyMessages;
-    const storyPopupPosition = normalizeStoryPopupPosition(this.data?.storyPopupPosition);
+    const storyPopupPosition = normalizeStoryPopupPosition(
+      this.data?.storyPopupPosition,
+    );
+    const storyBackground = nonEmptyString(this.data?.storyBackground);
     const storyMessages = Array.isArray(inputMessages)
       ? inputMessages.flatMap((inputMessage) => {
           if (
             !inputMessage ||
             typeof inputMessage.characterId !== "string" ||
             typeof inputMessage.message !== "string"
-          ) return [];
+          )
+            return [];
 
-          const direction: PhoneMessageDirection = inputMessage.direction === "outgoing" ? "outgoing" : "incoming";
-          const avatarSource = (CHAT_ROLE_AVATAR_SOURCES as readonly unknown[]).includes(inputMessage.avatarSource)
-            ? inputMessage.avatarSource as ChatRoleAvatarSource
+          const direction: PhoneMessageDirection =
+            inputMessage.direction === "outgoing" ? "outgoing" : "incoming";
+          const avatarSource = (
+            CHAT_ROLE_AVATAR_SOURCES as readonly unknown[]
+          ).includes(inputMessage.avatarSource)
+            ? (inputMessage.avatarSource as ChatRoleAvatarSource)
             : "first-portrait";
           const status = normalizeMessageStatus(inputMessage.status, direction);
-          const blockedHint = status === "blocked"
-            ? nonEmptyString(inputMessage.blockedHint, 240) ?? DEFAULT_BLOCKED_HINT
-            : undefined;
+          const blockedHint =
+            status === "blocked"
+              ? (nonEmptyString(inputMessage.blockedHint, 240) ??
+                DEFAULT_BLOCKED_HINT)
+              : undefined;
 
-          return [{
-            characterId: inputMessage.characterId,
-            chatRoleId: nonEmptyString(inputMessage.chatRoleId, 80) ?? `legacy:${inputMessage.characterId}`,
-            avatarSource,
-            ...(typeof inputMessage.avatarAsset === "string" && inputMessage.avatarAsset
-              ? { avatarAsset: inputMessage.avatarAsset }
-              : {}),
-            ...(typeof inputMessage.portraitId === "string" && inputMessage.portraitId
-              ? { portraitId: inputMessage.portraitId }
-              : {}),
-            message: inputMessage.message,
-            direction,
-            status,
-            ...(blockedHint ? { blockedHint } : {}),
-          }];
+          return [
+            {
+              characterId: inputMessage.characterId,
+              chatRoleId:
+                nonEmptyString(inputMessage.chatRoleId, 80) ??
+                `legacy:${inputMessage.characterId}`,
+              avatarSource,
+              ...(typeof inputMessage.avatarAsset === "string" &&
+              inputMessage.avatarAsset
+                ? { avatarAsset: inputMessage.avatarAsset }
+                : {}),
+              ...(typeof inputMessage.portraitId === "string" &&
+              inputMessage.portraitId
+                ? { portraitId: inputMessage.portraitId }
+                : {}),
+              message: inputMessage.message,
+              direction,
+              status,
+              ...(blockedHint ? { blockedHint } : {}),
+            },
+          ];
         })
       : undefined;
 
@@ -1176,20 +1656,35 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
         loadPreferences: () =>
           (this.save as unknown as SaveAPI<PhoneSaveMap>).get("preferences"),
         savePreferences: (value) =>
-          (this.save as unknown as SaveAPI<PhoneSaveMap>).set("preferences", value),
+          (this.save as unknown as SaveAPI<PhoneSaveMap>).set(
+            "preferences",
+            value,
+          ),
+        loadAppAvailability: () =>
+          (this.save as unknown as SaveAPI<PhoneSaveMap>).get(
+            "appAvailability",
+          ),
         isPhoneMounted: () => runtime.phoneMounted,
         closePhone: () => {
           finishStoryMessageSequence(runtime, "ui-close");
           runtime.storyMessageSessionVisible = false;
           runtime.activeStoryMessages = [];
           runtime.activeStoryPopupPosition = "bottom-right";
+          runtime.activeStoryBackground = undefined;
           publishStoryMessages(runtime);
           this.close();
         },
         // 不依赖 ctx.ui.show() 的初始 data：首次 render 若尚未拿到消息快照，UI 也能订阅并回放当前会话。
-        subscribeStoryMessages: (listener) => subscribeStoryMessages(runtime, listener),
+        subscribeStoryMessages: (listener) =>
+          subscribeStoryMessages(runtime, listener),
         advanceStoryMessage: () => advanceStoryMessage(runtime),
-        ...(storyMessages ? { storyMessages, storyPopupPosition } : {}),
+        ...(storyMessages
+          ? {
+              storyMessages,
+              storyPopupPosition,
+              ...(storyBackground ? { storyBackground } : {}),
+            }
+          : {}),
       },
     };
   }
