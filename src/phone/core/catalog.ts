@@ -629,7 +629,8 @@ export function resolvePhoneApps(
     const state = availability.get(app.id);
     const installed = state?.installed ?? app.preinstalled !== false;
     const enabled = state?.enabled ?? app.enabled;
-    if (!installed || !enabled) return [];
+    // 删除才从桌面移除；禁用的 APP 仍交给 UI 以暗化、不可启动的形式展示。
+    if (!installed) return [];
 
     const override = overrides.get(app.id);
     const requestedActionId = bindings.get(app.id);
@@ -640,6 +641,7 @@ export function resolvePhoneApps(
     if (!action) return [];
     return [{
       ...app,
+      enabled,
       displayName: override?.name ?? app.name,
       iconSource: override?.imageDataUrl ?? app.icon,
       actionId,

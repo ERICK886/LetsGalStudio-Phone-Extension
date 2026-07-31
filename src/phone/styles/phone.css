@@ -376,6 +376,27 @@
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--phone-accent), transparent 55%), 0 12px 24px rgba(0, 0, 0, 0.38);
 }
 
+[data-phone-root="ink.zenly.ext-7a9373"] .phone-app[data-disabled="true"] {
+  cursor: not-allowed;
+}
+
+[data-phone-root="ink.zenly.ext-7a9373"] .phone-app[data-disabled="true"] .phone-app-icon {
+  filter: brightness(0.48) saturate(0.35);
+  opacity: 0.72;
+}
+
+[data-phone-root="ink.zenly.ext-7a9373"] .phone-app[data-disabled="true"] .phone-app-name {
+  opacity: 0.56;
+}
+
+[data-phone-root="ink.zenly.ext-7a9373"] .phone-app[data-disabled="true"]:hover .phone-app-icon,
+[data-phone-root="ink.zenly.ext-7a9373"] .phone-app[data-disabled="true"]:focus-visible .phone-app-icon,
+[data-phone-root="ink.zenly.ext-7a9373"] .phone-app[data-disabled="true"][data-selected="true"] .phone-app-icon {
+  transform: none;
+  border-color: rgba(255, 255, 255, 0.18);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.28);
+}
+
 [data-phone-root="ink.zenly.ext-7a9373"] .phone-app-name {
   max-width: 76px;
   overflow: hidden;

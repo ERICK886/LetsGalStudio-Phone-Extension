@@ -861,6 +861,10 @@ const PhoneUIContent: React.FC<PhoneUIProps> = ({
    * 失败只记录日志，finally 必定释放 busy 状态，避免一次错误永久禁用桌面。
    */
   const launchApp = async (app: ResolvedPhoneApp) => {
+    if (!app.enabled) {
+      showMessage(`“${app.displayName}”当前已禁用`);
+      return;
+    }
     if (!isPhoneMounted()) {
       showMessage("手机尚未挂载");
       return;
@@ -1242,10 +1246,16 @@ const PhoneUIContent: React.FC<PhoneUIProps> = ({
                     }}
                     type="button"
                     className="phone-app"
+                    data-disabled={!app.enabled}
                     data-selected={focusedAppId === app.id}
                     tabIndex={focusedAppId === app.id ? 0 : -1}
-                    aria-label={`${app.displayName}，动作：${app.action.name}`}
-                    title={app.action.description ?? `执行：${app.action.name}`}
+                    aria-disabled={!app.enabled}
+                    aria-label={app.enabled
+                      ? `${app.displayName}，动作：${app.action.name}`
+                      : `${app.displayName}，当前已禁用`}
+                    title={app.enabled
+                      ? app.action.description ?? `执行：${app.action.name}`
+                      : "当前已禁用"}
                     onFocus={() => setFocusedAppId(app.id)}
                     onMouseEnter={() => setFocusedAppId(app.id)}
                     onClick={() => void launchApp(app)}

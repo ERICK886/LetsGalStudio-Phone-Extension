@@ -26,12 +26,15 @@ interface ExtensionBlock {
 
 interface ReactFiber {
   memoizedProps?: { block?: ExtensionBlock };
+  pendingProps?: { block?: ExtensionBlock };
+  alternate?: ReactFiber | null;
   return?: ReactFiber | null;
 }
 
 interface InlineCardRuntime {
   observer?: MutationObserver;
   themeObserver?: MutationObserver;
+  inspectorRefresh?: (event: Event) => void;
   frame?: number;
   dispose(): void;
 }
@@ -84,10 +87,12 @@ function literalParams(paramsJson: unknown): Record<string, unknown> {
   try {
     const raw: unknown = JSON.parse(paramsJson);
     if (!isRecord(raw)) return {};
-    return Object.fromEntries(Object.entries(raw).map(([key, value]) => [
-      key,
-      isRecord(value) && value.kind === "lit" ? value.value : value,
-    ]));
+    return Object.fromEntries(Object.entries(raw).map(([key, value]) => {
+      if (!isRecord(value) || !("value" in value)) return [key, value];
+      // Studio 的值模式在不同版本中使用过 lit、literal 与 value 等封装；
+      // 只要字段有原始 value 就解包，避免枚举摘要回退到错误默认状态。
+      return [key, value.value];
+    }));
   } catch {
     return {};
   }
@@ -100,24 +105,37 @@ function truncate(value: unknown, limit = 72): string {
 }
 
 function findBlock(content: HTMLElement): ExtensionBlock | undefined {
+  const blockRoot = content.closest<HTMLElement>("[data-id]");
+  const expectedBlockId = blockRoot?.dataset.id;
   const candidates: Element[] = [];
   for (let node: HTMLElement | null = content; node; node = node.parentElement) {
     candidates.push(node);
-    if (node.matches("[data-id]")) break;
+    if (node === blockRoot) break;
   }
   candidates.push(...content.querySelectorAll("*"));
 
+  let phoneBlockFallback: ExtensionBlock | undefined;
   for (const candidate of candidates) {
     const fiberKey = Object.keys(candidate).find((key) => key.startsWith("__reactFiber$"));
     let fiber = fiberKey
       ? (candidate as unknown as Record<string, ReactFiber | undefined>)[fiberKey]
       : undefined;
     while (fiber) {
-      if (fiber.memoizedProps?.block?.id) return fiber.memoizedProps.block;
+      const blocks = [
+        fiber.pendingProps?.block,
+        fiber.memoizedProps?.block,
+        fiber.alternate?.pendingProps?.block,
+        fiber.alternate?.memoizedProps?.block,
+      ];
+      for (const block of blocks) {
+        if (!block?.id) continue;
+        if (expectedBlockId && String(block.id) === expectedBlockId) return block;
+        if (!phoneBlockFallback && phoneMethodId(block)) phoneBlockFallback = block;
+      }
       fiber = fiber.return ?? undefined;
     }
   }
-  return undefined;
+  return phoneBlockFallback;
 }
 
 function applyTheme(card: HTMLElement, _content: HTMLElement): void {
@@ -167,6 +185,67 @@ function appIds(params: Record<string, unknown>): string[] {
   return ids;
 }
 
+const TOAST_POSITION_LABELS: Record<string, string> = {
+  "top-left": "左上",
+  "top-center": "中上",
+  "top-right": "右上",
+  "middle-left": "左中",
+  center: "中部",
+  "middle-right": "右中",
+  "bottom-left": "左下",
+  "bottom-center": "中下",
+  "bottom-right": "右下",
+};
+const TOAST_ANIMATION_IN_LABELS: Record<string, string> = {
+  "fade-in": "淡入",
+  "scale-in": "缩入",
+  "slide-in": "滑入",
+  "bounce-in": "弹入",
+  // 兼容旧剧情块。
+  fade: "淡入",
+  scale: "缩入",
+  slide: "滑入",
+  bounce: "弹入",
+};
+const TOAST_ANIMATION_OUT_LABELS: Record<string, string> = {
+  "fade-out": "淡出",
+  "scale-out": "缩出",
+  "slide-out": "滑出",
+  "bounce-out": "弹出",
+  // 兼容旧剧情块。
+  fade: "淡出",
+  scale: "缩出",
+  slide: "滑出",
+  bounce: "弹出",
+};
+const TOAST_STACK_DIRECTION_LABELS: Record<string, string> = {
+  above: "上方",
+  below: "下方",
+};
+
+function appManagementToastChips(params: Record<string, unknown>): string[] {
+  if (params.showNotification !== true) return ["Toast：不显示"];
+  const position = typeof params.notificationPosition === "string"
+    ? TOAST_POSITION_LABELS[params.notificationPosition] ?? "中上"
+    : "中上";
+  const animationIn = typeof params.notificationAnimation === "string"
+    ? TOAST_ANIMATION_IN_LABELS[params.notificationAnimation] ?? "滑入"
+    : "滑入";
+  const animationOut = typeof params.notificationExitAnimation === "string"
+    ? TOAST_ANIMATION_OUT_LABELS[params.notificationExitAnimation] ?? "滑出"
+    : "滑出";
+  const stackDirection = typeof params.notificationStackDirection === "string"
+    ? TOAST_STACK_DIRECTION_LABELS[params.notificationStackDirection] ?? "下方"
+    : "下方";
+  return [
+    "Toast：显示",
+    `位置：${position}`,
+    `入场：${animationIn}`,
+    `退场：${animationOut}`,
+    `后续：${stackDirection}`,
+  ];
+}
+
 function renderDetails(
   methodId: PhoneMethodId,
   params: Record<string, unknown>,
@@ -181,15 +260,25 @@ function renderDetails(
       const ids = appIds(params);
       return {
         summary: `${installing ? "添加到手机" : "从手机删除"}${ids.length ? `：${ids.join("、")}` : "：请在 Inspector 填写 APP ID"}`,
-        chips: [installing ? "安装" : "删除", `${ids.length} 个 APP`],
+        chips: [
+          installing ? "安装" : "删除",
+          `${ids.length} 个 APP`,
+          ...appManagementToastChips(params),
+        ],
       };
     }
     case "manage-app-enabled-state": {
-      const enabling = params.operation !== "disable";
+      // Inspector 的首个默认操作是禁用；只有明确的 enable 才显示为解禁，
+      // 避免旧参数封装尚未解包时把禁用卡片错误标为解禁。
+      const enabling = params.operation === "enable";
       const ids = appIds(params);
       return {
         summary: `${enabling ? "解禁 APP" : "禁用 APP"}${ids.length ? `：${ids.join("、")}` : "：请在 Inspector 填写 APP ID"}`,
-        chips: [enabling ? "解禁" : "禁用", `${ids.length} 个 APP`],
+        chips: [
+          enabling ? "解禁" : "禁用",
+          `${ids.length} 个 APP`,
+          ...appManagementToastChips(params),
+        ],
       };
     }
     case "show-message": {
@@ -306,6 +395,10 @@ function installInlineCards(): void {
         if (runtime.frame !== undefined) cancelAnimationFrame(runtime.frame);
         runtime.observer?.disconnect();
         runtime.themeObserver?.disconnect();
+        if (runtime.inspectorRefresh) {
+          document.removeEventListener("input", runtime.inspectorRefresh, true);
+          document.removeEventListener("change", runtime.inspectorRefresh, true);
+        }
         document.querySelectorAll<HTMLElement>(BLOCK_SELECTOR).forEach(restoreNativeBlock);
       },
     };
@@ -316,6 +409,10 @@ function installInlineCards(): void {
         refresh(root);
       });
     };
+    // Inspector 控件的值通常写入 React Fiber，不一定修改块 DOM；在事件后的下一帧重新读取 Fiber。
+    runtime.inspectorRefresh = () => schedule();
+    document.addEventListener("input", runtime.inspectorRefresh, true);
+    document.addEventListener("change", runtime.inspectorRefresh, true);
     runtime.observer = new MutationObserver(schedule);
     runtime.observer.observe(root, { childList: true, subtree: true });
     runtime.themeObserver = new MutationObserver(schedule);

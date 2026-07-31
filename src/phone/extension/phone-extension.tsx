@@ -18,6 +18,18 @@ import {
   type PlayerPhonePreferences,
 } from "../core/catalog";
 import { PhoneUI } from "../ui/phone-ui";
+import { enqueueToast } from "../../toast/core/toast-runtime";
+import {
+  PHONE_TOAST_ANIMATIONS_IN,
+  PHONE_TOAST_ANIMATIONS_OUT,
+  PHONE_TOAST_POSITIONS,
+  PHONE_TOAST_STACK_DIRECTIONS,
+  type PhoneToastAnimationIn,
+  type PhoneToastAnimationOut,
+  type PhoneToastData,
+  type PhoneToastPosition,
+  type PhoneToastStackDirection,
+} from "../../toast/ui/toast-ui";
 
 const OPEN_PHONE_ACTION = "ink.zenly.ext-7a9373.open-phone";
 const DEFAULT_OPEN_PHONE_SHORTCUT = "ArrowUp";
@@ -33,6 +45,34 @@ const PHONE_POPUP_POSITIONS = [
   "center",
 ] as const;
 export type PhonePopupPosition = (typeof PHONE_POPUP_POSITIONS)[number];
+
+const TOAST_POSITION_OPTIONS = [
+  { label: "左上", value: "top-left" },
+  { label: "中上", value: "top-center" },
+  { label: "右上", value: "top-right" },
+  { label: "左中", value: "middle-left" },
+  { label: "中部", value: "center" },
+  { label: "右中", value: "middle-right" },
+  { label: "左下", value: "bottom-left" },
+  { label: "中下", value: "bottom-center" },
+  { label: "右下", value: "bottom-right" },
+] as const;
+const TOAST_ANIMATION_IN_OPTIONS = [
+  { label: "淡入", value: "fade-in" },
+  { label: "缩入", value: "scale-in" },
+  { label: "滑入", value: "slide-in" },
+  { label: "弹入", value: "bounce-in" },
+] as const;
+const TOAST_ANIMATION_OUT_OPTIONS = [
+  { label: "淡出", value: "fade-out" },
+  { label: "缩出", value: "scale-out" },
+  { label: "滑出", value: "slide-out" },
+  { label: "弹出", value: "bounce-out" },
+] as const;
+const TOAST_STACK_DIRECTION_OPTIONS = [
+  { label: "显示在前一条上方", value: "above" },
+  { label: "显示在前一条下方", value: "below" },
+] as const;
 const LOCAL_COMMAND_IDS = [
   "quick-save",
   "quick-load",
@@ -140,6 +180,42 @@ function nonEmptyString(value: unknown, maxLength = 1024): string | undefined {
   return normalized && normalized.length <= maxLength ? normalized : undefined;
 }
 
+function normalizeToastPosition(value: unknown): PhoneToastPosition {
+  return (PHONE_TOAST_POSITIONS as readonly unknown[]).includes(value)
+    ? (value as PhoneToastPosition)
+    : "top-center";
+}
+
+function normalizeToastAnimationIn(value: unknown): PhoneToastAnimationIn {
+  if ((PHONE_TOAST_ANIMATIONS_IN as readonly unknown[]).includes(value)) {
+    return value as PhoneToastAnimationIn;
+  }
+  // 兼容旧剧情块保存的无后缀动画值。
+  if (value === "fade" || value === "scale" || value === "slide" || value === "bounce") {
+    return `${value}-in` as PhoneToastAnimationIn;
+  }
+  return "slide-in";
+}
+
+function normalizeToastAnimationOut(value: unknown): PhoneToastAnimationOut {
+  if ((PHONE_TOAST_ANIMATIONS_OUT as readonly unknown[]).includes(value)) {
+    return value as PhoneToastAnimationOut;
+  }
+  // 兼容旧剧情块保存的无后缀动画值。
+  if (value === "fade" || value === "scale" || value === "slide" || value === "bounce") {
+    return `${value}-out` as PhoneToastAnimationOut;
+  }
+  return "slide-out";
+}
+
+function normalizeToastStackDirection(
+  value: unknown,
+): PhoneToastStackDirection {
+  return (PHONE_TOAST_STACK_DIRECTIONS as readonly unknown[]).includes(value)
+    ? (value as PhoneToastStackDirection)
+    : "below";
+}
+
 type AppAvailabilityField = "installed" | "enabled";
 
 /** 当前上下文的作者应用目录；方法执行时用它验证 APP ID，绝不相信方法表单中的任意字符串。 */
@@ -171,6 +247,41 @@ function createAppAvailabilitySchema(
       default: operationOptions[0]?.value ?? "",
       required: true,
     } as const,
+    showNotification: {
+      type: "boolean",
+      label: "显示 Toast 通知",
+      default: false,
+      description: "执行此剧情方法时向玩家显示操作结果；不会阻塞剧情。",
+    } as const,
+    notificationPosition: {
+      type: "enum",
+      label: "Toast 位置",
+      options: TOAST_POSITION_OPTIONS,
+      default: "top-center",
+      enabledWhen: "showNotification",
+    } as const,
+    notificationAnimation: {
+      type: "enum",
+      label: "Toast 入场动画",
+      options: TOAST_ANIMATION_IN_OPTIONS,
+      default: "slide-in",
+      enabledWhen: "showNotification",
+    } as const,
+    notificationExitAnimation: {
+      type: "enum",
+      label: "Toast 退场动画",
+      options: TOAST_ANIMATION_OUT_OPTIONS,
+      default: "slide-out",
+      enabledWhen: "showNotification",
+    } as const,
+    notificationStackDirection: {
+      type: "enum",
+      label: "后续 Toast 显示于",
+      options: TOAST_STACK_DIRECTION_OPTIONS,
+      default: "below",
+      enabledWhen: "showNotification",
+    } as const,
+
     ...Object.fromEntries(
       Array.from({ length: 8 }, (_, offset) => {
         const index = offset + 1;
@@ -211,10 +322,23 @@ function updatePhoneAppAvailability(
   field: AppAvailabilityField,
   value: boolean,
   operation: string,
+  showToast = true,
 ): void {
+  const methodId =
+    field === "installed"
+      ? "manage-installed-apps"
+      : "manage-app-enabled-state";
   const catalog = catalogFromPhoneSettings(ctx);
   const knownIds = new Set(catalog.apps.map((app) => app.id));
   const requestedIds = collectAppIds(params);
+  phoneDebug("app-management-request", {
+    methodId,
+    operation,
+    field,
+    value,
+    requestedIds,
+  });
+
   const existing = normalizePhoneAppAvailability(save.get("appAvailability"));
   const states = new Map(
     existing
@@ -244,13 +368,78 @@ function updatePhoneAppAvailability(
   });
   save.set("appAvailability", next);
   phoneDebug("app-availability-updated", {
+    methodId,
     operation,
     field,
     value,
     requestedIds,
     appliedIds,
     ignoredIds,
+    savedOverrideCount: next.length,
   });
+  const appNamesById = new Map(catalog.apps.map((app) => [app.id, app.name]));
+  if (showToast) {
+    showAppAvailabilityToast(
+      ctx,
+      params,
+      operation,
+      appliedIds.map((appId) => appNamesById.get(appId) ?? appId),
+    );
+  }
+}
+
+function appAvailabilityToastMessage(
+  operation: string,
+  appliedIds: readonly string[],
+): string {
+  if (appliedIds.length === 0) return "未找到可操作的 APP";
+  const subject =
+    appliedIds.length === 1
+      ? `APP「${appliedIds[0]}」`
+      : `${appliedIds.length} 个 APP`;
+  const action =
+    operation === "remove"
+      ? "已从手机删除"
+      : operation === "disable"
+        ? "已禁用"
+        : operation === "enable"
+          ? "已解禁"
+          : "已添加到手机";
+  return `${subject}${action}`;
+}
+
+function showAppAvailabilityToast(
+  ctx: ExtensionContext,
+  params: Record<string, unknown>,
+  operation: string,
+  appliedIds: readonly string[],
+): void {
+  if (params.showNotification !== true) return;
+
+  const toast: PhoneToastData = {
+    message: appAvailabilityToastMessage(operation, appliedIds),
+    position: normalizeToastPosition(params.notificationPosition),
+    animation: normalizeToastAnimationIn(params.notificationAnimation),
+    exitAnimation: normalizeToastAnimationOut(params.notificationExitAnimation),
+    stackDirection: normalizeToastStackDirection(
+      params.notificationStackDirection,
+    ),
+  };
+  const wasEmpty = enqueueToast(ctx, toast);
+  if (!wasEmpty && ctx.ui.isVisible("phone-toast")) return;
+  try {
+    void Promise.resolve(
+      ctx.ui.show("phone-toast", undefined, {
+        size: "(100%, 100%)",
+        position: "(0, 0)",
+        interactable: false,
+      }),
+    ).catch((error: unknown) => {
+      phoneDebug("app-notification-show-failed", { error: String(error) });
+    });
+  } catch (error) {
+    phoneDebug("app-notification-show-failed", { error: String(error) });
+  }
 }
 
 function normalizeChatAvatarAssets(
@@ -386,6 +575,8 @@ interface PhoneRuntime {
   phoneMounted: boolean;
   phoneMountEpoch: number;
   opening: boolean;
+  toastSequence: number;
+  toastTimer: number | undefined;
 }
 
 /**
@@ -478,6 +669,8 @@ function getPhoneRuntime(ctx: ExtensionContext): PhoneRuntime {
     phoneMounted: false,
     phoneMountEpoch: 0,
     opening: false,
+    toastSequence: 0,
+    toastTimer: undefined,
   };
   bindPhoneRuntimeKeys(runtime, candidates);
   phoneDebug("runtime-created", {
@@ -546,6 +739,16 @@ async function deactivatePhoneRuntime(
   runtime.phoneMounted = false;
   runtime.phoneMountEpoch += 1;
   runtime.opening = false;
+  runtime.toastSequence += 1;
+  if (runtime.toastTimer !== undefined) {
+    globalThis.clearTimeout(runtime.toastTimer);
+    runtime.toastTimer = undefined;
+  }
+  try {
+    await ctx.ui.hide("phone-toast");
+  } catch (error) {
+    phoneDebug("app-notification-hide-failed", { error: String(error) });
+  }
 
   const pending = runtime.pendingStorySequence;
   runtime.pendingStorySequence = undefined;
@@ -1174,6 +1377,7 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
         "installed",
         operation === "install",
         operation,
+        false,
       );
     },
     skip(ctx, params) {
@@ -1185,6 +1389,7 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
         "installed",
         operation === "install",
         operation,
+        false,
       );
     },
   });
@@ -1218,6 +1423,7 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
         "enabled",
         operation === "enable",
         operation,
+        false,
       );
     },
     skip(ctx, params) {
@@ -1229,6 +1435,7 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
         "enabled",
         operation === "enable",
         operation,
+        false,
       );
     },
   });
