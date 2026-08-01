@@ -45,7 +45,7 @@ export class {{pascalName}}Controller extends Extension {
     registerPhoneApp({
       id: PROGRAM_ID,
       title: "{{title}}",
-      description: "{{title}} 内页应用",
+      description: "{{title}}",
       render: (props) => <{{pascalName}}App {...props} />,
     });
   }
