@@ -151,10 +151,11 @@ export async function runCreate(opts: RunCreateOptions): Promise<void> {
   const author = "池水三两升";
   const date = todayDate();
 
-  // title → JS/TS 双引号字符串安全；titleJson → extension.json 双引号安全
+  // title → JSX/MD/注释原文；titleJs → TS 双引号字面量；titleJson → extension.json
   const vars: Record<string, string> = {
     appId,
-    title: escapeForJsString(title),
+    title,
+    titleJs: escapeForJsString(title),
     titleJson: escapeForJsonString(title),
     packageName,
     extensionId,

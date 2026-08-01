@@ -27,7 +27,7 @@ const PROGRAM_ID = "{{appId}}";
  * @remarks
  * `exposeUI: false` 表示不在扩展树单独暴露 UI 模块，仅注册手机内页。
  */
-@extension({ id: PROGRAM_ID, label: "{{title}}", exposeUI: false })
+@extension({ id: PROGRAM_ID, label: "{{titleJs}}", exposeUI: false })
 export class {{pascalName}}Controller extends Extension {
   /**
    * Studio 加载扩展时调用，向 Phone SDK 注册内页应用。
@@ -44,8 +44,8 @@ export class {{pascalName}}Controller extends Extension {
   static onRegister() {
     registerPhoneApp({
       id: PROGRAM_ID,
-      title: "{{title}}",
-      description: "{{title}}",
+      title: "{{titleJs}}",
+      description: "{{titleJs}}",
       render: (props) => <{{pascalName}}App {...props} />,
     });
   }

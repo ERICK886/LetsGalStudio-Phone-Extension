@@ -122,10 +122,11 @@ export async function runAdd(opts: RunAddOptions): Promise<void> {
   const date = todayDate();
 
   // 模板变量至少包含 brief 要求的全部键（add 模板实际用到其中子集）
-  // title → JS/TS 双引号字符串安全；titleJson 预留给 JSON 模板（add 当前无 extension.json）
+  // title → JSX/MD/注释原文；titleJs → TS 双引号字面量；titleJson 预留给 JSON 模板
   const vars: Record<string, string> = {
     appId,
-    title: escapeForJsString(title),
+    title,
+    titleJs: escapeForJsString(title),
     titleJson: escapeForJsonString(title),
     packageName,
     extensionId,

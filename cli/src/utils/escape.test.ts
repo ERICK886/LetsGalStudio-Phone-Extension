@@ -43,4 +43,26 @@ describe("escapeForJsString / escapeForJsonString", () => {
     assert.equal(parsed.name, titleRaw);
     assert.equal(parsed.description, `${titleRaw} 手机内页`);
   });
+
+  it("title / titleJs / titleJson 三分：JSX 原文、TS 字面量转义、JSON 转义", () => {
+    const titleRaw = '说"好"';
+    const vars = {
+      title: titleRaw,
+      titleJs: escapeForJsString(titleRaw),
+      titleJson: escapeForJsonString(titleRaw),
+    };
+
+    assert.equal(
+      renderTemplateString("<h1>{{title}}</h1>", vars),
+      '<h1>说"好"</h1>',
+    );
+    assert.equal(
+      renderTemplateString('title: "{{titleJs}}",', vars),
+      'title: "说\\"好\\"",',
+    );
+    assert.equal(
+      renderTemplateString('"name": "{{titleJson}}"', vars),
+      '"name": "说\\"好\\""',
+    );
+  });
 });

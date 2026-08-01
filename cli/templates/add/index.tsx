@@ -38,7 +38,7 @@ export const PROGRAM_ID = "{{appId}}";
 export function {{registerFnName}}(): void {
   registerPhoneApp({
     id: PROGRAM_ID,
-    title: "{{title}}",
+    title: "{{titleJs}}",
     description: "src/{{appId}} 内页",
     render: (props) => <{{pascalName}}App {...props} />,
   });
