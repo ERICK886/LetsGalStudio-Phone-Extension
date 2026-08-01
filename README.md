@@ -20,6 +20,7 @@
 11. [调试、验收与常见问题](#11-调试验收与常见问题)
 12. [源码结构](#12-源码结构)
 13. [第三方 Phone SDK 接入](#13-第三方-phone-sdk-接入手机内部应用)
+14. [内页脚手架 create-phone-app](#14-内页脚手架-create-phone-app)
 
 ## 1. 能力范围与限制
 ### 已提供的能力
@@ -451,7 +452,16 @@ sdk/                                               # 本项目使用的 Studio S
 3. 作者在手机扩展设置「动作 · 手机内部应用」填写同一 `phoneAppId`，并在应用目录绑定动作 ID。
 4. 玩家点击图标后，界面在手机屏幕内打开；底部 Home / Escape 回桌面；应用内返回由第三方自己实现。
 
-### 本仓库内开发手机内页（`src/plugin/`）
+### 本仓库内开发手机内页（`src/<app-id>/`）
 
-可在 `src/plugin/<app-id>/` 下以轻量内页形式开发：`pnpm watch` 预览，`pnpm build` 一并打进本扩展发行包。  
-作者仍需手动配置「动作 · 手机内部应用」。也可迁出到独立 Studio 扩展。详见 `src/plugin/README.md`。
+可在 `src/<app-id>/` 下以轻量内页形式开发（参考 `src/demo-shop/`）：`pnpm watch` 预览，`pnpm build` 一并打进本扩展发行包。  
+作者仍需手动配置「动作 · 手机内部应用」。也可迁出到独立 Studio 扩展。
+
+## 14. 内页脚手架 create-phone-app
+
+本仓库提供 CLI（`cli/`，包名 `@ink-zenly/create-phone-app`），用于脚手架手机内页：
+
+- `pnpm create-phone-app add <app-id> --title "标题"`：在本仓 `src/<app-id>/` 生成内页并注入 `src/index.tsx`。
+- `pnpm create-phone-app create <dir> --template minimal|default --app-id <id> --title "标题"`：生成独立扩展工程。
+
+依赖始终写 `@ink-zenly/phone-sdk` 的 **npm 版本**（如 `^0.3.0`），不用 `file:`。完整用法、模板说明与注意点见 [`cli/README.md`](cli/README.md)。
