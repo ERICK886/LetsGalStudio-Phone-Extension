@@ -3,16 +3,17 @@
  * @description 在手机扩展内安装 @ink-zenly/phone-sdk 宿主，维护已注册应用表。
  * @author 池水三两升
  * @date 2026-08-01
- * @version 0.1.0
+ * @version 0.2.0
  */
 
 import {
   installPhoneSdkHost,
+  toPhoneAppId,
   type PhoneAppRegistration,
   type PhoneSdkHost,
 } from "@ink-zenly/phone-sdk";
 
-/** 模块级注册表；与 globalThis 槽位中的 host 方法绑定。 */
+/** 模块级注册表；与 globalThis 槽位中的 host 方法绑定。key = Studio 程序 ID。 */
 const registeredApps = new Map<string, PhoneAppRegistration>();
 
 /**
@@ -37,10 +38,12 @@ export function installPhoneExtensionSdkHost(): () => void {
       registeredApps.set(app.id, app);
     },
     unregisterApp(id) {
-      registeredApps.delete(id);
+      const key = toPhoneAppId(id) ?? id;
+      registeredApps.delete(key);
     },
     getApp(id) {
-      return registeredApps.get(id);
+      const key = toPhoneAppId(id) ?? id;
+      return registeredApps.get(key);
     },
     listApps() {
       return [...registeredApps.values()];
@@ -53,9 +56,11 @@ export function installPhoneExtensionSdkHost(): () => void {
 /**
  * 供手机 UI 查询已注册应用（不经过重新 import 客户端队列）。
  *
- * @param id 应用 id
+ * @param id 程序 ID，或 Studio 引用 `扩展ID/程序ID`
  * @returns 注册对象或 `undefined`
  */
 export function lookupPhoneSdkApp(id: string): PhoneAppRegistration | undefined {
-  return registeredApps.get(id);
+  const key = toPhoneAppId(id);
+  if (!key) return undefined;
+  return registeredApps.get(key);
 }

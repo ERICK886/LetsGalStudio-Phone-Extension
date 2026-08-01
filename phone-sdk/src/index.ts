@@ -3,7 +3,7 @@
  * @description @ink-zenly/phone-sdk 公共导出入口。
  * @author 池水三两升
  * @date 2026-08-01
- * @version 0.1.2
+ * @version 0.2.0
  */
 
 export type {
@@ -15,11 +15,17 @@ export type {
 } from "./types";
 
 export type { PhoneSdkRenderPropsAccessReport } from "./debug";
+export type { StudioProgramRef } from "./app-id";
 
 export { PHONE_SDK_GLOBAL_KEY, getPhoneSdkSlot } from "./slot";
 export {
-  getRegisteredPhoneApp,
+  formatStudioProgramRef,
   isPhoneAppId,
+  parseStudioProgramRef,
+  toPhoneAppId,
+} from "./app-id";
+export {
+  getRegisteredPhoneApp,
   listRegisteredPhoneApps,
   registerPhoneApp,
   unregisterPhoneApp,

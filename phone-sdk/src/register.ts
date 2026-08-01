@@ -3,33 +3,19 @@
  * @description Phone SDK 注册/注销/查询 API；宿主未就绪时排队。
  * @author 池水三两升
  * @date 2026-08-01
- * @version 0.1.0
+ * @version 0.2.0
  */
 
+import { isPhoneAppId, toPhoneAppId } from "./app-id";
 import { phoneSdkDebug } from "./debug";
 import { getPhoneSdkSlot } from "./slot";
 import type { PhoneAppRegistration } from "./types";
 
-
-const SAFE_APP_ID =
-  /^[a-z0-9](?:[a-z0-9-]{0,62}|[a-z0-9.-]{0,126}[a-z0-9])$/;
-
-/**
- * 校验 Phone SDK 应用 id。
- *
- * 支持两种约定：
- * 1. 短 kebab-case：`shop`、`snake-demo`
- * 2. 与 `extension.json` 的 `id` 一致的 reverse-DNS：`ink.zenly.ext-phone-snake`
- *
- * @param id 待校验字符串
- * @returns 是否合法
- */
-export function isPhoneAppId(id: unknown): id is string {
-  return typeof id === "string" && id.length <= 128 && SAFE_APP_ID.test(id);
-}
+export { isPhoneAppId } from "./app-id";
 
 /**
  * 规范化并校验一条注册描述。
+ * `id` 会规约为 Studio 程序 ID（支持误填 `扩展ID/程序ID`）。
  *
  * @param app 原始注册对象
  * @returns 净化后的对象；非法时返回 `null` 并打警告
@@ -39,15 +25,19 @@ function normalizeRegistration(app: PhoneAppRegistration): PhoneAppRegistration 
     console.warn("[phone-sdk] registerPhoneApp: 参数无效");
     return null;
   }
-  if (!isPhoneAppId(app.id)) {
+
+  const normalizedId = typeof app.id === "string" ? toPhoneAppId(app.id) : null;
+  if (!normalizedId || !isPhoneAppId(normalizedId)) {
     console.warn(
-      "[phone-sdk] registerPhoneApp: id 须为 kebab-case 或与 extension.json 的 id 一致（小写字母/数字/点/连字符）",
+      "[phone-sdk] registerPhoneApp: id 须等于 Studio 程序 ID（@extension({ id })），"
+        + "也可填写「扩展ID/程序ID」由 SDK 自动取程序段。示例：phone-snake 或 ink.zenly.ext-phone-snake/phone-snake",
       app.id,
     );
     return null;
   }
+
   if (typeof app.render !== "function") {
-    console.warn("[phone-sdk] registerPhoneApp: render 必须是函数", app.id);
+    console.warn("[phone-sdk] registerPhoneApp: render 必须是函数", normalizedId);
     return null;
   }
 
@@ -59,7 +49,7 @@ function normalizeRegistration(app: PhoneAppRegistration): PhoneAppRegistration 
     : undefined;
 
   return {
-    id: app.id,
+    id: normalizedId,
     ...(title ? { title } : {}),
     ...(description ? { description } : {}),
     render: app.render,
@@ -69,19 +59,23 @@ function normalizeRegistration(app: PhoneAppRegistration): PhoneAppRegistration 
 /**
  * 向手机扩展注册一个可在手机内部显示的应用。
  *
- * @param app 应用描述（id + render 必填）
+ * @param app 应用描述（id + render 必填）；`id` 必须与本程序 `@extension({ id })` 一致
  * @returns void
  * @throws 不抛出；非法参数只警告并忽略
  *
  * @example
  * ```ts
- * import { registerPhoneApp } from "@ink-zenly/phone-sdk";
+ * const PROGRAM_ID = "phone-snake";
  *
- * registerPhoneApp({
- *   id: "shop",
- *   title: "商店",
- *   render: ({ closeApp }) => <button type="button" onClick={closeApp}>回桌面</button>,
- * });
+ * @extension({ id: PROGRAM_ID, label: "贪吃蛇", exposeUI: false })
+ * class PhoneSnakeExtension extends Extension {
+ *   static onRegister() {
+ *     registerPhoneApp({
+ *       id: PROGRAM_ID,
+ *       render: (props) => <SnakeApp {...props} />,
+ *     });
+ *   }
+ * }
  * ```
  */
 export function registerPhoneApp(app: PhoneAppRegistration): void {
@@ -118,28 +112,29 @@ export function registerPhoneApp(app: PhoneAppRegistration): void {
 /**
  * 注销此前注册的手机内部应用。
  *
- * @param id 应用 id
+ * @param id 程序 ID，或 `扩展ID/程序ID`（自动取程序段）
  * @returns void
  */
 export function unregisterPhoneApp(id: string): void {
-  if (!isPhoneAppId(id)) {
+  const normalizedId = toPhoneAppId(id);
+  if (!normalizedId) {
     console.warn("[phone-sdk] unregisterPhoneApp: id 无效", id);
     return;
   }
 
   const slot = getPhoneSdkSlot();
   if (slot.host) {
-    slot.host.unregisterApp(id);
-    phoneSdkDebug("unregisterPhoneApp → 已从宿主移除", { id, hostReady: true });
+    slot.host.unregisterApp(normalizedId);
+    phoneSdkDebug("unregisterPhoneApp → 已从宿主移除", { id: normalizedId, hostReady: true });
     return;
   }
 
-  slot.queue = slot.queue.filter((item) => item.id !== id);
-  if (!slot.unregisterQueue.includes(id)) {
-    slot.unregisterQueue.push(id);
+  slot.queue = slot.queue.filter((item) => item.id !== normalizedId);
+  if (!slot.unregisterQueue.includes(normalizedId)) {
+    slot.unregisterQueue.push(normalizedId);
   }
   phoneSdkDebug("unregisterPhoneApp → 宿主未就绪，已记入注销队列", {
-    id,
+    id: normalizedId,
     hostReady: false,
     unregisterQueueLength: slot.unregisterQueue.length,
   });
@@ -148,12 +143,13 @@ export function unregisterPhoneApp(id: string): void {
 /**
  * 查询当前宿主中已生效的应用；宿主未安装时返回 `undefined`。
  *
- * @param id 应用 id
+ * @param id 程序 ID，或 `扩展ID/程序ID`
  * @returns 注册对象或 `undefined`
  */
 export function getRegisteredPhoneApp(id: string): PhoneAppRegistration | undefined {
-  if (!isPhoneAppId(id)) return undefined;
-  return getPhoneSdkSlot().host?.getApp(id);
+  const normalizedId = toPhoneAppId(id);
+  if (!normalizedId) return undefined;
+  return getPhoneSdkSlot().host?.getApp(normalizedId);
 }
 
 /**

@@ -5,7 +5,7 @@ import {
   type ExtensionContext,
   type InternalSystemSlot,
 } from "@avg-studio/sdk";
-import { isPhoneAppId } from "@ink-zenly/phone-sdk";
+import { isPhoneAppId, toPhoneAppId } from "@ink-zenly/phone-sdk";
 
 /**
  * 手机应用允许启动的受限目标集合。
@@ -14,7 +14,8 @@ import { isPhoneAppId } from "@ink-zenly/phone-sdk";
  * - `program-ui.ref`：程序 UI 引用；本扩展使用 `ui-id`，跨扩展使用 `extension-id/ui-id`，不得带 `@`。
  * - `visual-ui.name`：项目 UI 使用 `ui-name`，扩展 UI 使用 `@extension-id/ui-name`。
  * - `extension-method`：SDK 暂无直接调用 API，`methodRef` 仅用于标识，实际由 `fragmentId` 适配 Fragment 执行。
- * - `in-phone-app.phoneAppId`：第三方 `registerPhoneApp({ id })` 的 id，推荐等于该扩展 `extension.json` 的 `id`。
+ * - `in-phone-app.phoneAppId`：第三方 `registerPhoneApp({ id })` 的 id，须等于 Studio 程序 ID（`@extension({ id })`）；
+ *   也可填 `扩展ID/程序ID`（解析后取程序段）。同一扩展可有多个程序/多个内页 app。
  */
 export type PhoneTarget =
   | { kind: "program-ui"; ref: string; props?: Record<string, unknown> }
@@ -124,8 +125,8 @@ const DEFAULT_CATALOG: PhoneCatalog = {
     {
       id: "snake",
       name: "贪吃蛇",
-      description: "需同时启用 ink.zenly.ext-phone-snake（Phone SDK 示例）",
-      target: { kind: "in-phone-app", phoneAppId: "ink.zenly.ext-phone-snake" },
+      description: "需同时启用 ink.zenly.ext-phone-snake（Phone SDK 示例；程序 ID = phone-snake）",
+      target: { kind: "in-phone-app", phoneAppId: "phone-snake" },
     },
   ],
   apps: [
@@ -261,10 +262,12 @@ function parseTarget(value: unknown): PhoneTarget | null {
       return typeof value.commandId === "string" && LOCAL_COMMANDS.has(value.commandId as LocalCommandId)
         ? { kind: "local-command", commandId: value.commandId as LocalCommandId }
         : null;
-    case "in-phone-app":
-      return isPhoneAppId(value.phoneAppId)
-        ? { kind: "in-phone-app", phoneAppId: value.phoneAppId }
+    case "in-phone-app": {
+      const phoneAppId = typeof value.phoneAppId === "string" ? toPhoneAppId(value.phoneAppId) : null;
+      return phoneAppId && isPhoneAppId(phoneAppId)
+        ? { kind: "in-phone-app", phoneAppId }
         : null;
+    }
     default:
       return null;
   }

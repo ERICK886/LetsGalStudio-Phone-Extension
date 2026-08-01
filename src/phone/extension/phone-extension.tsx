@@ -1657,7 +1657,7 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
         phoneAppId: item
           .string("Phone SDK 应用 ID")
           .describe(
-            "填写第三方扩展 registerPhoneApp({ id }) 的 id；推荐与该扩展 extension.json 的 id 完全一致，例如 ink.zenly.ext-phone-snake。",
+            "填写第三方程序的 Studio 程序 ID（与 @extension({ id }) / registerPhoneApp({ id }) 一致），例如 phone-snake。也可填「扩展ID/程序ID」，例如 ink.zenly.ext-phone-snake/phone-snake。同一扩展可有多个程序、多个内页 app。",
           ),
         description: item.string("说明"),
       }))
@@ -1671,7 +1671,7 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
       .addLabel("添加手机内部应用动作")
       .emptyHint("没有手机内部应用动作。第三方需先通过 @ink-zenly/phone-sdk 注册应用。")
       .describe(
-        "操作：①第三方扩展用 Phone SDK 的 registerPhoneApp 注册（id 建议取自 extension.json）；②添加本动作并填写相同的 Phone SDK 应用 ID；③在「手机应用目录」的默认动作 ID 中绑定该动作 ID。",
+        "操作：①第三方每个程序用 registerPhoneApp({ id: 程序ID }) 注册；②添加本动作并填写相同程序 ID（或 扩展ID/程序ID）；③在「手机应用目录」绑定该动作 ID。",
       ),
     catalogApps: s
       .array("手机应用目录", (item) => ({

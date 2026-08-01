@@ -1,10 +1,42 @@
 # @ink-zenly/phone-sdk
 
-LetsGal「自定义手机扩展」专用 SDK。第三方扩展通过它注册可在**手机屏幕内部**显示的应用界面；作者在手机扩展设置里把应用图标绑定到已注册的 `phoneAppId`。
+LetsGal「自定义手机扩展」专用 SDK。第三方扩展通过它注册可在**手机屏幕内部**显示的应用界面。
+
+## 应用 ID 约定（重要）
+
+Studio 以 **`扩展ID/程序ID`** 标识程序，例如：
+
+`ink.zenly.ext-phone-snake/phone-snake`
+
+- **扩展 ID**：`extension.json` 的 `id`
+- **程序 ID**：`@extension({ id })` 的 id
+
+**Phone SDK 的 `registerPhoneApp({ id })` 必须等于程序 ID**（上例为 `phone-snake`），与 `@extension({ id })` 保持同一常量，不要另写一份。
+
+一个扩展可以有多个程序模块 → 每个模块各自 `registerPhoneApp`，即可在一部手机里挂多个内页 app。
+
+作者设置里的 `phoneAppId`：
+
+- 推荐填程序 ID：`phone-snake`
+- 也可填 Studio 完整引用：`ink.zenly.ext-phone-snake/phone-snake`（SDK/宿主会自动取程序段）
+
+辅助 API：
+
+```ts
+import {
+  formatStudioProgramRef,
+  toPhoneAppId,
+  parseStudioProgramRef,
+} from "@ink-zenly/phone-sdk";
+
+formatStudioProgramRef("ink.zenly.ext-phone-snake", "phone-snake");
+// → "ink.zenly.ext-phone-snake/phone-snake"
+
+toPhoneAppId("ink.zenly.ext-phone-snake/phone-snake");
+// → "phone-snake"
+```
 
 ## 安装
-
-在第三方扩展的 `package.json` 中：
 
 ```json
 {
@@ -14,26 +46,23 @@ LetsGal「自定义手机扩展」专用 SDK。第三方扩展通过它注册可
 }
 ```
 
-构建时请将 `@ink-zenly/phone-sdk` 打进自己的 bundle（仅 external `react` / `@avg-studio/sdk`），通过 `globalThis` 与手机宿主通信。
+构建时请将 `@ink-zenly/phone-sdk` 打进自己的 bundle（仅 external `react` / `@avg-studio/sdk`）。
 
-## 注册约定（重要）
-
-**`registerPhoneApp({ id })` 推荐直接使用本扩展 `extension.json` 的 `id`，不要在源码里再手写一份短 id。**
-
-作者设置里的 `phoneAppId` 必须与该值完全一致。
+## 注册示例
 
 ```tsx
 import { Extension, extension } from "@avg-studio/sdk";
 import { registerPhoneApp } from "@ink-zenly/phone-sdk";
-import extensionManifest from "../extension.json";
 
-@extension({ id: "shop-controller", label: "商店控制器", exposeUI: false })
+/** 与 @extension({ id })、registerPhoneApp({ id })、作者 phoneAppId 共用 */
+const PROGRAM_ID = "shop";
+
+@extension({ id: PROGRAM_ID, label: "商店", exposeUI: false })
 export class ShopController extends Extension {
   static onRegister() {
     registerPhoneApp({
-      // 与 extension.json 的 id 一致，例如 ink.zenly.ext-shop
-      id: extensionManifest.id,
-      title: extensionManifest.name,
+      id: PROGRAM_ID,
+      title: "商店",
       render: ({ closeApp, safeAreaInsets }) => (
         <div style={{ paddingTop: safeAreaInsets.top, color: "#fff" }}>
           <h2>商店</h2>
@@ -45,46 +74,17 @@ export class ShopController extends Extension {
 }
 ```
 
-`id` 规则：小写字母 / 数字 / 点 / 连字符；支持短名（`shop`）或 reverse-DNS（`ink.zenly.ext-shop`）。
-
 ## 作者配置
 
 1. 启用「自定义手机扩展」。
-2. 设置 →「动作 · 手机内部应用」→ 填写动作 ID，并将 `phoneAppId` 设为第三方 `extension.json` 的 `id`。
-3. 「手机应用目录」中某图标的「默认动作 ID」填该动作 ID。
-
-玩家点击图标后，手机会保持打开并在屏幕内渲染你的 `render`；底部 Home 返回桌面。
+2. 设置 →「动作 · 手机内部应用」→ `phoneAppId` 填程序 ID（如 `shop`）。
+3. 「手机应用目录」中绑定该动作 ID。
 
 ## 安全区（刘海 / Home）
 
-- **应用层必须全屏覆盖**手机屏幕（`width/height: 100%`），背景可以画到状态栏底下。
-- **`safeAreaInsets.top` = 状态栏高度**（`offsetHeight`）；底部为 Home 条高度。
-- 标题、按钮等可读/可点内容应加 `paddingTop: safeAreaInsets.top`（以及 bottom），不要把整块背景也缩进。
-
-```tsx
-registerPhoneApp({
-  id: extensionManifest.id,
-  render: ({ safeAreaInsets, closeApp }) => (
-    <div style={{ width: "100%", height: "100%", position: "relative" }}>
-      <div style={{ position: "absolute", inset: 0, background: "#123" }} />
-      <div
-        style={{
-          position: "relative",
-          height: "100%",
-          boxSizing: "border-box",
-          paddingTop: safeAreaInsets.top,
-          paddingBottom: safeAreaInsets.bottom,
-          paddingLeft: safeAreaInsets.left,
-          paddingRight: safeAreaInsets.right,
-        }}
-      >
-        <button type="button" onClick={closeApp}>回桌面</button>
-      </div>
-    </div>
-  ),
-});
-```
+- 应用层全屏覆盖；可读内容使用 `safeAreaInsets.top/bottom`。
+- `safeAreaInsets.top` = 状态栏高度。
 
 ## 示例扩展
 
-仓库旁有独立示例扩展 `AVG-Extensions/ext-phone-snake`（贪吃蛇），用于验证跨扩展接入。其 Phone SDK id 即 `extension.json` 的 `ink.zenly.ext-phone-snake`。
+`AVG-Extensions/ext-phone-snake`：Studio 引用 `ink.zenly.ext-phone-snake/phone-snake`，Phone SDK id = `phone-snake`。

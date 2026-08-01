@@ -53,7 +53,9 @@ export interface PhoneAppRenderProps {
 /**
  * 第三方通过 `registerPhoneApp` 提交的应用描述。
  *
- * @property id 稳定 id；推荐直接使用本扩展 `extension.json` 的 `id`，作者设置里的 `phoneAppId` 必须与此一致
+ * @property id 稳定 id，必须与 Studio 程序 ID（`@extension({ id })`）一致；
+ *   同一扩展可注册多个 app（每个程序模块各注册一次）。作者设置的 `phoneAppId` 填同一程序 ID，
+ *   也可填 Studio 引用 `扩展ID/程序ID`（宿主会规约为程序 ID）。
  * @property title 可选展示名（宿主可不显示顶栏，供调试/无障碍）
  * @property description 可选说明
  * @property render 返回要嵌在手机屏幕内的 React 节点

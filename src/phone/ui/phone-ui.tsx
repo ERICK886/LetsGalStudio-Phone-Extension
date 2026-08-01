@@ -246,13 +246,8 @@ function InPhoneAppContentReady(props: {
       });
     };
 
-    const micro = window.queueMicrotask
-      ? undefined
-      : window.setTimeout(flush, 0);
-
-    if (window.queueMicrotask) {
-      window.queueMicrotask(flush);
-    }
+    // queueMicrotask 在 Window 类型中始终存在，直接调度即可，无需 feature-detect。
+    window.queueMicrotask(flush);
 
     const raf1 = window.requestAnimationFrame(() => {
       flush();
@@ -262,7 +257,6 @@ function InPhoneAppContentReady(props: {
     const late = window.setTimeout(flush, 120);
 
     return () => {
-      if (micro !== undefined) window.clearTimeout(micro);
       window.cancelAnimationFrame(raf1);
       window.clearTimeout(late);
     };
@@ -1965,7 +1959,7 @@ const PhoneUIContent: React.FC<PhoneUIProps> = ({
                         <label className="phone-field">
                           Phone SDK 应用 ID
                           <input
-                            placeholder="例如 ink.zenly.ext-phone-snake（与 extension.json 的 id 一致）"
+                            placeholder="例如 phone-snake 或 ink.zenly.ext-phone-snake/phone-snake"
                             value={selectedAction.target.phoneAppId}
                             onChange={(event) => updateSelectedTarget({
                               kind: "in-phone-app",
