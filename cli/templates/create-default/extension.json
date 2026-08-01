@@ -1,0 +1,9 @@
+{
+  "id": "{{extensionId}}",
+  "name": "{{title}}",
+  "description": "{{title}} 手机内部应用扩展；在宿主设置中将 phoneAppId 配置为 {{appId}} 后即可打开内页。",
+  "author": "{{author}}",
+  "version": "0.1.0",
+  "entry": "dist/index.mjs",
+  "sdkVersion": ">=1.9.0"
+}

@@ -1,0 +1,9 @@
+{
+  "id": "{{extensionId}}",
+  "name": "{{title}}",
+  "description": "{{title}} 手机内页",
+  "author": "{{author}}",
+  "version": "0.1.0",
+  "entry": "dist/index.mjs",
+  "sdkVersion": ">=1.9.0"
+}
