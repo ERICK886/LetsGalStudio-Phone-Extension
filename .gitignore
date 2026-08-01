@@ -3,3 +3,5 @@ dist
 sdk
 *.log
 .DS_Store
+
+.worktrees/
