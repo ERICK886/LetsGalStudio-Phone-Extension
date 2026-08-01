@@ -71,6 +71,12 @@ function hasAllAddFields(opts: RunAddOptions): boolean {
  * ```
  */
 export async function runAdd(opts: RunAddOptions): Promise<void> {
+  const appIdHint = opts.appId?.trim();
+
+  if (appIdHint) {
+    assertValidAppId(appIdHint);
+  }
+
   const filled = hasAllAddFields(opts)
     ? {
         appId: opts.appId!.trim(),

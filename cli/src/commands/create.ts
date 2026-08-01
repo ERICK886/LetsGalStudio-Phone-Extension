@@ -99,6 +99,12 @@ function hasAllCreateFields(opts: RunCreateOptions): boolean {
  * ```
  */
 export async function runCreate(opts: RunCreateOptions): Promise<void> {
+  const appIdHint = opts.appId?.trim();
+
+  if (appIdHint) {
+    assertValidAppId(appIdHint);
+  }
+
   const templateHint =
     opts.template === undefined
       ? undefined
