@@ -118,7 +118,7 @@ pnpm create-phone-app add notes --title "便签" --force
 
 非法示例：`Bad_Id`、`123shop`、`MyApp`。
 
-非交互调用时请同时提供 `--title`（或完整 flags），以便校验在提示前执行；仅传非法 `app-id` 且缺少 `--title` 时会先进入交互补全标题。
+已提供 `app-id`（含位置参数）时会在进入交互前校验；非法值立即输出中文错误并以非零退出。仅 app-id 合法且缺少 `--title` 时才会进入标题交互。
 
 ---
 
