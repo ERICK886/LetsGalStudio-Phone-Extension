@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "create-phone-app": "node ./cli/bin/create-phone-app.js",
     "build": "vite build",
     "watch": "vite build --watch",
     "sync": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/sync-to-studio.ps1",

@@ -1,0 +1,28 @@
+{
+  "name": "@ink-zenly/create-phone-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Scaffold LetsGal phone in-app plugins (create / add)",
+  "bin": {
+    "create-phone-app": "./bin/create-phone-app.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "templates"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@clack/prompts": "^0.10.0",
+    "citty": "^0.1.6",
+    "picocolors": "^1.1.1",
+    "tsx": "^4.19.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.1.3"
+  }
+}
