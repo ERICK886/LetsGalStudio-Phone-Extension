@@ -12,6 +12,7 @@ import {
   resolveUIRef,
 } from "@avg-studio/sdk";
 import { isPhoneAppId, toPhoneAppId } from "@ink-zenly/phone-sdk/plugin";
+import { getPhoneHostExtensionId } from "../../host-extension-id";
 import type {
   ActionSettingsRow,
   AppSettingsRow,
@@ -66,7 +67,7 @@ function isProgramUiRef(value: unknown): value is string {
   if (!nonEmptyString(value) || value.startsWith("@") || value !== value.trim())
     return false;
   try {
-    resolveUIRef(value, "ink.zenly.ext-7a9373");
+    resolveUIRef(value, getPhoneHostExtensionId());
     return true;
   } catch {
     return false;

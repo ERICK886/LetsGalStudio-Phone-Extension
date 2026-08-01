@@ -86,4 +86,31 @@ describe("copyTemplateDir", () => {
     assert.equal(existsSync(join(destDir, "node_modules")), false);
     assert.equal(existsSync(join(destDir, ".git")), false);
   });
+
+  /**
+   * 验证模板源文件 `gitignore` 在生成工程时重命名为 `.gitignore`。
+   *
+   * @remarks
+   * npm pack 不会稳定带上包内模板的 `.gitignore`，故模板提交为 `gitignore`。
+   */
+  it("将模板文件 gitignore 重命名为 .gitignore", async () => {
+    const src = mkdtempSync(join(tmpdir(), "tpl-gi-src-"));
+    const dest = mkdtempSync(join(tmpdir(), "tpl-gi-dest-"));
+
+    try {
+      writeFileSync(join(src, "gitignore"), "node_modules\n");
+      const written = await copyTemplateDir(src, dest, {});
+
+      assert.equal(existsSync(join(dest, ".gitignore")), true);
+      assert.equal(existsSync(join(dest, "gitignore")), false);
+      assert.equal(
+        readFileSync(join(dest, ".gitignore"), "utf8"),
+        "node_modules\n",
+      );
+      assert.ok(written.includes(".gitignore"));
+    } finally {
+      rmSync(src, { recursive: true, force: true });
+      rmSync(dest, { recursive: true, force: true });
+    }
+  });
 });

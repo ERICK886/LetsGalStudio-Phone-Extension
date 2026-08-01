@@ -31,8 +31,9 @@ import {
   type PhoneToastPosition,
   type PhoneToastStackDirection,
 } from "../../toast/ui/toast-ui";
+import { getOpenPhoneActionId } from "../../host-extension-id";
 
-const OPEN_PHONE_ACTION = "ink.zenly.ext-7a9373.open-phone";
+const OPEN_PHONE_ACTION = getOpenPhoneActionId();
 const DEFAULT_OPEN_PHONE_SHORTCUT = "ArrowUp";
 /** 宿主未完成 show 时的保险释放时间，避免一次异常显示永久阻塞后续打开动作。 */
 const NORMAL_PHONE_OPEN_TIMEOUT_MS = 1_200;

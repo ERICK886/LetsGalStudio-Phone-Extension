@@ -13,6 +13,7 @@ import {
   type PhoneAppRegistration,
   type PhoneSafeAreaInsets,
 } from "@ink-zenly/phone-sdk/plugin";
+import { getPhoneHostExtensionId } from "../../host-extension-id";
 
 /**
  * 渲染 Phone SDK 已注册应用；注册在打开后丢失时给出可回桌面的占位。
@@ -111,7 +112,7 @@ export function InPhoneAppContentReady(props: {
     const flush = () => {
       const report = debugBundle.flushReport();
       const root = document.querySelector<HTMLElement>(
-        `[data-phone-root="ink.zenly.ext-7a9373"] .phone-in-app-host`,
+        `[data-phone-root="${getPhoneHostExtensionId()}"] .phone-in-app-host`,
       );
       const snakeRoot = root?.querySelector<HTMLElement>("[data-snake-build]");
       phoneSdkDebug("内页 DOM 探测", {

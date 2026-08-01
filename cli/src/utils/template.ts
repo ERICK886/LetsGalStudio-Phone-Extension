@@ -100,7 +100,15 @@ export async function copyTemplateDir(
 
       const srcPath = join(currentSrc, entry.name);
       const destName = renderTemplateString(entry.name, vars);
-      const destPath = join(currentDest, destName);
+
+      /**
+       * npm pack 不会稳定带上包内模板的 `.gitignore`；模板提交为 `gitignore`，
+       * 生成工程时改回 `.gitignore`。
+       */
+      const resolvedDestName =
+        destName === "gitignore" ? ".gitignore" : destName;
+
+      const destPath = join(currentDest, resolvedDestName);
       const relPath = relative(destDir, destPath).replace(/\\/g, "/");
 
       mkdirSync(currentDest, { recursive: true });

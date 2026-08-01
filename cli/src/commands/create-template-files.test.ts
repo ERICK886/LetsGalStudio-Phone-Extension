@@ -3,7 +3,7 @@
  * @description 断言 create-host / pack-release 模板关键文件存在。
  * @author 池水三两升
  * @date 2026-08-01
- * @version 0.3.0
+ * @version 0.3.1
  */
 
 import assert from "node:assert/strict";
@@ -26,7 +26,7 @@ const HOST_TEMPLATES = ["create-host-default", "create-host-minimal"] as const;
  * @constant
  */
 const HOST_REQUIRED = [
-  ".gitignore",
+  "gitignore",
   "extension.json",
   "package.json",
   "README.md",
@@ -42,7 +42,7 @@ const HOST_REQUIRED = [
  * @constant
  */
 const PACK_RELEASE_REQUIRED = [
-  ".gitignore",
+  "gitignore",
   "extension.json",
   "package.json",
   "README.md",

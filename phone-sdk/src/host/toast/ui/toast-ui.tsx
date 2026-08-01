@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { ExtensionProps } from "@avg-studio/sdk";
 import type { ToastListener, ToastNotification } from "../core/toast-runtime";
 import toastCss from "../styles/toast.css?inline";
+import { getPhoneHostExtensionId } from "../../host-extension-id";
 
 export const PHONE_TOAST_POSITIONS = ["top-left", "top-center", "top-right", "middle-left", "center", "middle-right", "bottom-left", "bottom-center", "bottom-right"] as const;
 export type PhoneToastPosition = (typeof PHONE_TOAST_POSITIONS)[number];
@@ -52,5 +53,5 @@ export const PhoneToastUI: React.FC<PhoneToastProps> = ({ subscribeToasts, close
   useEffect(() => subscribeToasts(setItems), [subscribeToasts]);
   useEffect(() => { if (items.length) hadItems.current = true; else if (hadItems.current) closeToastUi(); }, [items, closeToastUi]);
   const groups = useMemo(() => groupToasts(items), [items]);
-  return <div data-phone-toast-root="ink.zenly.ext-7a9373"><style>{toastCss}</style>{[...groups].map(([position, toasts]) => <div className="phone-toast-stack" data-position={position} key={position}>{toasts.map((toast) => <div className="phone-toast-bubble" data-animation={toast.animation} data-exit-animation={toast.exitAnimation} data-exiting={toast.exiting === true} key={toast.id} role="status" aria-live="polite"><span className="phone-toast-icon" aria-hidden="true">✓</span><span>{toast.message}</span></div>)}</div>)}</div>;
+  return <div data-phone-toast-root={getPhoneHostExtensionId()}><style>{toastCss}</style>{[...groups].map(([position, toasts]) => <div className="phone-toast-stack" data-position={position} key={position}>{toasts.map((toast) => <div className="phone-toast-bubble" data-animation={toast.animation} data-exit-animation={toast.exitAnimation} data-exiting={toast.exiting === true} key={toast.id} role="status" aria-live="polite"><span className="phone-toast-icon" aria-hidden="true">✓</span><span>{toast.message}</span></div>)}</div>)}</div>;
 };

@@ -8,10 +8,20 @@
 
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const rootDir = path.dirname(fileURLToPath(import.meta.url));
+
+const extensionJson = JSON.parse(
+  readFileSync(path.resolve(rootDir, "extension.json"), "utf8"),
+) as { id?: string };
+
+const hostExtensionId =
+  typeof extensionJson.id === "string" && extensionJson.id.trim() !== ""
+    ? extensionJson.id.trim()
+    : "ink.zenly.ext-7a9373";
 
 /**
  * Vite 配置。
@@ -41,6 +51,10 @@ export default defineConfig({
      * 宿主本身不编写内页；该标志仅供诊断快照。
      */
     __PHONE_PLUGIN_DEV__: JSON.stringify(true),
+    /**
+     * 本仓 `extension.json` 的 `id`，供 phone-sdk 宿主解析 open-phone 等命令前缀。
+     */
+    __PHONE_HOST_EXTENSION_ID__: JSON.stringify(hostExtensionId),
   },
   build: {
     lib: {

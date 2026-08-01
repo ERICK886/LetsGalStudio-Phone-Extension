@@ -14,6 +14,12 @@
  */
 declare const __PHONE_PLUGIN_DEV__: boolean;
 
+/**
+ * 由宿主工程 Vite `define` 注入：当前包 `extension.json` 的 `id`。
+ * 未注入时 SDK 回退 `ink.zenly.ext-7a9373`。
+ */
+declare const __PHONE_HOST_EXTENSION_ID__: string | undefined;
+
 declare module "*.css?inline" {
   const css: string;
   export default css;

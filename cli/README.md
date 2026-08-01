@@ -41,7 +41,7 @@ pnpm create-phone-app
 ### 已发布包
 
 ```powershell
-pnpm dlx @ink-zenly/create-phone-app@0.3.0 create .\my-host --template default --app-id my-shop --title "我的商店"
+pnpm dlx @ink-zenly/create-phone-app@0.3.1 create .\my-host --template default --app-id my-shop --title "我的商店"
 ```
 
 本仓开发仍推荐：`pnpm create-phone-app`。
@@ -50,7 +50,7 @@ pnpm dlx @ink-zenly/create-phone-app@0.3.0 create .\my-host --template default -
 
 ## `create`：手机宿主扩展
 
-在目标目录生成**宿主** Vite + TypeScript 扩展骨架：入口 `src/index.tsx` 导出 `PhoneExtension` 并注册首个内页 `src/<app-id>/`。依赖 `@ink-zenly/phone-sdk` 的 **npm 版本**（如 `^0.3.1`），捆绑 `@avg-studio/sdk` 于 `./sdk`。
+在目标目录生成**宿主** Vite + TypeScript 扩展骨架：入口 `src/index.tsx` 导出 `PhoneExtension` 并注册首个内页 `src/<app-id>/`。依赖 `@ink-zenly/phone-sdk` 的 **npm 版本**（如 `^0.4.0`），捆绑 `@avg-studio/sdk` 于 `./sdk`。`create` 宿主模板的 `vite.config.ts` 已从 `extension.json` 注入 `__PHONE_HOST_EXTENSION_ID__`。
 
 ```powershell
 pnpm create-phone-app create .\my-host --template default --app-id my-shop --title "我的商店"

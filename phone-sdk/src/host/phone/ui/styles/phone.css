@@ -1,4 +1,4 @@
-[data-phone-root="ink.zenly.ext-7a9373"] {
+[data-phone-root] {
   --phone-accent: #79c7ff;
   --phone-shell: #11151f;
   --phone-enter-x: 56px;
@@ -19,22 +19,22 @@
   animation: phone-backdrop-enter 280ms ease-out both;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"][data-phone-message-mode="true"] {
+[data-phone-root][data-phone-message-mode="true"] {
   background: transparent;
   backdrop-filter: none;
   pointer-events: none;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"][data-phone-message-mode="true"][data-phone-awaiting-advance="true"][data-phone-closing="false"] {
+[data-phone-root][data-phone-message-mode="true"][data-phone-awaiting-advance="true"][data-phone-closing="false"] {
   pointer-events: auto;
   cursor: pointer;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"][data-phone-message-mode="true"] .phone-shell {
+[data-phone-root][data-phone-message-mode="true"] .phone-shell {
   pointer-events: none;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"][data-phone-position="top-left"] {
+[data-phone-root][data-phone-position="top-left"] {
   align-items: start;
   justify-items: start;
   --phone-enter-x: -56px;
@@ -42,7 +42,7 @@
   --phone-transform-origin: top left;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"][data-phone-position="top-center"] {
+[data-phone-root][data-phone-position="top-center"] {
   align-items: start;
   justify-items: center;
   --phone-enter-x: 0px;
@@ -50,7 +50,7 @@
   --phone-transform-origin: top center;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"][data-phone-position="top-right"] {
+[data-phone-root][data-phone-position="top-right"] {
   align-items: start;
   justify-items: end;
   --phone-enter-x: 56px;
@@ -58,7 +58,7 @@
   --phone-transform-origin: top right;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"][data-phone-position="bottom-left"] {
+[data-phone-root][data-phone-position="bottom-left"] {
   align-items: end;
   justify-items: start;
   --phone-enter-x: -56px;
@@ -66,7 +66,7 @@
   --phone-transform-origin: bottom left;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"][data-phone-position="bottom-center"] {
+[data-phone-root][data-phone-position="bottom-center"] {
   align-items: end;
   justify-items: center;
   --phone-enter-x: 0px;
@@ -74,7 +74,7 @@
   --phone-transform-origin: bottom center;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"][data-phone-position="center"] {
+[data-phone-root][data-phone-position="center"] {
   align-items: center;
   justify-items: center;
   --phone-enter-x: 0px;
@@ -82,7 +82,7 @@
   --phone-transform-origin: center;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"][data-phone-position="bottom-right"] {
+[data-phone-root][data-phone-position="bottom-right"] {
   align-items: end;
   justify-items: end;
   --phone-enter-x: 56px;
@@ -90,16 +90,16 @@
   --phone-transform-origin: bottom right;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"][data-phone-closing="true"] {
+[data-phone-root][data-phone-closing="true"] {
   pointer-events: none;
   animation: phone-backdrop-exit 220ms ease-in both;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] * {
+[data-phone-root] * {
   box-sizing: border-box;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-shell {
+[data-phone-root] .phone-shell {
   position: relative;
   width: min(390px, calc(100vw - 40px));
   height: min(780px, calc(100vh - 40px));
@@ -114,7 +114,7 @@
   animation: phone-shell-enter 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"][data-phone-closing="true"] .phone-shell {
+[data-phone-root][data-phone-closing="true"] .phone-shell {
   animation: phone-shell-exit 220ms cubic-bezier(0.4, 0, 1, 1) both;
 }
 
@@ -151,13 +151,13 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  [data-phone-root="ink.zenly.ext-7a9373"],
-  [data-phone-root="ink.zenly.ext-7a9373"] .phone-shell {
+  [data-phone-root],
+  [data-phone-root] .phone-shell {
     animation-duration: 1ms !important;
   }
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-screen {
+[data-phone-root] .phone-screen {
   position: absolute;
   inset: 0;
   display: flex;
@@ -169,7 +169,7 @@
 }
 
 /* 手机外观预设：默认苹果风格使用灵动岛；安卓风格使用更紧凑的圆角和顶部听筒。 */
-[data-phone-root="ink.zenly.ext-7a9373"][data-phone-style-preset="apple"] .phone-shell::before {
+[data-phone-root][data-phone-style-preset="apple"] .phone-shell::before {
   position: absolute;
   z-index: 3;
   top: 7px;
@@ -184,11 +184,11 @@
   transform: translateX(-50%);
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"][data-phone-style-preset="apple"] .phone-status {
+[data-phone-root][data-phone-style-preset="apple"] .phone-status {
   padding-top: 12px;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"][data-phone-style-preset="android"] .phone-shell {
+[data-phone-root][data-phone-style-preset="android"] .phone-shell {
   width: min(400px, calc(100vw - 40px));
   height: min(760px, calc(100vh - 40px));
   border-width: 7px;
@@ -196,11 +196,11 @@
   box-shadow: 0 22px 62px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"][data-phone-style-preset="android"] .phone-screen {
+[data-phone-root][data-phone-style-preset="android"] .phone-screen {
   border-radius: 22px;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"][data-phone-style-preset="android"] .phone-shell::before {
+[data-phone-root][data-phone-style-preset="android"] .phone-shell::before {
   position: absolute;
   z-index: 3;
   top: 8px;
@@ -215,30 +215,30 @@
   transform: translateX(-50%);
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"][data-phone-style-preset="android"] .phone-status {
+[data-phone-root][data-phone-style-preset="android"] .phone-status {
   min-height: 40px;
   padding: 8px 17px 4px;
   font-size: 11px;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"][data-phone-style-preset="android"] .phone-toolbar {
+[data-phone-root][data-phone-style-preset="android"] .phone-toolbar {
   padding: 5px 16px 12px;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"][data-phone-style-preset="android"] .phone-app-icon {
+[data-phone-root][data-phone-style-preset="android"] .phone-app-icon {
   border-radius: 14px;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"][data-phone-style-preset="android"] .phone-story-bubble {
+[data-phone-root][data-phone-style-preset="android"] .phone-story-bubble {
   border-radius: 14px 14px 14px 4px;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"][data-phone-style-preset="android"] .phone-story-message-row[data-direction="outgoing"] .phone-story-bubble {
+[data-phone-root][data-phone-style-preset="android"] .phone-story-message-row[data-direction="outgoing"] .phone-story-bubble {
   border-radius: 14px 14px 4px 14px;
 }
 
 /* 剧情消息仅在手机屏幕内部压暗背景，避免干扰手机外部画面。 */
-[data-phone-root="ink.zenly.ext-7a9373"][data-phone-message-mode="true"] .phone-screen::before {
+[data-phone-root][data-phone-message-mode="true"] .phone-screen::before {
   position: absolute;
   z-index: 0;
   inset: 0;
@@ -247,12 +247,12 @@
   pointer-events: none;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"][data-phone-message-mode="true"] .phone-screen > * {
+[data-phone-root][data-phone-message-mode="true"] .phone-screen > * {
   position: relative;
   z-index: 1;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-status {
+[data-phone-root] .phone-status {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -263,52 +263,52 @@
   text-shadow: 0 1px 5px rgba(0, 0, 0, 0.8);
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-status-icons {
+[data-phone-root] .phone-status-icons {
   display: flex;
   align-items: center;
   gap: 6px;
   letter-spacing: 1px;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-status-icon {
+[data-phone-root] .phone-status-icon {
   display: block;
   width: 16px;
   height: 16px;
   flex: 0 0 auto;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-battery-icon {
+[data-phone-root] .phone-battery-icon {
   width: 18px;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-toolbar {
+[data-phone-root] .phone-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 5px 18px 14px;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-title {
+[data-phone-root] .phone-title {
   margin: 0;
   font-size: 22px;
   line-height: 1;
   text-shadow: 0 2px 9px rgba(0, 0, 0, 0.75);
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] button {
+[data-phone-root] button {
   color: inherit;
   font: inherit;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-round-button,
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-action-button {
+[data-phone-root] .phone-round-button,
+[data-phone-root] .phone-action-button {
   border: 1px solid rgba(255, 255, 255, 0.2);
   background: rgba(10, 15, 25, 0.58);
   backdrop-filter: blur(12px);
   cursor: pointer;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-round-button {
+[data-phone-root] .phone-round-button {
   display: grid;
   width: 36px;
   height: 36px;
@@ -317,16 +317,16 @@
   font-size: 18px;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-round-button:hover,
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-round-button:focus-visible,
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-action-button:hover,
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-action-button:focus-visible {
+[data-phone-root] .phone-round-button:hover,
+[data-phone-root] .phone-round-button:focus-visible,
+[data-phone-root] .phone-action-button:hover,
+[data-phone-root] .phone-action-button:focus-visible {
   border-color: var(--phone-accent);
   outline: 2px solid color-mix(in srgb, var(--phone-accent), transparent 30%);
   outline-offset: 2px;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-app-grid {
+[data-phone-root] .phone-app-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   align-content: start;
@@ -336,7 +336,7 @@
   overflow: auto;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-app {
+[data-phone-root] .phone-app {
   display: flex;
   min-width: 0;
   flex-direction: column;
@@ -348,7 +348,7 @@
   cursor: pointer;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-app-icon {
+[data-phone-root] .phone-app-icon {
   display: grid;
   width: 58px;
   height: 58px;
@@ -363,42 +363,42 @@
   transition: transform 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-app-icon img {
+[data-phone-root] .phone-app-icon img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-app:hover .phone-app-icon,
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-app:focus-visible .phone-app-icon,
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-app[data-selected="true"] .phone-app-icon {
+[data-phone-root] .phone-app:hover .phone-app-icon,
+[data-phone-root] .phone-app:focus-visible .phone-app-icon,
+[data-phone-root] .phone-app[data-selected="true"] .phone-app-icon {
   transform: translateY(-3px) scale(1.07);
   border-color: var(--phone-accent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--phone-accent), transparent 55%), 0 12px 24px rgba(0, 0, 0, 0.38);
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-app[data-disabled="true"] {
+[data-phone-root] .phone-app[data-disabled="true"] {
   cursor: not-allowed;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-app[data-disabled="true"] .phone-app-icon {
+[data-phone-root] .phone-app[data-disabled="true"] .phone-app-icon {
   filter: brightness(0.48) saturate(0.35);
   opacity: 0.72;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-app[data-disabled="true"] .phone-app-name {
+[data-phone-root] .phone-app[data-disabled="true"] .phone-app-name {
   opacity: 0.56;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-app[data-disabled="true"]:hover .phone-app-icon,
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-app[data-disabled="true"]:focus-visible .phone-app-icon,
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-app[data-disabled="true"][data-selected="true"] .phone-app-icon {
+[data-phone-root] .phone-app[data-disabled="true"]:hover .phone-app-icon,
+[data-phone-root] .phone-app[data-disabled="true"]:focus-visible .phone-app-icon,
+[data-phone-root] .phone-app[data-disabled="true"][data-selected="true"] .phone-app-icon {
   transform: none;
   border-color: rgba(255, 255, 255, 0.18);
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.28);
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-app-name {
+[data-phone-root] .phone-app-name {
   max-width: 76px;
   overflow: hidden;
   font-size: 12px;
@@ -408,7 +408,7 @@
   white-space: nowrap;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-home-indicator {
+[data-phone-root] .phone-home-indicator {
   width: 112px;
   height: 5px;
   margin: 0;
@@ -417,7 +417,7 @@
 }
 
 /* Home：内页时可点回桌面；桌面态禁用但仍显示指示条以保持布局。 */
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-home-button {
+[data-phone-root] .phone-home-button {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -429,18 +429,18 @@
   cursor: pointer;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-home-button:disabled {
+[data-phone-root] .phone-home-button:disabled {
   cursor: default;
   opacity: 0.85;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-home-button:not(:disabled):hover .phone-home-indicator,
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-home-button:not(:disabled):focus-visible .phone-home-indicator {
+[data-phone-root] .phone-home-button:not(:disabled):hover .phone-home-indicator,
+[data-phone-root] .phone-home-button:not(:disabled):focus-visible .phone-home-indicator {
   background: rgba(255, 255, 255, 0.95);
   box-shadow: 0 0 0 2px rgba(121, 199, 255, 0.45);
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-in-app {
+[data-phone-root] .phone-in-app {
   flex: 1;
   min-height: 0;
   overflow: auto;
@@ -450,7 +450,7 @@
 /* 内页应用全屏铺底：内页 absolute 盖住整块 screen。
  * 状态栏必须继续占位（不要 absolute 脱离文档流），否则工具栏+应用列表会整体上移。
  * 仅提高 z-index 叠在内页之上即可。 */
-[data-phone-root="ink.zenly.ext-7a9373"][data-phone-in-app="true"] .phone-status {
+[data-phone-root][data-phone-in-app="true"] .phone-status {
   position: relative;
   z-index: 5;
   flex: 0 0 auto;
@@ -458,7 +458,7 @@
   background: linear-gradient(180deg, rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0));
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"][data-phone-in-app="true"] .phone-toolbar[data-phone-toolbar-hidden="true"] {
+[data-phone-root][data-phone-in-app="true"] .phone-toolbar[data-phone-toolbar-hidden="true"] {
   /* 仍占位，避免应用列表因工具栏显隐而抖动 */
   visibility: hidden;
   pointer-events: none;
@@ -469,7 +469,7 @@
  * 内页用 absolute 铺满 phone-screen 盖在列表上方——等同「浮层全屏」，
  * 但不用 viewport fixed，以免跳出手机外壳。
  */
-[data-phone-root="ink.zenly.ext-7a9373"][data-phone-in-app="true"] .phone-app-grid[data-phone-desktop-layer="behind"] {
+[data-phone-root][data-phone-in-app="true"] .phone-app-grid[data-phone-desktop-layer="behind"] {
   z-index: 0;
   pointer-events: none;
   user-select: none;
@@ -479,12 +479,12 @@
   animation: none !important;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"][data-phone-in-app-phase="open"] .phone-app-grid[data-phone-desktop-layer="behind"] {
+[data-phone-root][data-phone-in-app-phase="open"] .phone-app-grid[data-phone-desktop-layer="behind"] {
   visibility: hidden;
 }
 
 /* —— 内页层：相对 phone-screen 绝对铺满，始终叠在应用列表上方 —— */
-[data-phone-root="ink.zenly.ext-7a9373"][data-phone-in-app="true"] .phone-in-app {
+[data-phone-root][data-phone-in-app="true"] .phone-in-app {
   position: absolute;
   top: 0;
   right: 0;
@@ -507,28 +507,28 @@
 }
 
 /* 苹果：从图标位置放大展开 */
-[data-phone-root="ink.zenly.ext-7a9373"][data-phone-style-preset="apple"][data-phone-in-app="true"] .phone-in-app {
+[data-phone-root][data-phone-style-preset="apple"][data-phone-in-app="true"] .phone-in-app {
   transform-origin: var(--phone-in-app-origin-x, 50%) var(--phone-in-app-origin-y, 42%);
   animation: phone-in-app-enter-apple 480ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"][data-phone-style-preset="apple"][data-phone-in-app-phase="leaving"] .phone-in-app,
-[data-phone-root="ink.zenly.ext-7a9373"][data-phone-style-preset="apple"] .phone-in-app[data-phone-in-app-phase="leaving"] {
+[data-phone-root][data-phone-style-preset="apple"][data-phone-in-app-phase="leaving"] .phone-in-app,
+[data-phone-root][data-phone-style-preset="apple"] .phone-in-app[data-phone-in-app-phase="leaving"] {
   animation: phone-in-app-exit-apple 340ms cubic-bezier(0.4, 0, 0.2, 1) both;
 }
 
 /* 安卓：自下而上淡入 + 轻微缩放（Material emphasized decelerate） */
-[data-phone-root="ink.zenly.ext-7a9373"][data-phone-style-preset="android"][data-phone-in-app="true"] .phone-in-app {
+[data-phone-root][data-phone-style-preset="android"][data-phone-in-app="true"] .phone-in-app {
   transform-origin: center bottom;
   animation: phone-in-app-enter-android 360ms cubic-bezier(0.05, 0.7, 0.1, 1) both;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"][data-phone-style-preset="android"][data-phone-in-app-phase="leaving"] .phone-in-app,
-[data-phone-root="ink.zenly.ext-7a9373"][data-phone-style-preset="android"] .phone-in-app[data-phone-in-app-phase="leaving"] {
+[data-phone-root][data-phone-style-preset="android"][data-phone-in-app-phase="leaving"] .phone-in-app,
+[data-phone-root][data-phone-style-preset="android"] .phone-in-app[data-phone-in-app-phase="leaving"] {
   animation: phone-in-app-exit-android 280ms cubic-bezier(0.3, 0, 0.8, 0.15) both;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"][data-phone-in-app="true"] .phone-in-app-host {
+[data-phone-root][data-phone-in-app="true"] .phone-in-app-host {
   box-sizing: border-box;
   display: flex;
   flex: 1 1 auto;
@@ -539,7 +539,7 @@
   min-height: 0;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"][data-phone-in-app="true"] .phone-in-app-host > * {
+[data-phone-root][data-phone-in-app="true"] .phone-in-app-host > * {
   box-sizing: border-box;
   display: flex;
   flex: 1 1 auto;
@@ -551,25 +551,25 @@
 }
 
 /* Home 同样保持文档流占位，仅抬高层级；改 absolute 会让上方 flex 区域高度变化引发列表微抖 */
-[data-phone-root="ink.zenly.ext-7a9373"][data-phone-in-app="true"] .phone-home-button {
+[data-phone-root][data-phone-in-app="true"] .phone-home-button {
   position: relative;
   z-index: 6;
   flex: 0 0 auto;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"][data-phone-style-preset="apple"][data-phone-in-app="true"] .phone-home-button {
+[data-phone-root][data-phone-style-preset="apple"][data-phone-in-app="true"] .phone-home-button {
   animation: phone-home-fade-in-apple 360ms ease-out both;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"][data-phone-style-preset="apple"][data-phone-in-app-phase="leaving"] .phone-home-button {
+[data-phone-root][data-phone-style-preset="apple"][data-phone-in-app-phase="leaving"] .phone-home-button {
   animation: phone-home-fade-out-apple 240ms ease-in both;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"][data-phone-style-preset="android"][data-phone-in-app="true"] .phone-home-button {
+[data-phone-root][data-phone-style-preset="android"][data-phone-in-app="true"] .phone-home-button {
   animation: phone-home-fade-in-android 280ms cubic-bezier(0.2, 0, 0, 1) both;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"][data-phone-style-preset="android"][data-phone-in-app-phase="leaving"] .phone-home-button {
+[data-phone-root][data-phone-style-preset="android"][data-phone-in-app-phase="leaving"] .phone-home-button {
   animation: phone-home-fade-out-android 200ms cubic-bezier(0.3, 0, 1, 1) both;
 }
 
@@ -659,15 +659,15 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  [data-phone-root="ink.zenly.ext-7a9373"][data-phone-in-app="true"] .phone-in-app,
-  [data-phone-root="ink.zenly.ext-7a9373"][data-phone-in-app="true"] .phone-home-button,
-  [data-phone-root="ink.zenly.ext-7a9373"][data-phone-in-app-phase="leaving"] .phone-in-app,
-  [data-phone-root="ink.zenly.ext-7a9373"][data-phone-in-app-phase="leaving"] .phone-home-button {
+  [data-phone-root][data-phone-in-app="true"] .phone-in-app,
+  [data-phone-root][data-phone-in-app="true"] .phone-home-button,
+  [data-phone-root][data-phone-in-app-phase="leaving"] .phone-in-app,
+  [data-phone-root][data-phone-in-app-phase="leaving"] .phone-home-button {
     animation-duration: 1ms !important;
   }
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-in-app-error {
+[data-phone-root] .phone-in-app-error {
   display: grid;
   gap: 12px;
   place-content: center;
@@ -677,7 +677,7 @@
   text-align: center;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-in-app-error pre {
+[data-phone-root] .phone-in-app-error pre {
   margin: 0;
   padding: 10px;
   overflow: auto;
@@ -689,7 +689,7 @@
   word-break: break-word;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-editor-backdrop {
+[data-phone-root] .phone-editor-backdrop {
   position: absolute;
   inset: 0;
   z-index: 10;
@@ -698,7 +698,7 @@
   background: rgba(0, 0, 0, 0.5);
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-editor {
+[data-phone-root] .phone-editor {
   width: 100%;
   max-height: 78%;
   padding: 18px;
@@ -710,38 +710,38 @@
 }
 
 /* 保留滚动能力与自动滚到底部，但不在手机屏幕内显示浏览器滚动条。 */
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-app-grid,
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-in-app,
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-editor,
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-story-message {
+[data-phone-root] .phone-app-grid,
+[data-phone-root] .phone-in-app,
+[data-phone-root] .phone-editor,
+[data-phone-root] .phone-story-message {
   -ms-overflow-style: none;
   scrollbar-width: none;
   overscroll-behavior: contain;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-app-grid::-webkit-scrollbar,
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-in-app::-webkit-scrollbar,
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-editor::-webkit-scrollbar,
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-story-message::-webkit-scrollbar {
+[data-phone-root] .phone-app-grid::-webkit-scrollbar,
+[data-phone-root] .phone-in-app::-webkit-scrollbar,
+[data-phone-root] .phone-editor::-webkit-scrollbar,
+[data-phone-root] .phone-story-message::-webkit-scrollbar {
   display: none;
   width: 0;
   height: 0;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-editor-header,
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-editor-actions {
+[data-phone-root] .phone-editor-header,
+[data-phone-root] .phone-editor-actions {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-editor h2 {
+[data-phone-root] .phone-editor h2 {
   margin: 0;
   font-size: 18px;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-field {
+[data-phone-root] .phone-field {
   display: grid;
   gap: 6px;
   margin-top: 13px;
@@ -749,9 +749,9 @@
   font-size: 12px;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-field input,
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-field select,
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-field textarea {
+[data-phone-root] .phone-field input,
+[data-phone-root] .phone-field select,
+[data-phone-root] .phone-field textarea {
   width: 100%;
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 10px;
@@ -762,20 +762,20 @@
   font: inherit;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-field input:focus,
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-field select:focus,
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-field textarea:focus {
+[data-phone-root] .phone-field input:focus,
+[data-phone-root] .phone-field select:focus,
+[data-phone-root] .phone-field textarea:focus {
   border-color: var(--phone-accent);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--phone-accent), transparent 70%);
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-field-row {
+[data-phone-root] .phone-field-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-file-button {
+[data-phone-root] .phone-file-button {
   display: block;
   padding: 9px 10px;
   border: 1px dashed rgba(255, 255, 255, 0.28);
@@ -784,7 +784,7 @@
   text-align: center;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-file-button input {
+[data-phone-root] .phone-file-button input {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -792,18 +792,18 @@
   pointer-events: none;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-action-button {
+[data-phone-root] .phone-action-button {
   margin-top: 14px;
   padding: 9px 13px;
   border-radius: 11px;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-action-button.primary {
+[data-phone-root] .phone-action-button.primary {
   border-color: var(--phone-accent);
   background: color-mix(in srgb, var(--phone-accent), #182136 55%);
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-message {
+[data-phone-root] .phone-message {
   position: absolute;
   right: 16px;
   bottom: 26px;
@@ -819,21 +819,21 @@
 }
 
 @media (max-height: 600px) {
-  [data-phone-root="ink.zenly.ext-7a9373"] .phone-shell {
+  [data-phone-root] .phone-shell {
     min-height: 0;
   }
 
-  [data-phone-root="ink.zenly.ext-7a9373"] .phone-app-grid {
+  [data-phone-root] .phone-app-grid {
     gap: 10px;
   }
 
-  [data-phone-root="ink.zenly.ext-7a9373"] .phone-app-icon {
+  [data-phone-root] .phone-app-icon {
     width: 48px;
     height: 48px;
   }
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-action-editor {
+[data-phone-root] .phone-action-editor {
   margin-top: 18px;
   padding: 14px;
   border: 1px solid rgba(121, 199, 255, 0.24);
@@ -841,30 +841,30 @@
   background: rgba(8, 13, 23, 0.38);
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-action-editor-title {
+[data-phone-root] .phone-action-editor-title {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-action-editor-title h3 {
+[data-phone-root] .phone-action-editor-title h3 {
   margin: 0 0 3px;
   color: #fff;
   font-size: 15px;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-action-editor-title span {
+[data-phone-root] .phone-action-editor-title span {
   color: rgba(255, 255, 255, 0.58);
   font-size: 11px;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-action-editor-title .phone-action-button {
+[data-phone-root] .phone-action-editor-title .phone-action-button {
   flex: 0 0 auto;
   margin-top: 0;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-checkbox-field {
+[data-phone-root] .phone-checkbox-field {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -873,21 +873,21 @@
   font-size: 12px;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-checkbox-field input {
+[data-phone-root] .phone-checkbox-field input {
   width: auto;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-action-button.danger {
+[data-phone-root] .phone-action-button.danger {
   border-color: rgba(255, 123, 123, 0.42);
   color: #ffc5c5;
 }
 
 /* 剧情消息复用完整手机 UI；根层透明且不拦截手机外部操作。 */
-[data-phone-root="ink.zenly.ext-7a9373"][data-phone-closing="true"] .phone-shell {
+[data-phone-root][data-phone-closing="true"] .phone-shell {
   pointer-events: none;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-story-message {
+[data-phone-root] .phone-story-message {
   display: flex;
   min-height: 0;
   flex: 1;
@@ -899,7 +899,7 @@
   scroll-behavior: smooth;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-story-message-row {
+[data-phone-root] .phone-story-message-row {
   display: flex;
   width: min(92%, 330px);
   flex: 0 0 auto;
@@ -909,7 +909,7 @@
   animation: phone-story-message-enter 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-story-message-row[data-direction="outgoing"] {
+[data-phone-root] .phone-story-message-row[data-direction="outgoing"] {
   flex-direction: row-reverse;
   margin-right: 0;
   margin-left: auto;
@@ -927,12 +927,12 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  [data-phone-root="ink.zenly.ext-7a9373"] .phone-story-message-row {
+  [data-phone-root] .phone-story-message-row {
     animation-duration: 1ms !important;
   }
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-story-avatar {
+[data-phone-root] .phone-story-avatar {
   display: grid;
   width: 44px;
   height: 44px;
@@ -947,14 +947,14 @@
   font-weight: 800;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-story-avatar img {
+[data-phone-root] .phone-story-avatar img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   object-position: top center;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-story-bubble {
+[data-phone-root] .phone-story-bubble {
   min-width: 0;
   padding: 11px 13px;
   border: 1px solid rgba(255, 255, 255, 0.18);
@@ -964,13 +964,13 @@
   backdrop-filter: blur(12px);
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-story-message-row[data-direction="outgoing"] .phone-story-bubble {
+[data-phone-root] .phone-story-message-row[data-direction="outgoing"] .phone-story-bubble {
   border-color: color-mix(in srgb, var(--phone-accent), transparent 48%);
   border-radius: 18px 18px 5px 18px;
   background: color-mix(in srgb, var(--phone-accent), rgba(12, 18, 30, 0.9) 68%);
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-story-bubble strong {
+[data-phone-root] .phone-story-bubble strong {
   display: block;
   overflow: hidden;
   color: rgba(255, 255, 255, 0.78);
@@ -980,7 +980,7 @@
   white-space: nowrap;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-story-bubble p {
+[data-phone-root] .phone-story-bubble p {
   margin: 5px 0 0;
   color: #fff;
   font-size: 14px;
@@ -989,23 +989,23 @@
   white-space: pre-wrap;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-story-message-body {
+[data-phone-root] .phone-story-message-body {
   min-width: 0;
   max-width: calc(100% - 78px);
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-story-message-content {
+[data-phone-root] .phone-story-message-content {
   position: relative;
   display: inline-block;
   min-width: 0;
   max-width: 100%;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-story-bubble {
+[data-phone-root] .phone-story-bubble {
   display: block;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-story-status {
+[data-phone-root] .phone-story-status {
   position: absolute;
   bottom: 0;
   display: inline-flex;
@@ -1019,40 +1019,40 @@
 }
 
 /* 我方状态位于气泡左下角外侧；对方的“已读”位于右下角外侧。 */
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-story-message-row[data-direction="outgoing"] .phone-story-status {
+[data-phone-root] .phone-story-message-row[data-direction="outgoing"] .phone-story-status {
   right: calc(100% + 6px);
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-story-message-row[data-direction="incoming"] .phone-story-status {
+[data-phone-root] .phone-story-message-row[data-direction="incoming"] .phone-story-status {
   left: calc(100% + 6px);
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-story-status-icon {
+[data-phone-root] .phone-story-status-icon {
   display: inline-grid;
   place-items: center;
   font-size: 18px;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-story-status-loading {
+[data-phone-root] .phone-story-status-loading {
   color: var(--phone-accent);
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-story-status-error {
+[data-phone-root] .phone-story-status-error {
   color: #fc4343;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-story-status-text {
+[data-phone-root] .phone-story-status-text {
   color: rgba(255, 255, 255, 0.64);
   font-size: 11px;
   white-space: nowrap;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-story-message-row[data-status="failed"] .phone-story-bubble,
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-story-message-row[data-status="blocked"] .phone-story-bubble {
+[data-phone-root] .phone-story-message-row[data-status="failed"] .phone-story-bubble,
+[data-phone-root] .phone-story-message-row[data-status="blocked"] .phone-story-bubble {
   border-color: color-mix(in srgb, #fc4343, transparent 38%);
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"] .phone-story-blocked-hint {
+[data-phone-root] .phone-story-blocked-hint {
   width: min(92%, 330px);
   flex: 0 0 auto;
   align-self: center;
@@ -1065,6 +1065,6 @@
   text-align: center;
 }
 
-[data-phone-root="ink.zenly.ext-7a9373"][data-phone-message-mode="true"] .phone-shell {
+[data-phone-root][data-phone-message-mode="true"] .phone-shell {
   z-index: 1;
 }

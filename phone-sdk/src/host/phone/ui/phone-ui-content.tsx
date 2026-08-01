@@ -23,6 +23,7 @@ import {
   useExtensionContext,
 } from "@avg-studio/sdk";
 import phoneCss from "./styles/phone.css?inline";
+import { getPhoneHostExtensionId } from "../../host-extension-id";
 import { InPhoneAppBoundary } from "./components/in-phone-app-boundary";
 import { PhoneStoryMessageItem } from "./components/story-message-item";
 import { firstGlyph, readImage, resolveAssetUrl } from "./asset-utils";
@@ -1286,7 +1287,7 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
 
   return (
     <div
-      data-phone-root="ink.zenly.ext-7a9373"
+      data-phone-root={getPhoneHostExtensionId()}
       data-phone-style-preset={phoneStylePreset}
       data-phone-position={messageMode ? displayStoryPopupPosition : popupPosition}
       data-phone-closing={closing ? "true" : "false"}

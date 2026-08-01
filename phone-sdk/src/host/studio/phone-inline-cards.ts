@@ -4,6 +4,8 @@
  * 通过受限的 DOM/Fiber 探测，把本扩展的方法块显示为摘要卡片；不写入编辑器数据，
  * Inspector 仍是参数编辑的唯一入口。宿主 DOM 变更或探测失败时会静默保留原生块。
  */
+import { getPhoneHostExtensionId } from "../host-extension-id";
+
 const CARD_ATTRIBUTE = "data-phone-inline-card";
 const HOST_ATTRIBUTE = "data-phone-inline-card-host";
 const ORIGINAL_DISPLAY_ATTRIBUTE = "data-phone-inline-original-display";
@@ -60,7 +62,8 @@ function asPhoneMethodId(value: string): PhoneMethodId | undefined {
 function phoneMethodId(block: ExtensionBlock | undefined): PhoneMethodId | undefined {
   if (block?.type !== "callExtensionFunction") return undefined;
   const target = block.props?.target;
-  if (typeof target !== "string" || !target.includes("ink.zenly.ext-7a9373")) return undefined;
+  const hostId = getPhoneHostExtensionId();
+  if (typeof target !== "string" || !target.includes(hostId)) return undefined;
   // 兼容 `extension-id/method-id` 与宿主可能加入的 `extension-id/ui-id/method-id` 路径。
   const segments = target.split("/");
   return asPhoneMethodId(segments[segments.length - 1] ?? "");
@@ -77,7 +80,8 @@ function phoneMethodIdFromContent(
   // 绝不能向上读到编辑器根节点，否则相邻块的扩展 ID 和标题会导致误判。
   const blockRoot = content.closest<HTMLElement>("[data-id]") ?? content;
   const text = blockRoot.textContent ?? "";
-  if (!text.includes("ink.zenly.ext-7a9373")) return undefined;
+  const hostId = getPhoneHostExtensionId();
+  if (!text.includes(hostId)) return undefined;
   return (Object.entries(METHOD_META).find(([, meta]) => text.includes(meta.label))?.[0]
     ?? undefined) as PhoneMethodId | undefined;
 }
