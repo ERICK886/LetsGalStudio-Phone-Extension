@@ -134,14 +134,12 @@ export async function runAdd(opts: RunAddOptions): Promise<void> {
   const files = await copyTemplateDir(templateDir, dest, vars);
 
   const indexPath = join(root, "src", "index.tsx");
-  let injected = false;
 
   try {
     const source = readFileSync(indexPath, "utf8");
     const next = injectPhoneAppRegistry(source, appId);
 
     writeFileSync(indexPath, next, "utf8");
-    injected = true;
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
 
@@ -158,10 +156,6 @@ export async function runAdd(opts: RunAddOptions): Promise<void> {
   console.log(`  应用：${pc.cyan(appId)}（${title}）`);
   console.log(`  注册：${pc.cyan(registerFnName)}`);
   console.log(`  文件：${files.length} 个`);
-  console.log(
-    injected
-      ? `  注入：${pc.green("已更新 src/index.tsx")}`
-      : `  注入：${pc.yellow("跳过")}`,
-  );
+  console.log(`  注入：${pc.green("已更新 src/index.tsx")}`);
   console.log();
 }

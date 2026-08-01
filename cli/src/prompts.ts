@@ -8,7 +8,7 @@
 
 import * as p from "@clack/prompts";
 
-import { APP_ID_RE } from "./utils/validate.ts";
+import { APP_ID_RE, assertValidAppId } from "./utils/validate.ts";
 
 /** create 向导可选项（均可缺省，缺省时再提问） */
 export type CreateOptionsPartial = {
@@ -134,7 +134,9 @@ export async function promptCreateOptions(
 
   let appId = partial.appId?.trim();
 
-  if (!appId) {
+  if (appId) {
+    assertValidAppId(appId);
+  } else {
     appId = handleCancel(
       await p.text({
         message: "程序 ID（app-id）",
@@ -217,7 +219,9 @@ export async function promptAddOptions(
 
   let appId = partial.appId?.trim();
 
-  if (!appId) {
+  if (appId) {
+    assertValidAppId(appId);
+  } else {
     appId = handleCancel(
       await p.text({
         message: "程序 ID（app-id）",
