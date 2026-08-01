@@ -17,6 +17,7 @@ export default defineConfig({
         "react/jsx-runtime",
         "react/jsx-dev-runtime",
         "@avg-studio/sdk",
+        // phone-sdk 需打进本扩展 bundle，以便安装宿主；第三方扩展构建时应将其 external。
       ],
     },
     outDir: "dist",

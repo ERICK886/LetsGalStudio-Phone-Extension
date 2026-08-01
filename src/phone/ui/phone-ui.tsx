@@ -1,6 +1,7 @@
 import React, {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -16,6 +17,7 @@ import {
 } from "@avg-studio/sdk";
 import phoneCss from "../styles/phone.css?inline";
 import { PhoneErrorBoundary } from "./components/phone-error-boundary";
+import { InPhoneAppBoundary } from "./components/in-phone-app-boundary";
 import { PhoneStoryMessageItem } from "./components/story-message-item";
 import { firstGlyph, readImage, resolveAssetUrl } from "./asset-utils";
 import {
@@ -35,11 +37,20 @@ import {
   type PlayerPhonePreferences,
   type ResolvedPhoneApp,
 } from "../core/catalog";
+import { lookupPhoneSdkApp } from "../sdk-host/install-phone-sdk-host";
 import type {
   PhonePopupPosition,
   PhoneStoryMessage,
   PhoneUIProps,
 } from "../extension/phone-extension";
+import {
+  EMPTY_PHONE_SAFE_AREA,
+  createDebugPhoneAppRenderProps,
+  phoneSdkDebug,
+  publishPhoneSafeAreaInsets,
+  type PhoneAppRegistration,
+  type PhoneSafeAreaInsets,
+} from "@ink-zenly/phone-sdk";
 
 const GRID_COLUMNS = 4;
 const MAX_WALLPAPER_BYTES = 2 * 1024 * 1024;
@@ -88,6 +99,7 @@ const TARGET_TYPE_LABELS: Record<PhoneTarget["kind"], string> = {
   "extension-method": "扩展方法（Fragment 适配）",
   fragment: "剧情 Fragment",
   "local-command": "手机内部方法",
+  "in-phone-app": "手机内部应用（Phone SDK）",
 };
 
 const PHONE_SYSTEM_SLOT_IDS = INTERNAL_SYSTEM_SLOT_IDS.filter(
@@ -108,6 +120,7 @@ function createDefaultTarget(kind: PhoneTarget["kind"]): PhoneTarget {
     case "extension-method": return { kind, methodRef: "", fragmentId: "" };
     case "fragment": return { kind, fragmentId: "" };
     case "local-command": return { kind, commandId: "quick-save" };
+    case "in-phone-app": return { kind, phoneAppId: "" };
   }
 }
 
@@ -116,6 +129,149 @@ function isTextInput(target: EventTarget | null): boolean {
     target.tagName === "INPUT" ||
     target.tagName === "TEXTAREA" ||
     target.isContentEditable
+  );
+}
+
+/**
+ * 渲染 Phone SDK 已注册应用；注册在打开后丢失时给出可回桌面的占位。
+ *
+ * @param props.phoneAppId 当前应用 id
+ * @param props.registration 注册对象；可能为 `undefined`
+ * @param props.onGoHome 回桌面
+ * @param props.onClosePhone 关手机
+ * @param props.safeAreaInsets 刘海/状态栏与底部 Home 安全区（CSS 像素）
+ */
+function InPhoneAppContent(props: {
+  phoneAppId: string;
+  registration: PhoneAppRegistration | undefined;
+  onGoHome: () => void;
+  onClosePhone: () => void;
+  safeAreaInsets: PhoneSafeAreaInsets;
+}): React.ReactElement {
+  const { phoneAppId, registration, onGoHome, onClosePhone, safeAreaInsets } = props;
+  if (!registration) {
+    return (
+      <div className="phone-in-app-error" role="alert">
+        <h2>应用不可用</h2>
+        <p>应用「{phoneAppId}」未注册或已被注销。</p>
+        <button type="button" className="phone-round-button" onClick={onGoHome}>
+          返回桌面
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <InPhoneAppContentReady
+      phoneAppId={phoneAppId}
+      registration={registration}
+      onGoHome={onGoHome}
+      onClosePhone={onClosePhone}
+      safeAreaInsets={safeAreaInsets}
+    />
+  );
+}
+
+/**
+ * 已确认有注册对象时渲染内页，并挂调试：检测是否读取安全区等 SDK props。
+ *
+ * @param props 同 {@link InPhoneAppContent}，且 `registration` 必填
+ */
+function InPhoneAppContentReady(props: {
+  phoneAppId: string;
+  registration: PhoneAppRegistration;
+  onGoHome: () => void;
+  onClosePhone: () => void;
+  safeAreaInsets: PhoneSafeAreaInsets;
+}): React.ReactElement {
+  const { phoneAppId, registration, onGoHome, onClosePhone, safeAreaInsets } = props;
+
+  const hostStyle = useMemo(
+    () =>
+      ({
+        ["--phone-safe-top" as string]: `${safeAreaInsets.top}px`,
+        ["--phone-safe-right" as string]: `${safeAreaInsets.right}px`,
+        ["--phone-safe-bottom" as string]: `${safeAreaInsets.bottom}px`,
+        ["--phone-safe-left" as string]: `${safeAreaInsets.left}px`,
+        ["--phone-safe-top-fallback" as string]: "52px",
+        ["--phone-safe-bottom-fallback" as string]: "40px",
+      }) as React.CSSProperties,
+    [safeAreaInsets],
+  );
+
+  /**
+   * 每次安全区或应用变化时重建 Proxy，重新统计「是否读取了 top/bottom」。
+   */
+  const debugBundle = useMemo(
+    () =>
+      createDebugPhoneAppRenderProps({
+        appId: phoneAppId,
+        closeApp: onGoHome,
+        closePhone: onClosePhone,
+        safeAreaInsets,
+      }),
+    [phoneAppId, onGoHome, onClosePhone, safeAreaInsets],
+  );
+
+  const rendered = registration.render(debugBundle.props);
+
+  useEffect(() => {
+    phoneSdkDebug("宿主调用 registration.render", {
+      phoneAppId,
+      title: registration.title,
+      safeAreaInsets,
+      cssVars: {
+        "--phone-safe-top": `${safeAreaInsets.top}px`,
+        "--phone-safe-bottom": `${safeAreaInsets.bottom}px`,
+      },
+    });
+
+    const flush = () => {
+      const report = debugBundle.flushReport();
+      const root = document.querySelector<HTMLElement>(
+        `[data-phone-root="ink.zenly.ext-7a9373"] .phone-in-app-host`,
+      );
+      const snakeRoot = root?.querySelector<HTMLElement>("[data-snake-build]");
+      phoneSdkDebug("内页 DOM 探测", {
+        phoneAppId,
+        hostChildCount: root?.childElementCount ?? 0,
+        snakeBuild: snakeRoot?.dataset.snakeBuild ?? null,
+        snakeSafeTopAttr: snakeRoot?.dataset.snakeSafeTop ?? null,
+        usedSafeAreaInsetValues: report.usedSafeAreaInsetValues,
+        accessedInsetFields: report.accessedInsetFields,
+        hint:
+          snakeRoot?.dataset.snakeBuild
+            ? "已挂载带 data-snake-build 的节点（当前贪吃蛇包）"
+            : "未找到 data-snake-build：Studio 可能未加载最新贪吃蛇 dist，或 render 未挂载 SnakeApp",
+      });
+    };
+
+    const micro = window.queueMicrotask
+      ? undefined
+      : window.setTimeout(flush, 0);
+
+    if (window.queueMicrotask) {
+      window.queueMicrotask(flush);
+    }
+
+    const raf1 = window.requestAnimationFrame(() => {
+      flush();
+      window.requestAnimationFrame(flush);
+    });
+
+    const late = window.setTimeout(flush, 120);
+
+    return () => {
+      if (micro !== undefined) window.clearTimeout(micro);
+      window.cancelAnimationFrame(raf1);
+      window.clearTimeout(late);
+    };
+  }, [debugBundle, phoneAppId, registration.title, safeAreaInsets]);
+
+  return (
+    <div className="phone-in-app-host" style={hostStyle}>
+      {rendered}
+    </div>
   );
 }
 
@@ -171,6 +327,7 @@ const PhoneUIContent: React.FC<PhoneUIProps> = ({
   const visualUiActionRows = ctx.settings.get<unknown[]>("visualUiActions");
   const systemSlotActionRows = ctx.settings.get<unknown[]>("systemSlotActions");
   const internalMethodActionRows = ctx.settings.get<unknown[]>("internalMethodActions");
+  const inPhoneAppActionRows = ctx.settings.get<unknown[]>("inPhoneAppActions");
   const catalogAppRows = ctx.settings.get<unknown[]>("catalogApps");
   // 旧宽表和旧 JSON 已从 Studio Schema 移除，但继续读取历史值以兼容已有项目。
   const legacyCatalogActionRows = ctx.settings.get<unknown[]>("catalogActions");
@@ -197,6 +354,7 @@ const PhoneUIContent: React.FC<PhoneUIProps> = ({
         visualUiActions: visualUiActionRows,
         systemSlotActions: systemSlotActionRows,
         internalMethodActions: internalMethodActionRows,
+        inPhoneAppActions: inPhoneAppActionRows,
       },
     ),
     [
@@ -207,6 +365,7 @@ const PhoneUIContent: React.FC<PhoneUIProps> = ({
       visualUiActionRows,
       systemSlotActionRows,
       internalMethodActionRows,
+      inPhoneAppActionRows,
     ],
   );
   const preferences = useMemo(
@@ -220,6 +379,23 @@ const PhoneUIContent: React.FC<PhoneUIProps> = ({
   const [focusedAppId, setFocusedAppId] = useState("");
   const [busy, setBusy] = useState(false);
   const [closing, setClosing] = useState(false);
+  /** 当前在手机屏幕内打开的 Phone SDK 应用；`null` 表示桌面。 */
+  const [activeInPhoneAppId, setActiveInPhoneAppId] = useState<string | null>(null);
+  /**
+   * 内页开合动画相位。
+   * - `idle`：桌面
+   * - `entering`：从图标放大进入
+   * - `open`：内页已稳定
+   * - `leaving`：缩回图标后卸载
+   */
+  const [inAppPhase, setInAppPhase] = useState<"idle" | "entering" | "open" | "leaving">("idle");
+  /** 开合动画的 transform-origin（相对 phone-screen，百分比），默认屏幕中部偏上。 */
+  const [inAppOrigin, setInAppOrigin] = useState<{ x: string; y: string }>({ x: "50%", y: "42%" });
+  /** 刘海/状态栏与底部 Home 的实测安全区（CSS 像素）。 */
+  const [safeAreaInsets, setSafeAreaInsets] = useState<PhoneSafeAreaInsets>(EMPTY_PHONE_SAFE_AREA);
+  const statusBarRef = useRef<HTMLElement | null>(null);
+  const homeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const phoneScreenRef = useRef<HTMLDivElement | null>(null);
   const [draggedAppId, setDraggedAppId] = useState<string>();
   const [appDropTarget, setAppDropTarget] = useState<AppDropTarget>();
   const [message, setMessage] = useState("");
@@ -291,6 +467,61 @@ const PhoneUIContent: React.FC<PhoneUIProps> = ({
     const timer = window.setInterval(() => setClock(new Date()), 30_000);
     return () => window.clearInterval(timer);
   }, []);
+
+  /**
+   * 测量状态栏 / Home 布局高度，作为 safeAreaInsets。
+   * top === 状态栏 offsetHeight（刘海/灵动岛已含在状态栏占位里）。
+   * 应用层仍 absolute 铺满全屏；第三方用 insets 排布文字与按钮，背景可全屏覆盖。
+   */
+  useLayoutEffect(() => {
+    if (!activeInPhoneAppId) {
+      setSafeAreaInsets(EMPTY_PHONE_SAFE_AREA);
+      publishPhoneSafeAreaInsets(EMPTY_PHONE_SAFE_AREA);
+      return undefined;
+    }
+
+    const measure = () => {
+      // 顶部安全距离 = 状态栏高度；底部 = Home 条高度。使用 offsetHeight，避免 transform 缩放干扰。
+      const top = Math.round(statusBarRef.current?.offsetHeight ?? 0);
+      const bottom = Math.round(homeButtonRef.current?.offsetHeight ?? 0);
+
+      const next: PhoneSafeAreaInsets = {
+        top,
+        right: 0,
+        bottom,
+        left: 0,
+      };
+
+      setSafeAreaInsets((prev) => (
+        prev.top === next.top &&
+        prev.right === next.right &&
+        prev.bottom === next.bottom &&
+        prev.left === next.left
+          ? prev
+          : next
+      ));
+      publishPhoneSafeAreaInsets(next);
+    };
+
+    measure();
+    const raf1 = window.requestAnimationFrame(() => {
+      measure();
+      window.requestAnimationFrame(measure);
+    });
+
+    const observer = typeof ResizeObserver !== "undefined"
+      ? new ResizeObserver(() => measure())
+      : null;
+    if (statusBarRef.current) observer?.observe(statusBarRef.current);
+    if (homeButtonRef.current) observer?.observe(homeButtonRef.current);
+    window.addEventListener("resize", measure);
+
+    return () => {
+      window.cancelAnimationFrame(raf1);
+      observer?.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [activeInPhoneAppId, phoneStylePreset]);
 
   useEffect(() => {
     // 订阅函数会立即回放模块级当前快照，因此即便 UI 首次以普通 props 挂载，也不会漏掉初始化阶段的首条消息。
@@ -772,6 +1003,9 @@ const PhoneUIContent: React.FC<PhoneUIProps> = ({
         backgroundColor: defaultBackgroundColor ?? "#172036",
         backgroundImage: `linear-gradient(rgba(4, 8, 16, .08), rgba(4, 8, 16, .24)), url(${JSON.stringify(storyBackgroundUrl)})`,
       }
+    : activeInPhoneAppId && inAppPhase === "open"
+      // 内页稳定后不透出桌面壁纸，避免第三方 UI 像浮层卡片。
+      ? { background: "#0b1020" }
     : backgroundCss
       ? { background: backgroundCss }
       : wallpaperUrl
@@ -783,6 +1017,8 @@ const PhoneUIContent: React.FC<PhoneUIProps> = ({
   const rootStyle = {
     "--phone-accent": activePreferences.accentColor ?? defaultAccentColor ?? "#79c7ff",
     "--phone-shell": activePreferences.shellColor ?? defaultShellColor ?? "#11151f",
+    "--phone-in-app-origin-x": inAppOrigin.x,
+    "--phone-in-app-origin-y": inAppOrigin.y,
     ...(messageMode
       ? { pointerEvents: awaitingStoryAdvance && !closing ? "auto" : "none" }
       : {}),
@@ -825,6 +1061,7 @@ const PhoneUIContent: React.FC<PhoneUIProps> = ({
   const closeWithAnimation = useCallback((): Promise<void> => {
     if (closePromise.current) return closePromise.current;
 
+    setActiveInPhoneAppId(null);
     setClosing(true);
     const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
     closePromise.current = new Promise<void>((resolve) => {
@@ -839,6 +1076,79 @@ const PhoneUIContent: React.FC<PhoneUIProps> = ({
     });
     return closePromise.current;
   }, [closePhone]);
+
+  /**
+   * 根据桌面图标位置计算内页开合动画的 transform-origin（相对屏幕百分比）。
+   *
+   * @param appId 桌面应用 id（用于查找按钮 DOM）
+   * @returns 原点百分比；测不到时回退屏幕中部
+   */
+  const resolveInAppOriginFromIcon = useCallback((appId: string): { x: string; y: string } => {
+    const fallback = { x: "50%", y: "42%" };
+    const screen = phoneScreenRef.current;
+    const button = appRefs.current.get(appId);
+    if (!screen || !button) return fallback;
+
+    const icon = button.querySelector(".phone-app-icon") ?? button;
+    const ir = icon.getBoundingClientRect();
+    const sr = screen.getBoundingClientRect();
+    if (sr.width <= 0 || sr.height <= 0) return fallback;
+
+    const x = (((ir.left + ir.width / 2) - sr.left) / sr.width) * 100;
+    const y = (((ir.top + ir.height / 2) - sr.top) / sr.height) * 100;
+    return {
+      x: `${Math.min(92, Math.max(8, x)).toFixed(2)}%`,
+      y: `${Math.min(92, Math.max(8, y)).toFixed(2)}%`,
+    };
+  }, []);
+
+  /**
+   * 从手机内部应用返回桌面：先播放缩回动画，再卸载内页。
+   */
+  const goHomeFromInPhoneApp = useCallback(() => {
+    setInAppPhase((phase) => {
+      if (phase === "leaving" || phase === "idle") return phase;
+      return "leaving";
+    });
+  }, []);
+
+  /**
+   * 内页 CSS 动画结束：进入完成 → `open`；离开完成 → 卸回桌面。
+   *
+   * @param event animationend（只处理本节点上的开合动画名）
+   */
+  const handleInAppAnimationEnd = useCallback((event: React.AnimationEvent<HTMLElement>) => {
+    const name = event.animationName;
+    if (event.target !== event.currentTarget) return;
+
+    if (name.includes("phone-in-app-enter")) {
+      setInAppPhase((phase) => (phase === "entering" ? "open" : phase));
+      return;
+    }
+    if (name.includes("phone-in-app-exit")) {
+      setActiveInPhoneAppId(null);
+      setInAppPhase("idle");
+    }
+  }, []);
+
+  // 兜底：个别环境下 animationend 丢失时仍能结束相位，避免卡在 entering/leaving。
+  // 时长与 CSS 中苹果 / 安卓动画对齐并略留余量。
+  useEffect(() => {
+    if (inAppPhase !== "entering" && inAppPhase !== "leaving") return undefined;
+    const apple = phoneStylePreset === "apple";
+    const delayMs = inAppPhase === "entering"
+      ? (apple ? 560 : 420)
+      : (apple ? 400 : 340);
+    const timer = window.setTimeout(() => {
+      if (inAppPhase === "entering") {
+        setInAppPhase((phase) => (phase === "entering" ? "open" : phase));
+      } else if (inAppPhase === "leaving") {
+        setActiveInPhoneAppId(null);
+        setInAppPhase("idle");
+      }
+    }, delayMs);
+    return () => window.clearTimeout(timer);
+  }, [inAppPhase, phoneStylePreset]);
 
   /**
    * 消费剧情模式的一次原生 pointer 事件。
@@ -857,7 +1167,8 @@ const PhoneUIContent: React.FC<PhoneUIProps> = ({
 
   /**
    * 统一启动应用目标，保证鼠标与键盘最终走相同的 Studio API 分支。
-   * 启动锁会忽略关闭动画期间的重复请求；先等待 `closeWithAnimation`，再调用可能切换 UI、系统槽、Fragment、存档或窗口状态的目标。
+   * `in-phone-app`：保持手机打开，切到屏幕内页渲染 Phone SDK 注册组件。
+   * 其它目标：先关闭手机再调用对应 Runtime API。
    * 失败只记录日志，finally 必定释放 busy 状态，避免一次错误永久禁用桌面。
    */
   const launchApp = async (app: ResolvedPhoneApp) => {
@@ -869,7 +1180,44 @@ const PhoneUIContent: React.FC<PhoneUIProps> = ({
       showMessage("手机尚未挂载");
       return;
     }
-    if (busy || closing) return;
+    if (busy || closing || inAppPhase === "entering" || inAppPhase === "leaving") return;
+
+    if (app.action.target.kind === "in-phone-app") {
+      const phoneAppId = app.action.target.phoneAppId;
+      const registered = lookupPhoneSdkApp(phoneAppId);
+      if (!registered) {
+        showMessage("应用不可用：未注册或 Phone SDK 宿主未就绪");
+        return;
+      }
+      setEditorOpen(false);
+      // 进入内页前先写入状态栏高度，避免首帧 safeAreaInsets 为 0 导致标题顶到状态栏。
+      const provisional: PhoneSafeAreaInsets = {
+        top: Math.round(statusBarRef.current?.offsetHeight || (phoneStylePreset === "apple" ? 52 : 46)),
+        right: 0,
+        bottom: Math.round(homeButtonRef.current?.offsetHeight || 44),
+        left: 0,
+      };
+      setSafeAreaInsets(provisional);
+      publishPhoneSafeAreaInsets(provisional);
+      // 苹果：从图标中心放大；安卓：自底部升起，原点固定为屏幕底部中心。
+      const origin = phoneStylePreset === "apple"
+        ? resolveInAppOriginFromIcon(app.id)
+        : { x: "50%", y: "100%" };
+      setInAppOrigin(origin);
+      phoneSdkDebug("进入手机内部应用", {
+        phoneAppId,
+        title: registered.title,
+        stylePreset: phoneStylePreset,
+        provisionalSafeArea: provisional,
+        statusBarOffsetHeight: statusBarRef.current?.offsetHeight ?? null,
+        homeButtonOffsetHeight: homeButtonRef.current?.offsetHeight ?? null,
+        origin,
+      });
+      setInAppPhase("entering");
+      setActiveInPhoneAppId(phoneAppId);
+      return;
+    }
+
     setBusy(true);
     try {
       await closeWithAnimation();
@@ -905,7 +1253,8 @@ const PhoneUIContent: React.FC<PhoneUIProps> = ({
 
   /**
    * 手机根节点的键盘输入状态机。
-   * 剧情模式优先消费 Escape、Enter 与 Space；编辑模式只处理 Escape；普通桌面模式跳过 input/textarea/contenteditable，
+   * 剧情模式优先消费 Escape、Enter 与 Space；编辑模式只处理 Escape；
+   * 手机内部应用内页：Escape 回桌面；普通桌面模式跳过 input/textarea/contenteditable，
    * 将方向键交给四列焦点导航、Enter/Space 交给与鼠标相同的应用启动函数。被手机处理的键都会阻止冒泡，避免推进底层剧情。
    */
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -926,6 +1275,14 @@ const PhoneUIContent: React.FC<PhoneUIProps> = ({
           event.stopPropagation();
           if (result === "close") void closeWithAnimation();
         }
+      }
+      return;
+    }
+    if (activeInPhoneAppId) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        goHomeFromInPhoneApp();
       }
       return;
     }
@@ -1113,6 +1470,8 @@ const PhoneUIContent: React.FC<PhoneUIProps> = ({
       data-phone-position={messageMode ? displayStoryPopupPosition : popupPosition}
       data-phone-closing={closing ? "true" : "false"}
       data-phone-message-mode={messageMode ? "true" : "false"}
+      data-phone-in-app={activeInPhoneAppId && !messageMode ? "true" : "false"}
+      data-phone-in-app-phase={!messageMode ? inAppPhase : "idle"}
       data-phone-awaiting-advance={awaitingStoryAdvance ? "true" : "false"}
       style={rootStyle}
       onKeyDownCapture={handleKeyDown}
@@ -1129,8 +1488,8 @@ const PhoneUIContent: React.FC<PhoneUIProps> = ({
         aria-modal={messageMode ? undefined : true}
         aria-label={messageMode ? "手机剧情消息" : phoneTitle ?? "手机"}
       >
-        <div className="phone-screen" style={screenStyle}>
-          <header className="phone-status">
+        <div className="phone-screen" ref={phoneScreenRef} style={screenStyle}>
+          <header className="phone-status" ref={statusBarRef}>
             <time>{clock.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time>
             <span className="phone-status-icons" aria-hidden="true">
               <svg
@@ -1182,9 +1541,16 @@ const PhoneUIContent: React.FC<PhoneUIProps> = ({
             </span>
           </header>
 
-          <div className="phone-toolbar">
-            <h1 className="phone-title">{messageMode ? "消息" : phoneTitle ?? "手机"}</h1>
-            {!messageMode && (
+          {/* 工具栏在内页时仍占位但不可见，避免桌面垫层图标跳动导致开合原点漂移。 */}
+          {!messageMode && (
+            <div
+              className="phone-toolbar"
+              aria-hidden={activeInPhoneAppId ? true : undefined}
+              data-phone-toolbar-hidden={activeInPhoneAppId ? "true" : "false"}
+            >
+              <h1 className="phone-title">
+                {phoneTitle ?? "手机"}
+              </h1>
               <div style={{ display: "flex", gap: 8 }}>
                 {playerCustomizationEnabled && (
                   <button
@@ -1193,6 +1559,8 @@ const PhoneUIContent: React.FC<PhoneUIProps> = ({
                     aria-label="个性化手机"
                     title="个性化手机"
                     onClick={openEditor}
+                    disabled={Boolean(activeInPhoneAppId)}
+                    tabIndex={activeInPhoneAppId ? -1 : undefined}
                   >
                     ⚙
                   </button>
@@ -1203,12 +1571,19 @@ const PhoneUIContent: React.FC<PhoneUIProps> = ({
                   aria-label="关闭手机"
                   title="关闭手机"
                   onClick={() => void closeWithAnimation()}
+                  disabled={Boolean(activeInPhoneAppId)}
+                  tabIndex={activeInPhoneAppId ? -1 : undefined}
                 >
                   ×
                 </button>
               </div>
-            )}
-          </div>
+            </div>
+          )}
+          {messageMode && (
+            <div className="phone-toolbar">
+              <h1 className="phone-title">消息</h1>
+            </div>
+          )}
 
           {messageMode ? (
             <main
@@ -1234,44 +1609,84 @@ const PhoneUIContent: React.FC<PhoneUIProps> = ({
               })}
             </main>
           ) : (
-            <main className="phone-app-grid" aria-label="应用列表">
-              {apps.map((app) => {
-                const iconUrl = resolveAssetUrl(ctx, app.iconSource);
-                return (
-                  <button
-                    key={app.id}
-                    ref={(element) => {
-                      if (element) appRefs.current.set(app.id, element);
-                      else appRefs.current.delete(app.id);
-                    }}
-                    type="button"
-                    className="phone-app"
-                    data-disabled={!app.enabled}
-                    data-selected={focusedAppId === app.id}
-                    tabIndex={focusedAppId === app.id ? 0 : -1}
-                    aria-disabled={!app.enabled}
-                    aria-label={app.enabled
-                      ? `${app.displayName}，动作：${app.action.name}`
-                      : `${app.displayName}，当前已禁用`}
-                    title={app.enabled
-                      ? app.action.description ?? `执行：${app.action.name}`
-                      : "当前已禁用"}
-                    onFocus={() => setFocusedAppId(app.id)}
-                    onMouseEnter={() => setFocusedAppId(app.id)}
-                    onClick={() => void launchApp(app)}
-                    disabled={busy || closing}
-                  >
-                    <span className="phone-app-icon" aria-hidden="true">
-                      {iconUrl ? <img src={iconUrl} alt="" /> : firstGlyph(app.displayName)}
-                    </span>
-                    <span className="phone-app-name">{app.displayName}</span>
-                  </button>
-                );
-              })}
-            </main>
+            <>
+              {/* 桌面常驻：内页开合时垫在下层，形成从图标放大的仿真感。 */}
+              <main
+                className="phone-app-grid"
+                aria-label="应用列表"
+                aria-hidden={activeInPhoneAppId ? true : undefined}
+                data-phone-desktop-layer={activeInPhoneAppId ? "behind" : "active"}
+              >
+                {apps.map((app) => {
+                  const iconUrl = resolveAssetUrl(ctx, app.iconSource);
+                  return (
+                    <button
+                      key={app.id}
+                      ref={(element) => {
+                        if (element) appRefs.current.set(app.id, element);
+                        else appRefs.current.delete(app.id);
+                      }}
+                      type="button"
+                      className="phone-app"
+                      data-disabled={!app.enabled}
+                      data-selected={focusedAppId === app.id}
+                      tabIndex={activeInPhoneAppId ? -1 : focusedAppId === app.id ? 0 : -1}
+                      aria-disabled={!app.enabled}
+                      aria-label={app.enabled
+                        ? `${app.displayName}，动作：${app.action.name}`
+                        : `${app.displayName}，当前已禁用`}
+                      title={app.enabled
+                        ? app.action.description ?? `执行：${app.action.name}`
+                        : "当前已禁用"}
+                      onFocus={() => setFocusedAppId(app.id)}
+                      onMouseEnter={() => setFocusedAppId(app.id)}
+                      onClick={() => void launchApp(app)}
+                      disabled={busy || closing || Boolean(activeInPhoneAppId)}
+                    >
+                      <span className="phone-app-icon" aria-hidden="true">
+                        {iconUrl ? <img src={iconUrl} alt="" /> : firstGlyph(app.displayName)}
+                      </span>
+                      <span className="phone-app-name">{app.displayName}</span>
+                    </button>
+                  );
+                })}
+              </main>
+
+              {activeInPhoneAppId ? (
+                <main
+                  className="phone-in-app"
+                  aria-label="手机内部应用"
+                  data-phone-in-app-phase={inAppPhase}
+                  onAnimationEnd={handleInAppAnimationEnd}
+                >
+                  <InPhoneAppBoundary key={activeInPhoneAppId} onGoHome={goHomeFromInPhoneApp}>
+                    <InPhoneAppContent
+                      phoneAppId={activeInPhoneAppId}
+                      registration={lookupPhoneSdkApp(activeInPhoneAppId)}
+                      onGoHome={goHomeFromInPhoneApp}
+                      onClosePhone={() => void closeWithAnimation()}
+                      safeAreaInsets={safeAreaInsets}
+                    />
+                  </InPhoneAppBoundary>
+                </main>
+              ) : null}
+            </>
           )}
 
-          <div className="phone-home-indicator" aria-hidden="true" />
+          {!messageMode && (
+            <button
+              ref={homeButtonRef}
+              type="button"
+              className="phone-home-button"
+              aria-label="返回桌面"
+              title="返回桌面"
+              disabled={!activeInPhoneAppId || closing || inAppPhase === "leaving"}
+              onClick={goHomeFromInPhoneApp}
+            >
+              <span className="phone-home-indicator" aria-hidden="true" />
+            </button>
+          )}
+          {messageMode && <div className="phone-home-indicator" aria-hidden="true" />}
 
           {!messageMode && playerCustomizationEnabled && editorOpen && (
             <div className="phone-editor-backdrop">
@@ -1543,6 +1958,21 @@ const PhoneUIContent: React.FC<PhoneUIProps> = ({
                               <option key={id} value={id}>{label}</option>
                             ))}
                           </select>
+                        </label>
+                      )}
+
+                      {selectedAction.target.kind === "in-phone-app" && (
+                        <label className="phone-field">
+                          Phone SDK 应用 ID
+                          <input
+                            placeholder="例如 ink.zenly.ext-phone-snake（与 extension.json 的 id 一致）"
+                            value={selectedAction.target.phoneAppId}
+                            onChange={(event) => updateSelectedTarget({
+                              kind: "in-phone-app",
+                              phoneAppId: event.target.value,
+                            })}
+                          />
+                          <span>点击后在手机屏幕内打开，不关闭手机。应用内返回由第三方自行实现；底部 Home 回桌面。</span>
                         </label>
                       )}
 

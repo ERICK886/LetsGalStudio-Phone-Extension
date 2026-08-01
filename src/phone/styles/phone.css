@@ -165,6 +165,7 @@
   overflow: hidden;
   border-radius: 34px;
   background: #172036 center / cover no-repeat;
+  isolation: isolate;
 }
 
 /* 手机外观预设：默认苹果风格使用灵动岛；安卓风格使用更紧凑的圆角和顶部听筒。 */
@@ -410,9 +411,282 @@
 [data-phone-root="ink.zenly.ext-7a9373"] .phone-home-indicator {
   width: 112px;
   height: 5px;
-  margin: 8px auto 10px;
+  margin: 0;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.78);
+}
+
+/* Home：内页时可点回桌面；桌面态禁用但仍显示指示条以保持布局。 */
+[data-phone-root="ink.zenly.ext-7a9373"] .phone-home-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin: 8px 0 10px;
+  padding: 10px 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+[data-phone-root="ink.zenly.ext-7a9373"] .phone-home-button:disabled {
+  cursor: default;
+  opacity: 0.85;
+}
+
+[data-phone-root="ink.zenly.ext-7a9373"] .phone-home-button:not(:disabled):hover .phone-home-indicator,
+[data-phone-root="ink.zenly.ext-7a9373"] .phone-home-button:not(:disabled):focus-visible .phone-home-indicator {
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 0 0 2px rgba(121, 199, 255, 0.45);
+}
+
+[data-phone-root="ink.zenly.ext-7a9373"] .phone-in-app {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* 内页应用全屏铺底：内页 absolute 盖住整块 screen。
+ * 状态栏必须继续占位（不要 absolute 脱离文档流），否则工具栏+应用列表会整体上移。
+ * 仅提高 z-index 叠在内页之上即可。 */
+[data-phone-root="ink.zenly.ext-7a9373"][data-phone-in-app="true"] .phone-status {
+  position: relative;
+  z-index: 5;
+  flex: 0 0 auto;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0));
+}
+
+[data-phone-root="ink.zenly.ext-7a9373"][data-phone-in-app="true"] .phone-toolbar[data-phone-toolbar-hidden="true"] {
+  /* 仍占位，避免应用列表因工具栏显隐而抖动 */
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/*
+ * 应用列表：内页打开期间完全静止（不位移、不缩放、不模糊）。
+ * 内页用 absolute 铺满 phone-screen 盖在列表上方——等同「浮层全屏」，
+ * 但不用 viewport fixed，以免跳出手机外壳。
+ */
+[data-phone-root="ink.zenly.ext-7a9373"][data-phone-in-app="true"] .phone-app-grid[data-phone-desktop-layer="behind"] {
+  z-index: 0;
+  pointer-events: none;
+  user-select: none;
+  /* 开合全程冻结列表，只靠内页遮罩；open 后彻底藏起 */
+  transform: none !important;
+  filter: none !important;
+  animation: none !important;
+}
+
+[data-phone-root="ink.zenly.ext-7a9373"][data-phone-in-app-phase="open"] .phone-app-grid[data-phone-desktop-layer="behind"] {
+  visibility: hidden;
+}
+
+/* —— 内页层：相对 phone-screen 绝对铺满，始终叠在应用列表上方 —— */
+[data-phone-root="ink.zenly.ext-7a9373"][data-phone-in-app="true"] .phone-in-app {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #0b1020;
+  border-radius: inherit;
+  isolation: isolate;
+  will-change: transform, opacity, border-radius;
+  backface-visibility: hidden;
+  /* 不参与下方 flex 排版，避免把应用列表顶走 */
+  margin: 0;
+  pointer-events: auto;
+}
+
+/* 苹果：从图标位置放大展开 */
+[data-phone-root="ink.zenly.ext-7a9373"][data-phone-style-preset="apple"][data-phone-in-app="true"] .phone-in-app {
+  transform-origin: var(--phone-in-app-origin-x, 50%) var(--phone-in-app-origin-y, 42%);
+  animation: phone-in-app-enter-apple 480ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+[data-phone-root="ink.zenly.ext-7a9373"][data-phone-style-preset="apple"][data-phone-in-app-phase="leaving"] .phone-in-app,
+[data-phone-root="ink.zenly.ext-7a9373"][data-phone-style-preset="apple"] .phone-in-app[data-phone-in-app-phase="leaving"] {
+  animation: phone-in-app-exit-apple 340ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+/* 安卓：自下而上淡入 + 轻微缩放（Material emphasized decelerate） */
+[data-phone-root="ink.zenly.ext-7a9373"][data-phone-style-preset="android"][data-phone-in-app="true"] .phone-in-app {
+  transform-origin: center bottom;
+  animation: phone-in-app-enter-android 360ms cubic-bezier(0.05, 0.7, 0.1, 1) both;
+}
+
+[data-phone-root="ink.zenly.ext-7a9373"][data-phone-style-preset="android"][data-phone-in-app-phase="leaving"] .phone-in-app,
+[data-phone-root="ink.zenly.ext-7a9373"][data-phone-style-preset="android"] .phone-in-app[data-phone-in-app-phase="leaving"] {
+  animation: phone-in-app-exit-android 280ms cubic-bezier(0.3, 0, 0.8, 0.15) both;
+}
+
+[data-phone-root="ink.zenly.ext-7a9373"][data-phone-in-app="true"] .phone-in-app-host {
+  box-sizing: border-box;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+[data-phone-root="ink.zenly.ext-7a9373"][data-phone-in-app="true"] .phone-in-app-host > * {
+  box-sizing: border-box;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* Home 同样保持文档流占位，仅抬高层级；改 absolute 会让上方 flex 区域高度变化引发列表微抖 */
+[data-phone-root="ink.zenly.ext-7a9373"][data-phone-in-app="true"] .phone-home-button {
+  position: relative;
+  z-index: 6;
+  flex: 0 0 auto;
+}
+
+[data-phone-root="ink.zenly.ext-7a9373"][data-phone-style-preset="apple"][data-phone-in-app="true"] .phone-home-button {
+  animation: phone-home-fade-in-apple 360ms ease-out both;
+}
+
+[data-phone-root="ink.zenly.ext-7a9373"][data-phone-style-preset="apple"][data-phone-in-app-phase="leaving"] .phone-home-button {
+  animation: phone-home-fade-out-apple 240ms ease-in both;
+}
+
+[data-phone-root="ink.zenly.ext-7a9373"][data-phone-style-preset="android"][data-phone-in-app="true"] .phone-home-button {
+  animation: phone-home-fade-in-android 280ms cubic-bezier(0.2, 0, 0, 1) both;
+}
+
+[data-phone-root="ink.zenly.ext-7a9373"][data-phone-style-preset="android"][data-phone-in-app-phase="leaving"] .phone-home-button {
+  animation: phone-home-fade-out-android 200ms cubic-bezier(0.3, 0, 1, 1) both;
+}
+
+@keyframes phone-in-app-enter-apple {
+  0% {
+    opacity: 0.55;
+    transform: scale(0.14);
+    border-radius: 28%;
+    filter: brightness(1.08) saturate(1.05);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  }
+  55% {
+    opacity: 1;
+    filter: brightness(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+    border-radius: 0;
+    filter: none;
+    box-shadow: none;
+  }
+}
+
+@keyframes phone-in-app-exit-apple {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+    border-radius: 0;
+    filter: none;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.14);
+    border-radius: 28%;
+    filter: brightness(1.06);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+  }
+}
+
+@keyframes phone-home-fade-in-apple {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes phone-home-fade-out-apple {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes phone-in-app-enter-android {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 28px, 0) scale(0.92);
+    border-radius: 18px 18px 0 0;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+    border-radius: 0;
+    box-shadow: none;
+  }
+}
+
+@keyframes phone-in-app-exit-android {
+  0% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+    border-radius: 0;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(0, 22px, 0) scale(0.94);
+    border-radius: 16px 16px 0 0;
+  }
+}
+
+@keyframes phone-home-fade-in-android {
+  from { opacity: 0; transform: scaleX(0.72); }
+  to { opacity: 1; transform: scaleX(1); }
+}
+
+@keyframes phone-home-fade-out-android {
+  from { opacity: 1; transform: scaleX(1); }
+  to { opacity: 0; transform: scaleX(0.72); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-phone-root="ink.zenly.ext-7a9373"][data-phone-in-app="true"] .phone-in-app,
+  [data-phone-root="ink.zenly.ext-7a9373"][data-phone-in-app="true"] .phone-home-button,
+  [data-phone-root="ink.zenly.ext-7a9373"][data-phone-in-app-phase="leaving"] .phone-in-app,
+  [data-phone-root="ink.zenly.ext-7a9373"][data-phone-in-app-phase="leaving"] .phone-home-button {
+    animation-duration: 1ms !important;
+  }
+}
+
+[data-phone-root="ink.zenly.ext-7a9373"] .phone-in-app-error {
+  display: grid;
+  gap: 12px;
+  place-content: center;
+  min-height: 100%;
+  padding: 24px 18px;
+  color: #fff;
+  text-align: center;
+}
+
+[data-phone-root="ink.zenly.ext-7a9373"] .phone-in-app-error pre {
+  margin: 0;
+  padding: 10px;
+  overflow: auto;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.35);
+  color: #ffb5b5;
+  text-align: left;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 [data-phone-root="ink.zenly.ext-7a9373"] .phone-editor-backdrop {
@@ -437,6 +711,7 @@
 
 /* 保留滚动能力与自动滚到底部，但不在手机屏幕内显示浏览器滚动条。 */
 [data-phone-root="ink.zenly.ext-7a9373"] .phone-app-grid,
+[data-phone-root="ink.zenly.ext-7a9373"] .phone-in-app,
 [data-phone-root="ink.zenly.ext-7a9373"] .phone-editor,
 [data-phone-root="ink.zenly.ext-7a9373"] .phone-story-message {
   -ms-overflow-style: none;
@@ -445,6 +720,7 @@
 }
 
 [data-phone-root="ink.zenly.ext-7a9373"] .phone-app-grid::-webkit-scrollbar,
+[data-phone-root="ink.zenly.ext-7a9373"] .phone-in-app::-webkit-scrollbar,
 [data-phone-root="ink.zenly.ext-7a9373"] .phone-editor::-webkit-scrollbar,
 [data-phone-root="ink.zenly.ext-7a9373"] .phone-story-message::-webkit-scrollbar {
   display: none;

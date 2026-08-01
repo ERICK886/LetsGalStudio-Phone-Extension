@@ -17,6 +17,7 @@ import {
   type PhoneAppAvailabilityOverride,
   type PlayerPhonePreferences,
 } from "../core/catalog";
+import { installPhoneExtensionSdkHost } from "../sdk-host/install-phone-sdk-host";
 import { PhoneUI } from "../ui/phone-ui";
 import { enqueueToast } from "../../toast/core/toast-runtime";
 import {
@@ -231,6 +232,7 @@ function catalogFromPhoneSettings(ctx: ExtensionContext) {
       internalMethodActions: ctx.settings.get<unknown[]>(
         "internalMethodActions",
       ),
+      inPhoneAppActions: ctx.settings.get<unknown[]>("inPhoneAppActions"),
     },
   );
 }
@@ -1494,7 +1496,7 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
         android: "安卓手机（Android）",
       })
       .describe(
-        "切换手机外壳、顶部开孔/听筒、圆角与应用气泡的预设样式；背景、强调色和外壳颜色仍使用下方作者设置。",
+        "切换手机外壳、顶部开孔/听筒、圆角、应用气泡，以及打开/关闭手机内页应用的过渡动画（苹果：从图标放大；安卓：自下而上升起）。背景、强调色和外壳颜色仍使用下方作者设置。",
       ),
     popupPosition: s
       .enum("手机弹出位置", PHONE_POPUP_POSITIONS)
@@ -1648,6 +1650,29 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
       .describe(
         "操作：①点击“添加内部方法动作”；②填写唯一 ID 和名称；③从下拉框选择快速存档、快速读档或切换全屏；④在应用目录中绑定该 ID。只能选择插件预注册的安全方法。",
       ),
+    inPhoneAppActions: s
+      .array("动作 · 手机内部应用", (item) => ({
+        id: item.string("ID").default("new-in-phone-app"),
+        name: item.string("名称").default("新手机内部应用"),
+        phoneAppId: item
+          .string("Phone SDK 应用 ID")
+          .describe(
+            "填写第三方扩展 registerPhoneApp({ id }) 的 id；推荐与该扩展 extension.json 的 id 完全一致，例如 ink.zenly.ext-phone-snake。",
+          ),
+        description: item.string("说明"),
+      }))
+      .itemDefault({
+        id: "new-in-phone-app",
+        name: "新手机内部应用",
+        phoneAppId: "",
+        description: "",
+      })
+      .maxItems(40)
+      .addLabel("添加手机内部应用动作")
+      .emptyHint("没有手机内部应用动作。第三方需先通过 @ink-zenly/phone-sdk 注册应用。")
+      .describe(
+        "操作：①第三方扩展用 Phone SDK 的 registerPhoneApp 注册（id 建议取自 extension.json）；②添加本动作并填写相同的 Phone SDK 应用 ID；③在「手机应用目录」的默认动作 ID 中绑定该动作 ID。",
+      ),
     catalogApps: s
       .array("手机应用目录", (item) => ({
         id: item.string("应用 ID").default("new-app"),
@@ -1726,6 +1751,9 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
    * 保险计时器会释放 `opening` 锁，避免一次异常显示永久阻塞之后的打开动作。
    */
   static onRegister(ctx: ExtensionContext): void {
+    // 尽早安装 Phone SDK 宿主，便于第三方扩展在其后（或排队在其前）完成 registerPhoneApp。
+    installPhoneExtensionSdkHost();
+
     let registeredShortcut = normalizeOpenPhoneShortcut(
       ctx.settings.get<unknown>("openPhoneShortcut"),
     );

@@ -5,6 +5,7 @@ import {
   type ExtensionContext,
   type InternalSystemSlot,
 } from "@avg-studio/sdk";
+import { isPhoneAppId } from "@ink-zenly/phone-sdk";
 
 /**
  * 手机应用允许启动的受限目标集合。
@@ -13,6 +14,7 @@ import {
  * - `program-ui.ref`：程序 UI 引用；本扩展使用 `ui-id`，跨扩展使用 `extension-id/ui-id`，不得带 `@`。
  * - `visual-ui.name`：项目 UI 使用 `ui-name`，扩展 UI 使用 `@extension-id/ui-name`。
  * - `extension-method`：SDK 暂无直接调用 API，`methodRef` 仅用于标识，实际由 `fragmentId` 适配 Fragment 执行。
+ * - `in-phone-app.phoneAppId`：第三方 `registerPhoneApp({ id })` 的 id，推荐等于该扩展 `extension.json` 的 `id`。
  */
 export type PhoneTarget =
   | { kind: "program-ui"; ref: string; props?: Record<string, unknown> }
@@ -25,7 +27,8 @@ export type PhoneTarget =
       chapterId?: string;
     }
   | { kind: "fragment"; fragmentId: string; chapterId?: string }
-  | { kind: "local-command"; commandId: LocalCommandId };
+  | { kind: "local-command"; commandId: LocalCommandId }
+  | { kind: "in-phone-app"; phoneAppId: string };
 
 /** 允许由手机本地执行的固定命令；不接受作者或玩家动态扩展命令名称。 */
 export type LocalCommandId =
@@ -118,6 +121,12 @@ const DEFAULT_CATALOG: PhoneCatalog = {
     { id: "quick-save", name: "快速存档", target: { kind: "local-command", commandId: "quick-save" } },
     { id: "quick-load", name: "快速读档", target: { kind: "local-command", commandId: "quick-load" } },
     { id: "fullscreen", name: "切换全屏", target: { kind: "local-command", commandId: "toggle-fullscreen" } },
+    {
+      id: "snake",
+      name: "贪吃蛇",
+      description: "需同时启用 ink.zenly.ext-phone-snake（Phone SDK 示例）",
+      target: { kind: "in-phone-app", phoneAppId: "ink.zenly.ext-phone-snake" },
+    },
   ],
   apps: [
     { id: "save", name: "存档", order: 0, enabled: true, locked: false, defaultActionId: "save" },
@@ -126,6 +135,7 @@ const DEFAULT_CATALOG: PhoneCatalog = {
     { id: "history", name: "历史", order: 0, enabled: true, locked: false, defaultActionId: "history" },
     { id: "gallery", name: "鉴赏", order: 0, enabled: true, locked: false, defaultActionId: "gallery" },
     { id: "utility", name: "快捷工具", order: 0, enabled: true, locked: false, defaultActionId: "fullscreen" },
+    { id: "snake", name: "贪吃蛇", order: 1, enabled: true, locked: false, defaultActionId: "snake" },
   ],
 };
 
@@ -251,6 +261,10 @@ function parseTarget(value: unknown): PhoneTarget | null {
       return typeof value.commandId === "string" && LOCAL_COMMANDS.has(value.commandId as LocalCommandId)
         ? { kind: "local-command", commandId: value.commandId as LocalCommandId }
         : null;
+    case "in-phone-app":
+      return isPhoneAppId(value.phoneAppId)
+        ? { kind: "in-phone-app", phoneAppId: value.phoneAppId }
+        : null;
     default:
       return null;
   }
@@ -334,6 +348,8 @@ export interface ActionSettingsRow {
   fragmentId?: string;
   chapterId?: string;
   commandId?: string;
+  /** 对应 `registerPhoneApp({ id })` 的应用 id */
+  phoneAppId?: string;
 }
 
 export interface GroupedActionSettingsRows {
@@ -341,6 +357,8 @@ export interface GroupedActionSettingsRows {
   visualUiActions?: unknown;
   systemSlotActions?: unknown;
   internalMethodActions?: unknown;
+  /** 「动作 · 手机内部应用」表单行 */
+  inPhoneAppActions?: unknown;
 }
 
 export interface AppSettingsRow {
@@ -402,6 +420,9 @@ function actionFromSettingsRow(raw: unknown): PhoneActionDefinition | null {
     case "local-command":
       target = { kind: "local-command", commandId: raw.commandId };
       break;
+    case "in-phone-app":
+      target = { kind: "in-phone-app", phoneAppId: raw.phoneAppId };
+      break;
     default:
       return null;
   }
@@ -439,6 +460,7 @@ function actionsFromGroupedSettingsRows(
     ...rowsWithTargetKind(groups.visualUiActions, "visual-ui"),
     ...rowsWithTargetKind(groups.systemSlotActions, "system-slot"),
     ...rowsWithTargetKind(groups.internalMethodActions, "local-command"),
+    ...rowsWithTargetKind(groups.inPhoneAppActions, "in-phone-app"),
   ]);
 }
 
@@ -657,6 +679,7 @@ export function resolvePhoneApps(
  * 程序 UI 使用 `ctx.ui.show`，可视化 UI 使用 `ctx.visualUI.open`，系统槽始终模态调用；Fragment 与扩展方法适配都会
  * 通过 `ctx.flow.callFragment` 执行。扩展方法分支不会直接执行 `methodRef`，因为 SDK 尚未公开该 API。
  * 本地命令仅允许快速存档、快速读档和切换全屏；宿主 API 的异步错误会向上传播给 UI 统一处理。
+ * `in-phone-app` 不在此函数执行：必须由手机 UI 保持外壳打开并渲染 SDK 注册组件。
  */
 export async function launchPhoneTarget(ctx: ExtensionContext, target: PhoneTarget): Promise<void> {
   switch (target.kind) {
@@ -684,5 +707,10 @@ export async function launchPhoneTarget(ctx: ExtensionContext, target: PhoneTarg
       if (target.commandId === "quick-save") await ctx.archive.quickSave();
       else if (target.commandId === "quick-load") await ctx.archive.quickLoad();
       else if (target.commandId === "toggle-fullscreen") await ctx.game.window.toggleFullscreen();
+      return;
+    case "in-phone-app":
+      throw new Error(
+        `[phone] in-phone-app（${target.phoneAppId}）必须由手机 UI 内页处理，不能经 launchPhoneTarget 关闭手机后启动`,
+      );
   }
 }

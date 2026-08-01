@@ -19,12 +19,14 @@
 10. [Preview、缓存与多预览隔离](#10-preview缓存与多预览隔离)
 11. [调试、验收与常见问题](#11-调试验收与常见问题)
 12. [源码结构](#12-源码结构)
+13. [第三方 Phone SDK 接入](#13-第三方-phone-sdk-接入手机内部应用)
 
 ## 1. 能力范围与限制
 ### 已提供的能力
 - 苹果手机（iPhone）与安卓手机两套外壳预设。
 - 四列 APP 桌面；支持键盘、鼠标和语义快捷键打开。
 - 作者配置的程序 UI、可视化 UI、内置系统界面、快速存档/读档/全屏等安全动作。
+- **手机内部应用（Phone SDK）**：第三方通过 `@ink-zenly/phone-sdk` 注册界面，点击后在手机屏幕内打开（不关手机）；底部 Home 回桌面。
 - APP 的默认排序、默认预装、默认可用、锁定玩家编辑，以及剧情中的安装、删除、禁用、解禁。
 - 已安装但被禁用的 APP 仍保留在桌面，图标与名称变暗且不能启动；只有删除才会移出桌面。
 - APP 管理方法可选显示 Toast：支持九宫格位置、上下堆叠、独立入场/退场动画和自动消失；剧情快进或跳过时不显示。
@@ -173,6 +175,7 @@ CSS 背景只能是单个背景值：不能包含 `url()`、`;`、`{}` 或 `@` �
 | 动作 · 可视化 UI | 打开项目或扩展的可视化 UI。 | 项目 UI 填 `ui-name`；扩展 UI 填 `@extension-id/ui-name`。可指定是否模态。 |
 | 动作 · 内置系统界面 | 打开标题、工具栏、存档、读档、设置、历史或鉴赏。 | 从下拉框选择系统槽位。 |
 | 动作 · 手机内部方法 | 直接执行预置安全命令。 | 只能选择快速存档、快速读档或切换全屏。 |
+| 动作 · 手机内部应用 | 在手机屏幕内打开第三方 Phone SDK 应用。 | 填写与 `registerPhoneApp({ id })` 一致的应用 ID；不关闭手机。 |
 
 每个动作都有 **ID、名称、说明**。ID 是稳定引用，不建议在项目发布后随意改名；改名后，已绑定的 APP 和玩家历史绑定都不会自动迁移。
 
@@ -410,22 +413,36 @@ pnpm run build
 
 ## 12. 源码结构
 ```text
+phone-sdk/                                         # @ink-zenly/phone-sdk：第三方注册手机内部应用
 src/
 ├─ index.tsx                                      # 扩展入口，同时导出 PhoneExtension 与 ToastExtension
 ├─ studio/
 │  └─ phone-inline-cards.ts                       # Studio 方法 Block 摘要兼容层
 ├─ phone/
 │  ├─ core/catalog.ts                             # 目录、排序、APP 状态、目标校验与启动
+│  ├─ sdk-host/install-phone-sdk-host.ts          # Phone SDK 宿主安装
 │  ├─ extension/phone-extension.tsx              # 手机设置、存档、剧情方法、消息与 Toast 入队
 │  ├─ styles/phone.css                            # 手机外壳、APP、消息与响应式样式
 │  └─ ui/
-│     ├─ phone-ui.tsx                            # 普通/消息 UI、输入与个性化编辑器
+│     ├─ phone-ui.tsx                            # 普通/消息/内页 UI、输入与个性化编辑器
 │     ├─ asset-utils.ts                           # 图片读取与 Studio 素材 URI 解析
-│     └─ components/story-message-item.tsx       # 头像回退与单条消息渲染
+│     └─ components/
+│        ├─ story-message-item.tsx               # 头像回退与单条消息渲染
+│        ├─ phone-error-boundary.tsx             # 整机错误边界
+│        └─ in-phone-app-boundary.tsx            # 内页应用错误边界
 └─ toast/
    ├─ core/toast-runtime.ts                       # 独立 Toast 队列、计时、进出场状态与订阅
    ├─ extension/toast-extension.tsx              # 独立 phone-toast 程序 UI 模块
    ├─ styles/toast.css                            # 九宫格堆叠及入场/退场动画
    └─ ui/toast-ui.tsx                             # Toast 队列 React UI 与公开类型
-sdk/                                               # 本项目使用的 SDK 类型定义；不要直接修改
+sdk/                                               # 本项目使用的 Studio SDK 类型定义；不要直接修改
 ```
+
+## 13. 第三方 Phone SDK 接入（手机内部应用）
+
+完整说明见 `phone-sdk/README.md`。最小流程：
+
+1. 第三方扩展依赖 `@ink-zenly/phone-sdk`（`file:` 指向本仓库 `phone-sdk/`）。
+2. 在 `onRegister` 中调用 `registerPhoneApp({ id, title, render })`。
+3. 作者在手机扩展设置「动作 · 手机内部应用」填写同一 `phoneAppId`，并在应用目录绑定动作 ID。
+4. 玩家点击图标后，界面在手机屏幕内打开；底部 Home / Escape 回桌面；应用内返回由第三方自己实现。

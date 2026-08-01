@@ -7,6 +7,10 @@ settings:
 importers:
 
   .:
+    dependencies:
+      '@ink-zenly/phone-sdk':
+        specifier: file:phone-sdk
+        version: file:phone-sdk(react@18.3.1)
     devDependencies:
       '@avg-studio/sdk':
         specifier: file:./sdk
@@ -260,6 +264,11 @@ packages:
     engines: {node: '>=12'}
     cpu: [x64]
     os: [win32]
+
+  '@ink-zenly/phone-sdk@file:phone-sdk':
+    resolution: {directory: phone-sdk, type: directory}
+    peerDependencies:
+      react: ^18.0.0
 
   '@jridgewell/gen-mapping@0.3.13':
     resolution: {integrity: sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA==}
@@ -798,6 +807,10 @@ snapshots:
 
   '@esbuild/win32-x64@0.21.5':
     optional: true
+
+  '@ink-zenly/phone-sdk@file:phone-sdk(react@18.3.1)':
+    dependencies:
+      react: 18.3.1
 
   '@jridgewell/gen-mapping@0.3.13':
     dependencies:
