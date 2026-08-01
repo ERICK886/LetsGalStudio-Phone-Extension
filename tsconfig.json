@@ -8,6 +8,7 @@
     "paths": {
       "@avg-studio/sdk": ["./sdk/index.ts"],
       "@ink-zenly/phone-sdk": ["./phone-sdk/src/index.ts"],
+      "@ink-zenly/phone-sdk/plugin": ["./phone-sdk/src/client/index.ts"],
       "react": ["./node_modules/@types/react/index.d.ts"],
       "react/jsx-runtime": ["./node_modules/@types/react/jsx-runtime.d.ts"],
       "react/jsx-dev-runtime": ["./node_modules/@types/react/jsx-dev-runtime.d.ts"]
@@ -19,5 +20,5 @@
     "isolatedModules": true,
     "noEmit": true
   },
-  "include": ["src/**/*", "phone-sdk/src/**/*"]
+  "include": ["src/**/*", "phone-sdk/src/**/*", "vite.config.ts"]
 }

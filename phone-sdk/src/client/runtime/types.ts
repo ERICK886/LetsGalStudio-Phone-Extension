@@ -104,7 +104,11 @@ export interface PhoneSdkHost {
 
 /**
  * 挂在 `globalThis` 上的 SDK 槽位形状。
- * 所有扩展 bundle 必须共享同一槽位，因此队列与宿主都不能放在模块私有变量里。
+ * 所有扩展 bundle 必须共享同一槽位，因此队列、宿主与已注册应用表都不能放在模块私有变量里。
+ *
+ * @remarks
+ * Studio 可能对同一 `dist/index.mjs` 做多次模块实例化；模块级 `Map` 会导致
+ * `registerPhoneApp` 写入实例 A、UI `lookup` 读实例 B（空表）而误报未注册。
  */
 export interface PhoneSdkGlobalSlot {
   host?: PhoneSdkHost;
@@ -112,6 +116,18 @@ export interface PhoneSdkGlobalSlot {
   queue: PhoneAppRegistration[];
   /** 宿主安装前暂存的注销 id */
   unregisterQueue: string[];
+  /**
+   * 跨模块实例共享的已注册应用表（key = 程序 ID）。
+   * 由手机扩展宿主写入；查找时必须读此表而非模块私有变量。
+   */
+  apps?: Map<string, PhoneAppRegistration>;
+  /**
+   * 可选：宿主安装完成后的外部回调。
+   *
+   * 宿主本身不注册任何内页应用；若扩展入口（`src/index.tsx` → `bootstrapPhonePluginApps`）
+   * 或其它包挂上此钩子，宿主仅在安装后调用一次，便于热重载后重新 `registerPhoneApp`。
+   */
+  pluginDevReregister?: () => void;
   /** 宿主最近一次发布的安全区；未发布时为 `undefined` */
   safeAreaInsets?: PhoneSafeAreaInsets;
 }

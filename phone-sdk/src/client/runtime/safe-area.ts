@@ -6,7 +6,7 @@
  * @version 0.1.1
  */
 
-import { phoneSdkDebug } from "./debug";
+import { phoneSdkDebug } from "../debug/debug";
 import { getPhoneSdkSlot } from "./slot";
 import type { PhoneSafeAreaInsets } from "./types";
 

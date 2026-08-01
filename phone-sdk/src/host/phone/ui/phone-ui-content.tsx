@@ -1,3 +1,11 @@
+/**
+ * @file phone-ui-content.tsx
+ * @description 手机 UI 主状态编排（桌面 / 编辑器 / 消息 / 内页）。
+ * @author 池水三两升
+ * @date 2026-08-01
+ * @version 0.5.0
+ */
+
 import React, {
   useCallback,
   useEffect,
@@ -11,12 +19,10 @@ import React, {
 } from "react";
 import {
   INTERNAL_SYSTEM_SLOT,
-  INTERNAL_SYSTEM_SLOT_IDS,
   INTERNAL_SYSTEM_SLOTS,
   useExtensionContext,
 } from "@avg-studio/sdk";
-import phoneCss from "../styles/phone.css?inline";
-import { PhoneErrorBoundary } from "./components/phone-error-boundary";
+import phoneCss from "./styles/phone.css?inline";
 import { InPhoneAppBoundary } from "./components/in-phone-app-boundary";
 import { PhoneStoryMessageItem } from "./components/story-message-item";
 import { firstGlyph, readImage, resolveAssetUrl } from "./asset-utils";
@@ -36,8 +42,8 @@ import {
   type PhoneTarget,
   type PlayerPhonePreferences,
   type ResolvedPhoneApp,
-} from "../core/catalog";
-import { lookupPhoneSdkApp } from "../sdk-host/install-phone-sdk-host";
+} from "../catalog";
+import { lookupPhoneSdkApp } from "../runtime/install-host";
 import type {
   PhonePopupPosition,
   PhoneStoryMessage,
@@ -45,234 +51,36 @@ import type {
 } from "../extension/phone-extension";
 import {
   EMPTY_PHONE_SAFE_AREA,
-  createDebugPhoneAppRenderProps,
+  diagnosePhoneAppLookup,
   phoneSdkDebug,
+  phoneSdkDiag,
+  phoneSdkDiagWarn,
   publishPhoneSafeAreaInsets,
-  type PhoneAppRegistration,
   type PhoneSafeAreaInsets,
-} from "@ink-zenly/phone-sdk";
-
-const GRID_COLUMNS = 4;
-const MAX_WALLPAPER_BYTES = 2 * 1024 * 1024;
-const MAX_ICON_BYTES = 512 * 1024;
-const PHONE_POPUP_POSITIONS = [
-  "top-left",
-  "top-center",
-  "top-right",
-  "bottom-left",
-  "bottom-center",
-  "bottom-right",
-  "center",
-] as const;
-const PHONE_CLOSE_ANIMATION_MS = 220;
-// 保留旧 shared 数据的兼容解析路径；普通桌面不再绑定这些拖拽处理器。
-const APP_REORDER_LONG_PRESS_MS = 450;
-const APP_REORDER_MOVEMENT_PX = 8;
-const PROCESSED_STORY_POINTER_EVENTS = new WeakSet<Event>();
-
-type AppDropPlacement = "before" | "after";
-
-interface AppDropTarget {
-  appId: string;
-  placement: AppDropPlacement;
-}
-
-interface AppDragStart {
-  appId: string;
-  pointerId: number;
-  clientX: number;
-  clientY: number;
-}
-
-type LocalPhonePopupPosition = (typeof PHONE_POPUP_POSITIONS)[number];
-
-function normalizePhonePopupPosition(value: unknown): LocalPhonePopupPosition {
-  return (PHONE_POPUP_POSITIONS as readonly unknown[]).includes(value)
-    ? value as LocalPhonePopupPosition
-    : "bottom-right";
-}
-
-const TARGET_TYPE_LABELS: Record<PhoneTarget["kind"], string> = {
-  "program-ui": "程序 UI（本扩展/跨扩展）",
-  "visual-ui": "可视化 UI（项目/扩展）",
-  "system-slot": "内置系统界面",
-  "extension-method": "扩展方法（Fragment 适配）",
-  fragment: "剧情 Fragment",
-  "local-command": "手机内部方法",
-  "in-phone-app": "手机内部应用（Phone SDK）",
-};
-
-const PHONE_SYSTEM_SLOT_IDS = INTERNAL_SYSTEM_SLOT_IDS.filter(
-  (slot) => slot !== INTERNAL_SYSTEM_SLOT.Input && slot !== INTERNAL_SYSTEM_SLOT.Choice,
-);
-
-const LOCAL_COMMAND_LABELS: Record<LocalCommandId, string> = {
-  "quick-save": "快速存档",
-  "quick-load": "快速读档",
-  "toggle-fullscreen": "切换全屏",
-};
-
-function createDefaultTarget(kind: PhoneTarget["kind"]): PhoneTarget {
-  switch (kind) {
-    case "program-ui": return { kind, ref: "" };
-    case "visual-ui": return { kind, name: "", modal: true };
-    case "system-slot": return { kind, slot: INTERNAL_SYSTEM_SLOT.Settings };
-    case "extension-method": return { kind, methodRef: "", fragmentId: "" };
-    case "fragment": return { kind, fragmentId: "" };
-    case "local-command": return { kind, commandId: "quick-save" };
-    case "in-phone-app": return { kind, phoneAppId: "" };
-  }
-}
-
-function isTextInput(target: EventTarget | null): boolean {
-  return target instanceof HTMLElement && (
-    target.tagName === "INPUT" ||
-    target.tagName === "TEXTAREA" ||
-    target.isContentEditable
-  );
-}
-
-/**
- * 渲染 Phone SDK 已注册应用；注册在打开后丢失时给出可回桌面的占位。
- *
- * @param props.phoneAppId 当前应用 id
- * @param props.registration 注册对象；可能为 `undefined`
- * @param props.onGoHome 回桌面
- * @param props.onClosePhone 关手机
- * @param props.safeAreaInsets 刘海/状态栏与底部 Home 安全区（CSS 像素）
- */
-function InPhoneAppContent(props: {
-  phoneAppId: string;
-  registration: PhoneAppRegistration | undefined;
-  onGoHome: () => void;
-  onClosePhone: () => void;
-  safeAreaInsets: PhoneSafeAreaInsets;
-}): React.ReactElement {
-  const { phoneAppId, registration, onGoHome, onClosePhone, safeAreaInsets } = props;
-  if (!registration) {
-    return (
-      <div className="phone-in-app-error" role="alert">
-        <h2>应用不可用</h2>
-        <p>应用「{phoneAppId}」未注册或已被注销。</p>
-        <button type="button" className="phone-round-button" onClick={onGoHome}>
-          返回桌面
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <InPhoneAppContentReady
-      phoneAppId={phoneAppId}
-      registration={registration}
-      onGoHome={onGoHome}
-      onClosePhone={onClosePhone}
-      safeAreaInsets={safeAreaInsets}
-    />
-  );
-}
-
-/**
- * 已确认有注册对象时渲染内页，并挂调试：检测是否读取安全区等 SDK props。
- *
- * @param props 同 {@link InPhoneAppContent}，且 `registration` 必填
- */
-function InPhoneAppContentReady(props: {
-  phoneAppId: string;
-  registration: PhoneAppRegistration;
-  onGoHome: () => void;
-  onClosePhone: () => void;
-  safeAreaInsets: PhoneSafeAreaInsets;
-}): React.ReactElement {
-  const { phoneAppId, registration, onGoHome, onClosePhone, safeAreaInsets } = props;
-
-  const hostStyle = useMemo(
-    () =>
-      ({
-        ["--phone-safe-top" as string]: `${safeAreaInsets.top}px`,
-        ["--phone-safe-right" as string]: `${safeAreaInsets.right}px`,
-        ["--phone-safe-bottom" as string]: `${safeAreaInsets.bottom}px`,
-        ["--phone-safe-left" as string]: `${safeAreaInsets.left}px`,
-        ["--phone-safe-top-fallback" as string]: "52px",
-        ["--phone-safe-bottom-fallback" as string]: "40px",
-      }) as React.CSSProperties,
-    [safeAreaInsets],
-  );
-
-  /**
-   * 每次安全区或应用变化时重建 Proxy，重新统计「是否读取了 top/bottom」。
-   */
-  const debugBundle = useMemo(
-    () =>
-      createDebugPhoneAppRenderProps({
-        appId: phoneAppId,
-        closeApp: onGoHome,
-        closePhone: onClosePhone,
-        safeAreaInsets,
-      }),
-    [phoneAppId, onGoHome, onClosePhone, safeAreaInsets],
-  );
-
-  const rendered = registration.render(debugBundle.props);
-
-  useEffect(() => {
-    phoneSdkDebug("宿主调用 registration.render", {
-      phoneAppId,
-      title: registration.title,
-      safeAreaInsets,
-      cssVars: {
-        "--phone-safe-top": `${safeAreaInsets.top}px`,
-        "--phone-safe-bottom": `${safeAreaInsets.bottom}px`,
-      },
-    });
-
-    const flush = () => {
-      const report = debugBundle.flushReport();
-      const root = document.querySelector<HTMLElement>(
-        `[data-phone-root="ink.zenly.ext-7a9373"] .phone-in-app-host`,
-      );
-      const snakeRoot = root?.querySelector<HTMLElement>("[data-snake-build]");
-      phoneSdkDebug("内页 DOM 探测", {
-        phoneAppId,
-        hostChildCount: root?.childElementCount ?? 0,
-        snakeBuild: snakeRoot?.dataset.snakeBuild ?? null,
-        snakeSafeTopAttr: snakeRoot?.dataset.snakeSafeTop ?? null,
-        usedSafeAreaInsetValues: report.usedSafeAreaInsetValues,
-        accessedInsetFields: report.accessedInsetFields,
-        hint:
-          snakeRoot?.dataset.snakeBuild
-            ? "已挂载带 data-snake-build 的节点（当前贪吃蛇包）"
-            : "未找到 data-snake-build：Studio 可能未加载最新贪吃蛇 dist，或 render 未挂载 SnakeApp",
-      });
-    };
-
-    // queueMicrotask 在 Window 类型中始终存在，直接调度即可，无需 feature-detect。
-    window.queueMicrotask(flush);
-
-    const raf1 = window.requestAnimationFrame(() => {
-      flush();
-      window.requestAnimationFrame(flush);
-    });
-
-    const late = window.setTimeout(flush, 120);
-
-    return () => {
-      window.cancelAnimationFrame(raf1);
-      window.clearTimeout(late);
-    };
-  }, [debugBundle, phoneAppId, registration.title, safeAreaInsets]);
-
-  return (
-    <div className="phone-in-app-host" style={hostStyle}>
-      {rendered}
-    </div>
-  );
-}
-
-/** 普通手机桌面应用排序的运行时诊断；用于确认长按、落点命中和 shared 保存是否完整发生。 */
-function appReorderDebug(event: string, details: Record<string, unknown>): void {
-  console.log(`[phone-debug] app-reorder-${event}`, details);
-}
+} from "@ink-zenly/phone-sdk/plugin";
+import {
+  APP_REORDER_LONG_PRESS_MS,
+  APP_REORDER_MOVEMENT_PX,
+  GRID_COLUMNS,
+  LOCAL_COMMAND_LABELS,
+  MAX_ICON_BYTES,
+  MAX_WALLPAPER_BYTES,
+  PHONE_CLOSE_ANIMATION_MS,
+  PHONE_POPUP_POSITIONS,
+  PHONE_SYSTEM_SLOT_IDS,
+  PROCESSED_STORY_POINTER_EVENTS,
+  TARGET_TYPE_LABELS,
+  createDefaultTarget,
+  isTextInput,
+  normalizePhonePopupPosition,
+} from "./constants";
+import {
+  type AppDragStart,
+  type AppDropPlacement,
+  type AppDropTarget,
+  appReorderDebug,
+} from "./app-reorder";
+import { InPhoneAppContent } from "./in-phone-app";
 
 /**
  * 手机程序 UI 的状态编排根组件。
@@ -281,7 +89,7 @@ function appReorderDebug(event: string, details: Record<string, unknown>): void 
  * 剧情消息模式则订阅扩展的模块级消息会话，并隔离 pointer/mouse/keyboard 事件，确保一次输入最多推进一条消息。
  * 作者关闭玩家个性化时会忽略而非删除既有 shared 偏好；关闭动画复用同一个 Promise，保证目标动作只会在手机关闭后启动。
  */
-const PhoneUIContent: React.FC<PhoneUIProps> = ({
+export const PhoneUIContent: React.FC<PhoneUIProps> = ({
   loadPreferences,
   savePreferences,
   loadAppAvailability,
@@ -1178,11 +986,30 @@ const PhoneUIContent: React.FC<PhoneUIProps> = ({
 
     if (app.action.target.kind === "in-phone-app") {
       const phoneAppId = app.action.target.phoneAppId;
+      const lookupDiag = diagnosePhoneAppLookup(phoneAppId);
       const registered = lookupPhoneSdkApp(phoneAppId);
       if (!registered) {
-        showMessage("应用不可用：未注册或 Phone SDK 宿主未就绪");
+        phoneSdkDiagWarn("打开内页失败：注册表未命中", {
+          phase: "open-in-phone-app-miss",
+          catalogAppId: app.id,
+          catalogAppName: app.displayName,
+          actionId: app.action.id,
+          ...lookupDiag,
+        });
+        showMessage(
+          `应用不可用：未找到「${phoneAppId}」。`
+            + "请确认已通过 @ink-zenly/phone-sdk/plugin 完成 registerPhoneApp，"
+            + "且 Phone SDK 应用 ID 与程序 ID 一致。",
+        );
         return;
       }
+      phoneSdkDiag("打开内页：注册表命中", {
+        phase: "open-in-phone-app-hit",
+        catalogAppId: app.id,
+        actionId: app.action.id,
+        phoneAppId,
+        title: registered.title,
+      });
       setEditorOpen(false);
       // 进入内页前先写入状态栏高度，避免首帧 safeAreaInsets 为 0 导致标题顶到状态栏。
       const provisional: PhoneSafeAreaInsets = {
@@ -2058,12 +1885,3 @@ const PhoneUIContent: React.FC<PhoneUIProps> = ({
   );
 };
 
-/**
- * 对外导出的手机 UI 根组件。
- * 只应由 PhoneExtension.render 传入完整 PhoneUIProps；错误边界会隔离渲染期异常，但事件处理器和异步启动失败仍由内部流程记录。
- */
-export const PhoneUI: React.FC<PhoneUIProps> = (props) => (
-  <PhoneErrorBoundary closePhone={props.closePhone}>
-    <PhoneUIContent {...props} />
-  </PhoneErrorBoundary>
-);

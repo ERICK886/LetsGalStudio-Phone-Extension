@@ -415,7 +415,11 @@ pnpm run build
 ```text
 phone-sdk/                                         # @ink-zenly/phone-sdk：第三方注册手机内部应用
 src/
-├─ index.tsx                                      # 扩展入口，同时导出 PhoneExtension 与 ToastExtension
+├─ index.tsx                                      # 扩展入口（同步加载 src/plugin）
+├─ plugin/                                        # 本扩展内手机内页（watch 预览，build 打包）
+│  ├─ bootstrap.ts                                # 引导注册 + pluginDevReregister
+│  ├─ dev-registry.ts                             # 显式清单 registerAllPluginDevApps
+│  └─ <app-id>/                                   # 各应用：registerPhoneApp + UI
 ├─ studio/
 │  └─ phone-inline-cards.ts                       # Studio 方法 Block 摘要兼容层
 ├─ phone/
@@ -446,3 +450,8 @@ sdk/                                               # 本项目使用的 Studio S
 2. 在 `onRegister` 中调用 `registerPhoneApp({ id, title, render })`。
 3. 作者在手机扩展设置「动作 · 手机内部应用」填写同一 `phoneAppId`，并在应用目录绑定动作 ID。
 4. 玩家点击图标后，界面在手机屏幕内打开；底部 Home / Escape 回桌面；应用内返回由第三方自己实现。
+
+### 本仓库内开发手机内页（`src/plugin/`）
+
+可在 `src/plugin/<app-id>/` 下以轻量内页形式开发：`pnpm watch` 预览，`pnpm build` 一并打进本扩展发行包。  
+作者仍需手动配置「动作 · 手机内部应用」。也可迁出到独立 Studio 扩展。详见 `src/plugin/README.md`。

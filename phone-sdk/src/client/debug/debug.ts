@@ -6,7 +6,7 @@
  * @version 0.1.2
  */
 
-import type { PhoneAppRenderProps, PhoneSafeAreaInsets } from "./types";
+import type { PhoneAppRenderProps, PhoneSafeAreaInsets } from "../runtime/types";
 
 /** 控制台统一前缀，便于过滤。 */
 export const PHONE_SDK_DEBUG_PREFIX = "[phone-sdk-debug]";

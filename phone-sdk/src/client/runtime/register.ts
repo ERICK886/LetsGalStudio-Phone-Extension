@@ -7,7 +7,7 @@
  */
 
 import { isPhoneAppId, toPhoneAppId } from "./app-id";
-import { phoneSdkDebug } from "./debug";
+import { phoneSdkDebug } from "../debug/debug";
 import { getPhoneSdkSlot } from "./slot";
 import type { PhoneAppRegistration } from "./types";
 

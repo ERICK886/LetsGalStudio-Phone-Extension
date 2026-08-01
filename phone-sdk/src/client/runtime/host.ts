@@ -3,10 +3,11 @@
  * @description Phone SDK 宿主安装入口；仅由手机扩展调用。
  * @author 池水三两升
  * @date 2026-08-01
- * @version 0.1.0
+ * @version 0.1.1
  */
 
-import { getPhoneSdkSlot } from "./slot";
+import { phoneSdkDebug } from "../debug/debug";
+import { getPhoneSdkAppsRegistry, getPhoneSdkSlot } from "./slot";
 import type { PhoneSdkHost } from "./types";
 
 /**
@@ -28,6 +29,14 @@ export function installPhoneSdkHost(host: PhoneSdkHost): () => void {
     console.warn("[phone-sdk] 正在替换已安装的 Phone SDK 宿主");
   }
 
+  const queueIds = slot.queue.map((item) => item.id);
+  phoneSdkDebug("installPhoneSdkHost：开始安装", {
+    replacing: Boolean(slot.host && slot.host !== host),
+    queueLength: slot.queue.length,
+    queueIds,
+    registrySizeBefore: getPhoneSdkAppsRegistry().size,
+  });
+
   slot.host = host;
 
   const queued = slot.queue.splice(0, slot.queue.length);
@@ -40,11 +49,18 @@ export function installPhoneSdkHost(host: PhoneSdkHost): () => void {
     host.unregisterApp(id);
   }
 
+  phoneSdkDebug("installPhoneSdkHost：安装完成", {
+    flushedRegisterCount: queued.length,
+    flushedUnregisterCount: unregisters.length,
+    registryIds: [...getPhoneSdkAppsRegistry().keys()],
+  });
+
   return () => {
     const current = getPhoneSdkSlot();
     if (current.host === host) {
       current.host = undefined;
     }
+    phoneSdkDebug("installPhoneSdkHost：宿主已卸载");
   };
 }
 

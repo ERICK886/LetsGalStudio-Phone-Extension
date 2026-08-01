@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "build": "vite build",
-    "watch": "vite build --watch"
+    "watch": "vite build --watch",
+    "sync": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/sync-to-studio.ps1",
+    "sync:full": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/sync-to-studio.ps1 -IncludeNodeModules"
   },
   "peerDependencies": {
     "react": "^18.0.0",
@@ -13,6 +15,7 @@
   },
   "devDependencies": {
     "@avg-studio/sdk": "file:./sdk",
+    "@types/node": "^26.1.2",
     "@types/react": "^18.0.28",
     "@types/react-dom": "^18.0.11",
     "@vitejs/plugin-react": "^4.2.1",

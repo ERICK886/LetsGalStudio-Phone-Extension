@@ -16,8 +16,8 @@ import {
   normalizePhoneAppAvailability,
   type PhoneAppAvailabilityOverride,
   type PlayerPhonePreferences,
-} from "../core/catalog";
-import { installPhoneExtensionSdkHost } from "../sdk-host/install-phone-sdk-host";
+} from "../catalog";
+import { installPhoneExtensionSdkHost } from "../runtime/install-host";
 import { PhoneUI } from "../ui/phone-ui";
 import { enqueueToast } from "../../toast/core/toast-runtime";
 import {
@@ -1657,7 +1657,7 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
         phoneAppId: item
           .string("Phone SDK 应用 ID")
           .describe(
-            "填写第三方程序的 Studio 程序 ID（与 @extension({ id }) / registerPhoneApp({ id }) 一致），例如 phone-snake。也可填「扩展ID/程序ID」，例如 ink.zenly.ext-phone-snake/phone-snake。同一扩展可有多个程序、多个内页 app。",
+            "填写已通过 @ink-zenly/phone-sdk/plugin 注册的程序 ID（与 @extension({ id }) / registerPhoneApp({ id }) 一致），例如 phone-snake。也可填「扩展ID/程序ID」。宿主本身不提供内页应用。",
           ),
         description: item.string("说明"),
       }))
@@ -1669,9 +1669,9 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
       })
       .maxItems(40)
       .addLabel("添加手机内部应用动作")
-      .emptyHint("没有手机内部应用动作。第三方需先通过 @ink-zenly/phone-sdk 注册应用。")
+      .emptyHint("没有手机内部应用动作。请先由外部通过 @ink-zenly/phone-sdk/plugin 注册应用。")
       .describe(
-        "操作：①第三方每个程序用 registerPhoneApp({ id: 程序ID }) 注册；②添加本动作并填写相同程序 ID（或 扩展ID/程序ID）；③在「手机应用目录」绑定该动作 ID。",
+        "操作：①外部用 @ink-zenly/phone-sdk/plugin 的 registerPhoneApp({ id: 程序ID }) 注册；②添加本动作并填写相同程序 ID（或 扩展ID/程序ID）；③在「手机应用目录」绑定该动作 ID。宿主不编写内页应用。",
       ),
     catalogApps: s
       .array("手机应用目录", (item) => ({
