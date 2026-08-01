@@ -13,6 +13,10 @@ import pc from "picocolors";
 
 import { resolvePhoneSdkVersion, TEMPLATES_DIR } from "../constants.ts";
 import { promptAddOptions } from "../prompts.ts";
+import {
+  escapeForJsString,
+  escapeForJsonString,
+} from "../utils/escape.ts";
 import { findHostRepoRoot } from "../utils/fs.ts";
 import { injectPhoneAppRegistry } from "../utils/inject.ts";
 import {
@@ -118,9 +122,11 @@ export async function runAdd(opts: RunAddOptions): Promise<void> {
   const date = todayDate();
 
   // 模板变量至少包含 brief 要求的全部键（add 模板实际用到其中子集）
+  // title → JS/TS 双引号字符串安全；titleJson 预留给 JSON 模板（add 当前无 extension.json）
   const vars: Record<string, string> = {
     appId,
-    title,
+    title: escapeForJsString(title),
+    titleJson: escapeForJsonString(title),
     packageName,
     extensionId,
     phoneSdkVersion,

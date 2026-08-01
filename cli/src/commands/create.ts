@@ -12,6 +12,10 @@ import pc from "picocolors";
 
 import { resolvePhoneSdkVersion, TEMPLATES_DIR } from "../constants.ts";
 import { promptCreateOptions } from "../prompts.ts";
+import {
+  escapeForJsString,
+  escapeForJsonString,
+} from "../utils/escape.ts";
 import { isDirectoryNonEmpty } from "../utils/fs.ts";
 import {
   toExtensionId,
@@ -147,9 +151,11 @@ export async function runCreate(opts: RunCreateOptions): Promise<void> {
   const author = "池水三两升";
   const date = todayDate();
 
+  // title → JS/TS 双引号字符串安全；titleJson → extension.json 双引号安全
   const vars: Record<string, string> = {
     appId,
-    title,
+    title: escapeForJsString(title),
+    titleJson: escapeForJsonString(title),
     packageName,
     extensionId,
     phoneSdkVersion,

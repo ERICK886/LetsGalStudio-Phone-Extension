@@ -6,7 +6,7 @@
  * @version 0.1.0
  */
 
-import { defineCommand, runMain } from "citty";
+import { defineCommand, runCommand, showUsage } from "citty";
 
 import { runAdd } from "./commands/add.ts";
 import { runCreate } from "./commands/create.ts";
@@ -27,6 +27,22 @@ function hasCreateOrAddSubcommand(): boolean {
   const argv = process.argv.slice(2);
 
   return argv.some((arg) => arg === "create" || arg === "add");
+}
+
+/**
+ * 可预期错误：仅打印用户可读消息并非零退出（设计 §9，不打印堆栈）。
+ *
+ * @param err - catch 到的未知值
+ * @returns never（始终 process.exit）
+ */
+function exitWithExpectedError(err: unknown): never {
+  if (err instanceof Error) {
+    console.error(err.message);
+    process.exit(1);
+  }
+
+  console.error(String(err));
+  process.exit(1);
 }
 
 const createCmd = defineCommand({
@@ -133,4 +149,44 @@ const main = defineCommand({
   },
 });
 
-runMain(main);
+/**
+ * 启动 CLI（不用 citty `runMain`：其对普通 Error 会经 consola 打印完整堆栈）。
+ *
+ * - `--help` / `-h`：打印用法后 exit 0
+ * - `--version`：打印版本后返回
+ * - 业务 / 校验抛出的 `Error`：仅 `console.error(message)` + exit 1
+ *
+ * @returns Promise<void>
+ */
+async function start(): Promise<void> {
+  const rawArgs = process.argv.slice(2);
+
+  try {
+    if (rawArgs.includes("--help") || rawArgs.includes("-h")) {
+      if (rawArgs.includes("create")) {
+        await showUsage(createCmd, main);
+      } else if (rawArgs.includes("add")) {
+        await showUsage(addCmd, main);
+      } else {
+        await showUsage(main);
+      }
+
+      process.exit(0);
+    }
+
+    if (rawArgs.length === 1 && rawArgs[0] === "--version") {
+      const meta =
+        typeof main.meta === "function" ? await main.meta() : main.meta;
+
+      console.log(meta?.version ?? "0.1.0");
+      return;
+    }
+
+    await runCommand(main, { rawArgs });
+  } catch (err) {
+    exitWithExpectedError(err);
+  }
+}
+
+void start();
+
