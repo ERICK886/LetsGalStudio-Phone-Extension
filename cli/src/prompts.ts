@@ -3,8 +3,11 @@
  * @description create-phone-app 交互向导问题封装（@clack/prompts）。
  * @author 池水三两升
  * @date 2026-08-01
- * @version 0.1.0
+ * @version 0.3.0
  */
+
+import { existsSync, readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
 
 import * as p from "@clack/prompts";
 
@@ -101,7 +104,7 @@ export async function promptWizardMode(): Promise<"create" | "add"> {
         {
           value: "create" as const,
           label: "create",
-          hint: "创建独立内页扩展工程",
+          hint: "创建手机宿主扩展工程（含首个内页）",
         },
         {
           value: "add" as const,
@@ -130,7 +133,7 @@ export async function promptWizardMode(): Promise<"create" | "add"> {
 export async function promptCreateOptions(
   partial: CreateOptionsPartial,
 ): Promise<CreateOptions> {
-  p.intro("创建独立内页扩展工程");
+  p.intro("创建手机宿主扩展工程");
 
   let appId = partial.appId?.trim();
 
@@ -168,12 +171,12 @@ export async function promptCreateOptions(
           {
             value: "default" as const,
             label: "default",
-            hint: "完整独立扩展（含详细 README）",
+            hint: "完整宿主脚手架（含详细 README）",
           },
           {
             value: "minimal" as const,
             label: "minimal",
-            hint: "最小独立扩展",
+            hint: "最小宿主脚手架",
           },
         ],
         initialValue: "default",
@@ -246,4 +249,64 @@ export async function promptAddOptions(
   const force = partial.force ?? false;
 
   return { appId, title, force };
+}
+
+/**
+ * 列出宿主 `src/` 下含 `index.tsx` 的内页目录，供 pack 交互选择。
+ *
+ * @param hostRoot - 宿主仓库根目录（含 `src/index.tsx` 与 `definePhonePluginRegistry`）
+ * @returns 用户选择的 app-id；仅一个候选时直接返回该 id
+ * @throws Error 无可用内页目录时抛出中文错误
+ * @throws 不抛出；用户取消时 `process.exit(0)`
+ *
+ * @example
+ * ```ts
+ * const appId = await promptPackAppId("/path/to/host");
+ * await runPack({ appId, force: true });
+ * ```
+ */
+export async function promptPackAppId(hostRoot: string): Promise<string> {
+  const srcDir = join(hostRoot, "src");
+  let entries: string[] = [];
+
+  try {
+    entries = readdirSync(srcDir);
+  } catch {
+    entries = [];
+  }
+
+  const candidates = entries.filter((name) => {
+    const dirPath = join(srcDir, name);
+
+    try {
+      return (
+        statSync(dirPath).isDirectory() &&
+        existsSync(join(dirPath, "index.tsx"))
+      );
+    } catch {
+      return false;
+    }
+  });
+
+  if (candidates.length === 0) {
+    throw new Error(
+      "未找到可打包的内页：src/ 下无含 index.tsx 的子目录",
+    );
+  }
+
+  if (candidates.length === 1) {
+    return candidates[0]!;
+  }
+
+  const appId = handleCancel(
+    await p.select({
+      message: "选择要抽离的内页（app-id）",
+      options: candidates.map((id) => ({
+        value: id,
+        label: id,
+      })),
+    }),
+  );
+
+  return appId;
 }

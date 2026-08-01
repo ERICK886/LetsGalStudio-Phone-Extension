@@ -21,7 +21,7 @@ try {
   tsxCli = require.resolve("tsx/cli");
 } catch {
   console.error(
-    "错误：找不到 tsx 依赖。请先在 cli 目录执行 pnpm install（cd cli && pnpm install）。",
+    "错误：找不到 tsx 依赖。请重新安装本包：npm i -g @ink-zenly/create-phone-app 或在项目中 pnpm add -D @ink-zenly/create-phone-app。",
   );
   process.exit(1);
 }

@@ -1,9 +1,9 @@
 /**
  * @file create.ts
- * @description `create-phone-app create`：脚手架独立内页扩展工程。
+ * @description `create-phone-app create`：脚手架手机宿主扩展工程（含首个内页）。
  * @author 池水三两升
  * @date 2026-08-01
- * @version 0.1.0
+ * @version 0.3.0
  */
 
 import { join, resolve } from "node:path";
@@ -23,6 +23,7 @@ import {
   toPascalCase,
   toRegisterFnName,
 } from "../utils/names.ts";
+import { copyBundledAvgStudioSdk } from "../utils/sdk-bundle.ts";
 import { copyTemplateDir } from "../utils/template.ts";
 import { assertValidAppId } from "../utils/validate.ts";
 
@@ -86,7 +87,7 @@ function hasAllCreateFields(opts: RunCreateOptions): boolean {
 }
 
 /**
- * 执行 create：将 create-default / create-minimal 模板拷贝到目标目录。
+ * 执行 create：拷贝 create-host-* 宿主骨架，再渲染 add 模板到 `src/<app-id>/`。
  *
  * @param opts - 命令行选项；缺失字段会进入交互补全
  * @returns Promise<void>
@@ -166,26 +167,39 @@ export async function runCreate(opts: RunCreateOptions): Promise<void> {
     registerFnName,
   };
 
-  // 注意：模板目录名为 create-default / create-minimal（不是 default）
+  // 注意：模板目录名为 create-host-default / create-host-minimal（不是 default）
   const templateName =
-    template === "minimal" ? "create-minimal" : "create-default";
-  const templateDir = join(TEMPLATES_DIR, templateName);
-  const files = await copyTemplateDir(templateDir, dest, vars);
+    template === "minimal" ? "create-host-minimal" : "create-host-default";
+  const hostTemplateDir = join(TEMPLATES_DIR, templateName);
+  const addTemplateDir = join(TEMPLATES_DIR, "add");
+  const appDest = join(dest, "src", appId);
+
+  const hostFiles = await copyTemplateDir(hostTemplateDir, dest, vars);
+  const appFiles = await copyTemplateDir(addTemplateDir, appDest, vars);
+  const sdkFiles = await copyBundledAvgStudioSdk(dest);
 
   console.log();
-  console.log(pc.green("✔ 已创建独立内页扩展工程"));
+  console.log(pc.green("✔ 已创建手机宿主扩展工程"));
   console.log(`  目录：${pc.cyan(dest)}`);
   console.log(`  模板：${pc.cyan(templateName)}`);
-  console.log(`  应用：${pc.cyan(appId)}（${title}）`);
-  console.log(`  文件：${files.length} 个`);
+  console.log(`  内页：${pc.cyan(`src/${appId}/`)}（${title}）`);
+  console.log(
+    `  文件：${hostFiles.length + appFiles.length} 个（宿主 ${hostFiles.length} + 内页 ${appFiles.length}）`,
+  );
+  console.log(
+    `  Studio SDK：已拷贝至 ${pc.cyan("sdk/")}（${sdkFiles.length} 个文件，dependencies 使用 file:./sdk）`,
+  );
   console.log();
   console.log(pc.bold("下一步："));
   console.log(`  cd ${dest}`);
   console.log("  pnpm install");
-  console.log("  pnpm build");
   console.log();
-  console.log(
-    `  在宿主设置中将 phoneAppId 配置为 ${pc.cyan(appId)} 后即可打开内页。`,
-  );
+  console.log(pc.bold("开发（含手机宿主）："));
+  console.log("  pnpm watch");
+  console.log("  # Studio 仅启用本扩展即可预览");
+  console.log();
+  console.log(pc.bold("分发标准内页包："));
+  console.log(`  pnpm create-phone-app pack ${appId}`);
+  console.log("  # 产物在 ./release/");
   console.log();
 }

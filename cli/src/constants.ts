@@ -3,10 +3,10 @@
  * @description CLI 常量：模板路径、phone-sdk 版本解析。
  * @author 池水三两升
  * @date 2026-08-01
- * @version 0.1.0
+ * @version 0.1.1
  */
 
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -19,24 +19,54 @@ export const CLI_ROOT = join(__dirname, "..");
 export const TEMPLATES_DIR = join(CLI_ROOT, "templates");
 
 /**
- * 读取本仓 phone-sdk 版本并格式化为 npm 范围。
+ * 解析脚手架应写入的 `@ink-zenly/phone-sdk` npm 版本范围。
  *
- * @returns 形如 `^0.3.0` 的版本字符串
- * @throws 找不到或无法解析 phone-sdk/package.json 时抛出 Error
+ * 查找顺序：
+ * 1. 本仓 monorepo：`../phone-sdk/package.json` 的 `version`（开发态）
+ * 2. 本 CLI 包 `package.json` 的 `inkZenly.phoneSdkVersion`（发布态兜底）
+ *
+ * @returns 形如 `^0.3.1` 的版本字符串
+ * @throws 所有来源均不可用时抛出中文 Error
  *
  * @example
  * ```ts
- * resolvePhoneSdkVersion(); // "^0.3.0"
+ * resolvePhoneSdkVersion(); // "^0.3.1"
  * ```
  */
 export function resolvePhoneSdkVersion(): string {
-  const pkgPath = join(CLI_ROOT, "..", "phone-sdk", "package.json");
-  const raw = readFileSync(pkgPath, "utf8");
-  const pkg = JSON.parse(raw) as { version?: string };
+  const monorepoPkg = join(CLI_ROOT, "..", "phone-sdk", "package.json");
 
-  if (!pkg.version) {
-    throw new Error(`无法从 ${pkgPath} 读取 version`);
+  if (existsSync(monorepoPkg)) {
+    try {
+      const pkg = JSON.parse(readFileSync(monorepoPkg, "utf8")) as {
+        version?: string;
+      };
+
+      if (pkg.version) {
+        return `^${pkg.version}`;
+      }
+    } catch {
+      // 继续尝试 CLI 包内兜底配置
+    }
   }
 
-  return `^${pkg.version}`;
+  const cliPkgPath = join(CLI_ROOT, "package.json");
+
+  try {
+    const cliPkg = JSON.parse(readFileSync(cliPkgPath, "utf8")) as {
+      inkZenly?: { phoneSdkVersion?: string };
+    };
+    const pinned = cliPkg.inkZenly?.phoneSdkVersion?.trim();
+
+    if (pinned) {
+      return pinned;
+    }
+  } catch {
+    // fall through
+  }
+
+  throw new Error(
+    "无法解析 @ink-zenly/phone-sdk 版本：既不在 monorepo（缺少 ../phone-sdk/package.json），" +
+      "CLI package.json 也未配置 inkZenly.phoneSdkVersion",
+  );
 }

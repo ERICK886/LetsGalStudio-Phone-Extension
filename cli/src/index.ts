@@ -1,15 +1,16 @@
 /**
  * @file index.ts
- * @description create-phone-app CLI 入口（citty）：create / add 子命令与无参向导。
+ * @description create-phone-app CLI 入口（citty）：create / add / pack 子命令与无参向导。
  * @author 池水三两升
  * @date 2026-08-01
- * @version 0.1.0
+ * @version 0.3.0
  */
 
 import { defineCommand, runCommand, showUsage } from "citty";
 
 import { runAdd } from "./commands/add.ts";
 import { runCreate } from "./commands/create.ts";
+import { runPack } from "./commands/pack.ts";
 import {
   promptAddOptions,
   promptCreateOptions,
@@ -17,16 +18,18 @@ import {
 } from "./prompts.ts";
 
 /**
- * 判断当前 argv 是否显式包含 create / add 子命令名。
+ * 判断当前 argv 是否显式包含已知子命令名。
  *
  * citty 在部分情况下可能同时触发根 `run` 与子命令；无子命令名时才进入向导。
  *
- * @returns 含 create 或 add 时为 true
+ * @returns 含 create / add / pack 时为 true
  */
-function hasCreateOrAddSubcommand(): boolean {
+function hasKnownSubcommand(): boolean {
   const argv = process.argv.slice(2);
 
-  return argv.some((arg) => arg === "create" || arg === "add");
+  return argv.some(
+    (arg) => arg === "create" || arg === "add" || arg === "pack",
+  );
 }
 
 /**
@@ -48,7 +51,7 @@ function exitWithExpectedError(err: unknown): never {
 const createCmd = defineCommand({
   meta: {
     name: "create",
-    description: "创建独立内页扩展工程",
+    description: "创建手机宿主扩展工程（含首个内页）",
   },
   args: {
     dir: {
@@ -121,19 +124,62 @@ const addCmd = defineCommand({
   },
 });
 
+const packCmd = defineCommand({
+  meta: {
+    name: "pack",
+    description: "将 src/<app-id>/ 抽离为 release/ 标准内页包",
+  },
+  args: {
+    appId: {
+      type: "positional",
+      required: false,
+      description: "程序 ID",
+    },
+    cwd: {
+      type: "string",
+      description: "起始查找宿主根的目录",
+    },
+    out: {
+      type: "string",
+      default: "release",
+      description: "输出目录（相对宿主根或绝对路径）",
+    },
+    force: {
+      type: "boolean",
+      default: false,
+      description: "允许写入非空目录",
+    },
+    title: {
+      type: "string",
+      description: "扩展显示标题（默认用 app-id）",
+    },
+  },
+  async run({ args }) {
+    await runPack({
+      appId: args.appId,
+      cwd: args.cwd,
+      out: args.out,
+      force: args.force,
+      title: args.title,
+    });
+  },
+});
+
 const main = defineCommand({
   meta: {
     name: "create-phone-app",
-    version: "0.1.0",
-    description: "Scaffold LetsGal phone in-app plugins (create / add)",
+    version: "0.3.0",
+    description:
+      "Scaffold LetsGal phone host + in-app plugins (create / add / pack)",
   },
   subCommands: {
     create: createCmd,
     add: addCmd,
+    pack: packCmd,
   },
   async run() {
-    // citty quirk：若根 run 与子命令一并触发，仅在无 create/add 时跑向导
-    if (hasCreateOrAddSubcommand()) {
+    // citty quirk：若根 run 与子命令一并触发，仅在无已知子命令时跑向导
+    if (hasKnownSubcommand()) {
       return;
     }
 
@@ -167,6 +213,8 @@ async function start(): Promise<void> {
         await showUsage(createCmd, main);
       } else if (rawArgs.includes("add")) {
         await showUsage(addCmd, main);
+      } else if (rawArgs.includes("pack")) {
+        await showUsage(packCmd, main);
       } else {
         await showUsage(main);
       }
@@ -178,7 +226,7 @@ async function start(): Promise<void> {
       const meta =
         typeof main.meta === "function" ? await main.meta() : main.meta;
 
-      console.log(meta?.version ?? "0.1.0");
+      console.log(meta?.version ?? "0.3.0");
       return;
     }
 

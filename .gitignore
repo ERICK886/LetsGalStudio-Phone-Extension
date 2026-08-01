@@ -1,7 +1,11 @@
 node_modules
 dist
+docs
 sdk
 *.log
 .DS_Store
-
+.idea
 .worktrees/
+
+release
+

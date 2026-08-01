@@ -1,0 +1,7 @@
+node_modules
+*.test.ts
+pnpm-lock.yaml
+tsconfig.json
+*.local
+*.log
+.DS_Store

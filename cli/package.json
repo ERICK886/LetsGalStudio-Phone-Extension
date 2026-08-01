@@ -1,19 +1,41 @@
 {
   "name": "@ink-zenly/create-phone-app",
-  "version": "0.1.0",
-  "private": true,
+  "version": "0.3.0",
+  "description": "Scaffold LetsGal phone host + in-app plugins (create / add / pack)",
+  "author": "池水三两升",
+  "license": "MIT",
   "type": "module",
-  "description": "Scaffold LetsGal phone in-app plugins (create / add)",
   "bin": {
     "create-phone-app": "./bin/create-phone-app.js"
   },
   "files": [
     "bin",
     "src",
-    "templates"
+    "templates",
+    "vendor",
+    "README.md"
   ],
   "engines": {
     "node": ">=18"
+  },
+  "inkZenly": {
+    "phoneSdkVersion": "^0.3.1"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "keywords": [
+    "letsgal",
+    "phone",
+    "scaffold",
+    "cli",
+    "create-phone-app"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ink-zenly/ext-7a9373.git",
+    "directory": "cli"
   },
   "dependencies": {
     "@clack/prompts": "^0.10.0",

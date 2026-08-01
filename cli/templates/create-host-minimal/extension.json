@@ -1,0 +1,9 @@
+{
+  "id": "{{extensionId}}",
+  "name": "{{titleJson}}",
+  "description": "{{titleJson}} 自定义手机宿主扩展（含内页 {{appId}}）。开发调试用；分发内页请用 create-phone-app pack。",
+  "author": "{{author}}",
+  "version": "0.1.0",
+  "entry": "dist/index.mjs",
+  "sdkVersion": ">=1.9.0"
+}
