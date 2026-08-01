@@ -1,10 +1,16 @@
 {
   "name": "@ink-zenly/phone-sdk",
   "version": "0.4.0",
-  "private": true,
+  "description": "LetsGal 自定义手机扩展 SDK：宿主 PhoneExtension / ToastExtension，以及内页 registerPhoneApp 插件 API",
+  "author": "池水三两升",
+  "license": "MIT",
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
+  "files": [
+    "src",
+    "README.md"
+  ],
   "exports": {
     ".": {
       "types": "./src/index.ts",
@@ -17,8 +23,23 @@
       "default": "./src/client/index.ts"
     }
   },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "peerDependencies": {
     "react": "^18.0.0",
     "@avg-studio/sdk": "*"
+  },
+  "keywords": [
+    "letsgal",
+    "phone",
+    "sdk",
+    "avg-studio"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ink-zenly/ext-7a9373.git",
+    "directory": "phone-sdk"
   }
 }
