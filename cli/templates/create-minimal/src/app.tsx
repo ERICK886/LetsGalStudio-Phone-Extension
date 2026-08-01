@@ -1,6 +1,6 @@
 /**
  * @file app.tsx
- * @description {{title}} 手机内页 UI（独立扩展模板）。
+ * @description {{title}} 手机内页 UI（minimal 独立扩展模板）。
  * @author {{author}}
  * @date {{date}}
  * @version 0.1.0
@@ -9,7 +9,7 @@
 import type { PhoneAppRenderProps } from "@ink-zenly/phone-sdk/plugin";
 
 /**
- * {{title}} 内页组件。
+ * {{title}} 内页组件（minimal 骨架）。
  *
  * @param props - Phone SDK 注入的运行时 props
  * @param props.appId - 注册时的程序 ID
@@ -38,27 +38,24 @@ export function {{pascalName}}App(props: PhoneAppRenderProps) {
         paddingRight: Math.max(16, safeAreaInsets.right),
         paddingBottom: safeAreaInsets.bottom,
         paddingLeft: Math.max(16, safeAreaInsets.left),
-        color: "#f5f5f5",
-        background:
-          "linear-gradient(160deg, #1a2332 0%, #0f1419 55%, #1b2a22 100%)",
+        color: "#e8e8e8",
+        background: "#141820",
         fontFamily: "ui-sans-serif, system-ui, sans-serif",
         display: "flex",
         flexDirection: "column",
-        gap: 12,
+        gap: 10,
       }}
     >
       <header style={{ marginTop: 8 }}>
-        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>{{title}}</h1>
-        <p style={{ margin: "6px 0 0", opacity: 0.72, fontSize: 13 }}>
-          程序 ID：{appId}
+        <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>{{title}}</h1>
+        <p style={{ margin: "4px 0 0", opacity: 0.65, fontSize: 12 }}>
+          {appId}
         </p>
       </header>
 
-      <main style={{ flex: 1, fontSize: 14, lineHeight: 1.55, opacity: 0.9 }}>
+      <main style={{ flex: 1, fontSize: 13, lineHeight: 1.5, opacity: 0.85 }}>
         <p style={{ margin: 0 }}>
-          这是 <code>{{packageName}}</code> 独立扩展内页。
-          请在宿主设置中配置「动作 · 手机内部应用」，
-          将 <code>phoneAppId</code> 填为 <code>{{appId}}</code> 后即可点开。
+          minimal 模板 · <code>{{appId}}</code>
         </p>
       </main>
 
@@ -69,12 +66,12 @@ export function {{pascalName}}App(props: PhoneAppRenderProps) {
           style={{
             width: "100%",
             border: "none",
-            borderRadius: 10,
-            padding: "12px 14px",
+            borderRadius: 8,
+            padding: "10px 12px",
             background: "#3dd68c",
             color: "#0b1a12",
-            fontWeight: 650,
-            fontSize: 15,
+            fontWeight: 600,
+            fontSize: 14,
             cursor: "pointer",
           }}
         >

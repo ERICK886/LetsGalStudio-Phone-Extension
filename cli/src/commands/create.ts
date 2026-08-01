@@ -177,4 +177,8 @@ export async function runCreate(opts: RunCreateOptions): Promise<void> {
   console.log("  pnpm install");
   console.log("  pnpm build");
   console.log();
+  console.log(
+    `  在宿主设置中将 phoneAppId 配置为 ${pc.cyan(appId)} 后即可打开内页。`,
+  );
+  console.log();
 }

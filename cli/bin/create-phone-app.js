@@ -14,7 +14,18 @@ import { createRequire } from "node:module";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
-const tsxCli = require.resolve("tsx/cli");
+
+let tsxCli;
+
+try {
+  tsxCli = require.resolve("tsx/cli");
+} catch {
+  console.error(
+    "错误：找不到 tsx 依赖。请先在 cli 目录执行 pnpm install（cd cli && pnpm install）。",
+  );
+  process.exit(1);
+}
+
 const entry = join(__dirname, "../src/index.ts");
 const result = spawnSync(process.execPath, [tsxCli, entry, ...process.argv.slice(2)], {
   stdio: "inherit",
