@@ -1,10 +1,12 @@
 # LetsGal Studio 自定义手机扩展
-> 扩展 ID：`ink.zenly.ext-7a9373` ｜ 程序 UI：`phone`、`phone-toast`  
-> 当前版本：`0.1.3` ｜ 要求 LetsGal Studio SDK：`>=1.9.0`
+> 扩展包 ID：`ink.zenly.ext-7a9373`（见 `extension.json` → `id`）｜ 程序 UI 模块：`phone`、`phone-toast`  
+> 扩展版本：`0.2.0` ｜ `@ink-zenly/phone-sdk`：`0.4.0` ｜ `@ink-zenly/create-phone-app`：`0.3.1`  
+> 要求 LetsGal Studio SDK：`>=1.9.0`
 
 这是一个由剧情挂载、供玩家在游戏中打开的手机扩展。它提供四列 APP 桌面、作者可配置的安全启动动作、玩家个性化、剧情控制的 APP 安装与可用状态、逐条推进的聊天消息，以及独立、非阻塞、可堆叠的 Toast 通知 UI。
 
-本 README 是当前版本唯一的使用说明，以 `extension.json` 和 `src/` 源码为准。历史方案文档如与本文冲突，请以本文为准。
+宿主实现位于 `@ink-zenly/phone-sdk`；本仓库 `src/` 负责扩展入口与 `src/<app-id>/` 内页。  
+本 README 是当前版本使用说明，以 `extension.json`、`phone-sdk/` 与 `src/` 为准。历史方案文档如与本文冲突，请以本文为准。
 
 ## 目录
 1. [能力范围与限制](#1-能力范围与限制)
@@ -20,7 +22,8 @@
 11. [调试、验收与常见问题](#11-调试验收与常见问题)
 12. [源码结构](#12-源码结构)
 13. [第三方 Phone SDK 接入](#13-第三方-phone-sdk-接入手机内部应用)
-14. [内页脚手架 create-phone-app](#14-内页脚手架-create-phone-app)
+14. [脚手架 create-phone-app（宿主 / 内页 / pack）](#14-脚手架-create-phone-app宿主--内页--pack)
+15. [宿主扩展包 id 注入（phone-sdk ≥ 0.4.0）](#15-宿主扩展包-id-注入phone-sdk--040)
 
 ## 1. 能力范围与限制
 ### 已提供的能力
@@ -58,6 +61,8 @@ pnpm run build
 ```
 
 Studio 从 `extension.json` 中配置的 `dist/index.mjs` 加载扩展。`pnpm run build` 会生成该文件。
+
+根目录 `vite.config.ts` 会读取 `extension.json` 的 `id`，并通过 Vite `define` 注入 `__PHONE_HOST_EXTENSION_ID__`，供 phone-sdk 生成「打开手机」动作名与 DOM `data-*`（详见 [§15](#15-宿主扩展包-id-注入phone-sdk--040)）。
 
 ### 日常开发
 需要持续编译时，可在自己的终端运行：
@@ -149,14 +154,22 @@ mount-phone
 | 鼠标点击 | 启动对应 APP。 |
 | `Escape`、关闭按钮、外部遮罩 | 关闭普通手机。 |
 
-打开手机的语义动作 ID 是 `ink.zenly.ext-7a9373.open-phone`。它的默认按键来自扩展设置的“打开手机快捷键”，默认值为 `ArrowUp`；可填写 `ArrowUp`、`KeyP`、`Ctrl+KeyP`、`F5` 等 SDK 支持的快捷键格式。作者也可在 Studio 的**输入按键**配置中为该语义动作重映射，玩家级输入映射优先于作者级映射，作者级映射优先于扩展设置的默认键。手机未挂载、消息手机正在显示、普通手机已显示或 UI 正在打开时，打开动作会被安全忽略。
+打开手机的语义动作 ID 为 **`<扩展包 id>.open-phone`**，其中扩展包 id 来自宿主工程的 `extension.json` → `id`（经构建注入）。本仓库当前为：
+
+```text
+ink.zenly.ext-7a9373.open-phone
+```
+
+若使用脚手架生成的其它宿主（例如 `ink.zenly.phone-app-my-shop`），动作名会变为 `ink.zenly.phone-app-my-shop.open-phone`，请按该工程的实际 id 配置 Studio「输入按键」。
+
+默认按键来自扩展设置的「打开手机快捷键」，默认值为 `ArrowUp`；可填写 `ArrowUp`、`KeyP`、`Ctrl+KeyP`、`F5` 等 SDK 支持的快捷键格式。作者也可在 Studio 的**输入按键**配置中为该语义动作重映射：玩家级输入映射优先于作者级映射，作者级映射优先于扩展设置的默认键。手机未挂载、消息手机正在显示、普通手机已显示或 UI 正在打开时，打开动作会被安全忽略。
 
 ## 5. 作者设置：外观、动作和 APP
 ### 5.1 外观设置
 | 设置 | 用途与建议 |
 | --- | --- |
 | 手机标题 | 普通手机顶部标题，默认“手机”。消息模式标题固定为“消息”。 |
-| 打开手机快捷键 | 打开普通手机的扩展默认键，默认 `ArrowUp`。可使用 `KeyP`、`Ctrl+KeyP`、`F5` 等 SDK 支持的格式；修改后会立即更新默认键。Studio“输入按键”中对 `ink.zenly.ext-7a9373.open-phone` 的映射优先级更高。 |
+| 打开手机快捷键 | 打开普通手机的扩展默认键，默认 `ArrowUp`。可使用 `KeyP`、`Ctrl+KeyP`、`F5` 等 SDK 支持的格式；修改后会立即更新默认键。Studio「输入按键」中对 **`<扩展包 id>.open-phone`**（本仓即 `ink.zenly.ext-7a9373.open-phone`）的映射优先级更高。 |
 | 手机样式预设 | `苹果手机（iPhone）` 为默认值，使用动态岛样式；`安卓手机（Android）` 使用听筒开孔和更紧凑圆角。预设不会覆盖下方颜色和背景。 |
 | 手机弹出位置 | 控制普通手机在视口中的位置与滑入/滑出方向；可选左上、中上、右上、左下、中下、右下、中部。 |
 | 默认背景色 | 没有图片和 CSS 背景时使用的底色，例如 `#172036`。 |
@@ -414,54 +427,93 @@ pnpm run build
 
 ## 12. 源码结构
 ```text
-phone-sdk/                                         # @ink-zenly/phone-sdk：第三方注册手机内部应用
+extension.json                 # 扩展清单（id / entry / sdkVersion）
+vite.config.ts                 # 构建；注入 __PHONE_HOST_EXTENSION_ID__
 src/
-├─ index.tsx                                      # 扩展入口（同步加载 src/plugin）
-├─ plugin/                                        # 本扩展内手机内页（watch 预览，build 打包）
-│  ├─ bootstrap.ts                                # 引导注册 + pluginDevReregister
-│  ├─ dev-registry.ts                             # 显式清单 registerAllPluginDevApps
-│  └─ <app-id>/                                   # 各应用：registerPhoneApp + UI
-├─ studio/
-│  └─ phone-inline-cards.ts                       # Studio 方法 Block 摘要兼容层
-├─ phone/
-│  ├─ core/catalog.ts                             # 目录、排序、APP 状态、目标校验与启动
-│  ├─ sdk-host/install-phone-sdk-host.ts          # Phone SDK 宿主安装
-│  ├─ extension/phone-extension.tsx              # 手机设置、存档、剧情方法、消息与 Toast 入队
-│  ├─ styles/phone.css                            # 手机外壳、APP、消息与响应式样式
-│  └─ ui/
-│     ├─ phone-ui.tsx                            # 普通/消息/内页 UI、输入与个性化编辑器
-│     ├─ asset-utils.ts                           # 图片读取与 Studio 素材 URI 解析
-│     └─ components/
-│        ├─ story-message-item.tsx               # 头像回退与单条消息渲染
-│        ├─ phone-error-boundary.tsx             # 整机错误边界
-│        └─ in-phone-app-boundary.tsx            # 内页应用错误边界
-└─ toast/
-   ├─ core/toast-runtime.ts                       # 独立 Toast 队列、计时、进出场状态与订阅
-   ├─ extension/toast-extension.tsx              # 独立 phone-toast 程序 UI 模块
-   ├─ styles/toast.css                            # 九宫格堆叠及入场/退场动画
-   └─ ui/toast-ui.tsx                             # Toast 队列 React UI 与公开类型
-sdk/                                               # 本项目使用的 Studio SDK 类型定义；不要直接修改
+├─ index.tsx                   # 扩展入口：导出 Phone/Toast，bootstrap 内页清单
+├─ vite-env.d.ts
+└─ <app-id>/                   # 内页应用（如 demo-shop/）：registerPhoneApp + UI
+phone-sdk/                     # 发布包 @ink-zenly/phone-sdk（0.4.0+）
+├─ src/index.ts                # main：宿主 PhoneExtension / ToastExtension
+├─ src/client/                 # → @ink-zenly/phone-sdk/plugin（内页 API）
+└─ src/host/
+   ├─ host-extension-id.ts     # 宿主扩展包 id：Vite 注入优先，否则默认回退
+   ├─ phone/                   # 目录、扩展、UI、CSS
+   ├─ toast/
+   └── studio/                 # 编辑器内联卡片等
+cli/                           # 发布包 @ink-zenly/create-phone-app（0.3.1+）
+sdk/                           # 本项目使用的 Studio SDK；不要直接修改
 ```
+
+两层 ID 勿混淆：
+
+| 层级 | 来源 | 本仓示例 | 是否按工程变化 |
+|------|------|----------|----------------|
+| 扩展包 id | `extension.json` → `id` | `ink.zenly.ext-7a9373` | 是（脚手架宿主各自不同） |
+| 模块 id | `@extension({ id })` | `phone` / `phone-toast` | 否（SDK 固定） |
 
 ## 13. 第三方 Phone SDK 接入（手机内部应用）
 
-完整说明见 `phone-sdk/README.md`。最小流程：
+完整说明见 [`phone-sdk/README.md`](phone-sdk/README.md)。最小流程：
 
-1. 第三方扩展依赖 `@ink-zenly/phone-sdk`（`file:` 指向本仓库 `phone-sdk/`）。
-2. 在 `onRegister` 中调用 `registerPhoneApp({ id, title, render })`。
-3. 作者在手机扩展设置「动作 · 手机内部应用」填写同一 `phoneAppId`，并在应用目录绑定动作 ID。
+1. 依赖 `@ink-zenly/phone-sdk`（推荐 npm `^0.4.0`；本仓开发可用 `file:phone-sdk`）。
+2. 在扩展入口调用 `@ink-zenly/phone-sdk/plugin` 的 `registerPhoneApp({ id, title, render })`（或经 `bootstrapPhonePluginApps` 清单注册）。
+3. 作者在**手机宿主**设置「动作 · 手机内部应用」填写同一 `phoneAppId`，并在应用目录绑定动作 ID。
 4. 玩家点击图标后，界面在手机屏幕内打开；底部 Home / Escape 回桌面；应用内返回由第三方自己实现。
 
 ### 本仓库内开发手机内页（`src/<app-id>/`）
 
 可在 `src/<app-id>/` 下以轻量内页形式开发（参考 `src/demo-shop/`）：`pnpm watch` 预览，`pnpm build` 一并打进本扩展发行包。  
-作者仍需手动配置「动作 · 手机内部应用」。也可迁出到独立 Studio 扩展。
+作者仍需在宿主设置中配置「动作 · 手机内部应用」。也可用 CLI `pack` 抽成独立标准内页包。
 
-## 14. 内页脚手架 create-phone-app
+## 14. 脚手架 create-phone-app（宿主 / 内页 / pack）
 
-本仓库提供 CLI（`cli/`，包名 `@ink-zenly/create-phone-app`），用于脚手架手机内页：
+本仓库提供 CLI（`cli/`，包名 `@ink-zenly/create-phone-app@0.3.1`）：
 
-- `pnpm create-phone-app add <app-id> --title "标题"`：在本仓 `src/<app-id>/` 生成内页并注入 `src/index.tsx`。
-- `pnpm create-phone-app create <dir> --template minimal|default --app-id <id> --title "标题"`：生成独立扩展工程。
+| 命令 | 作用 |
+|------|------|
+| `create` | 生成**手机宿主**工程（`PhoneExtension` + 首个内页 `src/<app-id>/`） |
+| `add` | 在已有宿主中新增内页，并注入 `src/index.tsx` |
+| `pack` | 将 `src/<app-id>/` 抽离为 `release/` **标准内页包**（可单独分发） |
 
-依赖始终写 `@ink-zenly/phone-sdk` 的 **npm 版本**（如 `^0.3.0`），不用 `file:`。完整用法、模板说明与注意点见 [`cli/README.md`](cli/README.md)。
+```powershell
+# 本仓
+pnpm create-phone-app create .\my-host --template default --app-id my-shop --title "我的商店"
+pnpm create-phone-app add demo-mail --title "邮件"
+pnpm create-phone-app pack my-shop
+
+# 已发布包
+pnpm dlx @ink-zenly/create-phone-app@0.3.1 create .\my-host --template minimal --app-id my-shop --title "我的商店"
+```
+
+依赖始终写 npm 版 `@ink-zenly/phone-sdk`（当前钉选 `^0.4.0`），不用脚手架内 `file:phone-sdk`。  
+`create` 模板的 `vite.config.ts` 已从 `extension.json` 注入 `__PHONE_HOST_EXTENSION_ID__`。  
+完整用法见 [`cli/README.md`](cli/README.md)。
+
+## 15. 宿主扩展包 id 注入（phone-sdk ≥ 0.4.0）
+
+从 `0.4.0` 起，phone-sdk **不再**在业务逻辑里写死官方扩展包 id。宿主侧统一通过：
+
+```ts
+getPhoneHostExtensionId()   // → extension.json.id（构建注入）或默认回退
+getOpenPhoneActionId()      // → `${hostId}.open-phone`
+```
+
+### 构建要求（宿主工程）
+
+在 Vite 配置中注入（本仓与 `create-host-*` 模板已配置）：
+
+```ts
+define: {
+  __PHONE_HOST_EXTENSION_ID__: JSON.stringify(/* 来自 extension.json.id */),
+}
+```
+
+未注入时回退为兼容默认值 `ink.zenly.ext-7a9373`（便于旧工程平滑升级）。  
+CSS 使用通用选择器 `[data-phone-root]` / `[data-phone-toast-root]`；DOM 仍写入真实宿主 id，便于调试。
+
+### 验收要点
+
+- 本仓 `pnpm build` 后，产物中注入值为 `ink.zenly.ext-7a9373`。
+- 脚手架宿主（如 `ink.zenly.phone-app-foo`）构建后，动作与 `data-phone-root` 均为该 id，而不是强制官方 id。
+- 模块 id `phone` / `phone-toast` **不会**随扩展包 id 改变。

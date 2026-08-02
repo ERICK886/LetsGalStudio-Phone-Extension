@@ -17,11 +17,7 @@ import {
 } from "@ink-zenly/phone-sdk/plugin";
 import { registerDemoShopPhoneApp } from "./demo-shop";
 
-bootstrapPhonePluginApps(
-  definePhonePluginRegistry(
-    registerDemoShopPhoneApp
-  ),
-);
+bootstrapPhonePluginApps(definePhonePluginRegistry(registerDemoShopPhoneApp));
 
 export { PhoneExtension, ToastExtension } from "@ink-zenly/phone-sdk";
 export { default } from "@ink-zenly/phone-sdk";
