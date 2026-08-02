@@ -445,12 +445,13 @@ cli/                           # 发布包 @ink-zenly/create-phone-app（0.3.2+�
 sdk/                           # 本项目使用的 Studio SDK；不要直接修改
 ```
 
-两层 ID 勿混淆：
+三层 ID 勿混淆：
 
-| 层级 | 来源 | 本仓示例 | 是否按工程变化 |
-|------|------|----------|----------------|
-| 扩展包 id | `extension.json` → `id` | `ink.zenly.ext-7a9373` | 是（脚手架宿主各自不同） |
-| 模块 id | `@extension({ id })` | `phone` / `phone-toast` | 否（SDK 固定） |
+| 层级 | 来源 | 本仓 / 脚手架示例 | 是否由用户自定义 |
+|------|------|-------------------|------------------|
+| **宿主扩展包 id** | 宿主 `extension.json` → `id` | 本仓 `ink.zenly.ext-7a9373`；脚手架 = `--extension-id` | 是（脚手架必填，互不从 app-id 推导） |
+| **内页程序 id（app-id）** | `registerPhoneApp({ id })` / `src/<app-id>/` | `demo-shop` | 是（`--app-id` / `add`） |
+| **宿主模块 id** | `@extension({ id })` | `phone` / `phone-toast` | 否（SDK 固定） |
 
 ## 13. 内页应用完整开发流程
 
@@ -481,17 +482,21 @@ API 细节见 [`phone-sdk/README.md`](phone-sdk/README.md)；CLI 细节见 [`cli
 
 ### 13.2 必须对齐的 ID
 
-| 名称 | 规则 | 示例 |
-|------|------|------|
-| **程序 ID / app-id** | `^[a-z][a-z0-9-]*$`；=`registerPhoneApp({ id })` | `demo-shop`、`my-mail` |
-| **phoneAppId（作者设置）** | 填程序 ID，或 `扩展包ID/程序ID` | `demo-shop` |
-| **动作 ID** | 作者自定，APP 目录「默认动作 ID」引用它 | `open-demo-shop` |
-| **扩展包 id** | 宿主或内页包自己的 `extension.json.id` | 本仓宿主 `ink.zenly.ext-7a9373`；pack 产物另有 id |
+脚手架自 **0.3.2** 起：宿主扩展包 id 与内页 app-id **分开指定**，不再生成 `ink.zenly.phone-app-*`。
+
+| 名称 | 规则 | 谁指定 | 示例 |
+|------|------|--------|------|
+| **宿主扩展包 id** | `^[a-z][a-z0-9.-]*$`（可含点号）→ 宿主 `extension.json.id` | `create --extension-id` | `com.acme.my-phone` |
+| **程序 ID / app-id** | `^[a-z][a-z0-9-]*$` → `registerPhoneApp({ id })`、`src/<app-id>/` | `create --app-id` / `add` | `demo-shop`、`my-mail` |
+| **phoneAppId（作者设置）** | 填**程序 ID**，或 `宿主扩展包ID/程序ID` | Studio 手动配置 | `my-mail` |
+| **动作 ID** | 作者自定；APP 目录「默认动作 ID」引用它 | Studio 手动配置 | `open-my-mail` |
+| **内页包扩展包 id**（仅 pack） | 默认同 app-id；可用 `--extension-id` 覆盖 | `pack` 可选 | 默认 `my-mail` |
 
 要点：
 
-- 开发期挂在本仓时，内页**没有**独立 `@extension`；程序 ID 仍必须稳定，将来 `pack` 后应与 `@extension({ id })` 一致。
-- 宿主模块 id `phone` / `phone-toast` **不是**内页 app-id，不要填混。
+- **宿主扩展包 id ≠ 内页 app-id**。打开手机动作为 `<宿主扩展包 id>.open-phone`；桌面点开内页靠 `phoneAppId` = app-id。
+- 开发期挂在本仓时，内页**没有**独立 `@extension`；程序 ID 仍必须稳定，将来 `pack` 后应与内页包 `@extension({ id })`（通常等于 app-id）一致。
+- 宿主模块 id `phone` / `phone-toast` **不是**内页 app-id，也不要当成扩展包 id。
 
 ### 13.3 路径 A：在本仓库开发内页（推荐入门）
 
@@ -624,12 +629,15 @@ pnpm watch
 
 ```powershell
 pnpm create-phone-app pack my-mail --title "邮件"
+# 若内页包的 extension.json.id 需要与 app-id 不同：
+pnpm create-phone-app pack my-mail --title "邮件" --extension-id com.acme.my-mail-ext
 ```
 
 - 默认输出到宿主根下 `release/`（已被 `.gitignore`）
 - 自动 `pnpm install` + `pnpm build`
 - 产物是**只有内页**的扩展：无 `PhoneExtension`，需与手机宿主**同时启用**
-- 对方宿主里 `phoneAppId` 仍填 `my-mail`（或 `其扩展包id/my-mail`）
+- 内页包 `extension.json.id` **默认等于 app-id**；可用 `--extension-id` 单独指定
+- 对方宿主里 `phoneAppId` 仍填 **app-id** `my-mail`（或 `宿主扩展包id/my-mail`），不要填错成内页包 extension-id（除非二者相同）
 
 ### 13.4 路径 B：从零创建宿主 + 内页
 
@@ -706,6 +714,7 @@ export class ShopController extends Extension {
 
 ### 13.7 内页开发检查清单
 
+- [ ] 新建宿主时已分别指定 `--extension-id`（宿主包）与 `--app-id`（内页），二者不要混用
 - [ ] `app-id` 合法（小写开头，仅 `a-z` / `0-9` / `-`）
 - [ ] `registerPhoneApp({ id })` 与作者设置 `phoneAppId` 一致
 - [ ] `src/index.tsx`（或独立扩展 `onRegister`）已注册该应用
@@ -713,7 +722,7 @@ export class ShopController extends Extension {
 - [ ] `pnpm build` / `watch` 后已在 Studio 重载扩展
 - [ ] 剧本 Preview 中已 `mount-phone`，能打开内页并 Home 回桌面
 - [ ] 安全区：`padding` 使用了 `safeAreaInsets`
-- [ ] 分发前若只要内页：已 `pack`，且说明需同时启用宿主
+- [ ] 分发前若只要内页：已 `pack`，且说明需同时启用宿主；`phoneAppId` 指向 app-id
 
 ### 13.8 内页常见问题
 
@@ -728,20 +737,30 @@ export class ShopController extends Extension {
 
 ## 14. 脚手架 create-phone-app 命令速查
 
-包名：`@ink-zenly/create-phone-app@0.3.2`。内页完整流程见 [§13](#13-内页应用完整开发流程)；此处仅列命令。
+包名：`@ink-zenly/create-phone-app@0.3.2`（已发布）。内页完整流程见 [§13](#13-内页应用完整开发流程)；此处仅列命令。
 
 | 命令 | 作用 |
 |------|------|
-| `create` | 生成**手机宿主**工程 + 首个内页（须同时指定 `--extension-id` 与 `--app-id`） |
-| `add` | 在已有宿主添加 `src/<app-id>/` 并注入注册表 |
-| `pack` | 抽离 `release/` 标准内页包；`--extension-id` 可选（默认 = app-id） |
+| `create` | 生成**手机宿主**工程 + 首个内页（**必填** `--extension-id` 与 `--app-id`） |
+| `add` | 在已有宿主添加 `src/<app-id>/` 并注入注册表（只需 app-id） |
+| `pack` | 抽离 `release/` 标准内页包；`--extension-id` **可选**（默认 = app-id） |
+
+`create` 两层 ID：
+
+| 参数 | 写入 | 规则 |
+|------|------|------|
+| `--extension-id` | 宿主 `extension.json.id`、`package.json` name、Vite 注入 | `^[a-z][a-z0-9.-]*$` |
+| `--app-id` | `src/<app-id>/`、`registerPhoneApp({ id })` | `^[a-z][a-z0-9-]*$` |
 
 ```powershell
+# 本仓
 pnpm create-phone-app create .\my-host --template default `
   --extension-id com.acme.my-phone --app-id my-shop --title "我的商店"
 pnpm create-phone-app add my-mail --title "邮件"
 pnpm create-phone-app pack my-mail --title "邮件"
+pnpm create-phone-app pack my-mail --extension-id com.acme.my-mail-ext --title "邮件"
 
+# 已发布包
 pnpm dlx @ink-zenly/create-phone-app@0.3.2 create .\my-host --template minimal `
   --extension-id tiny-host --app-id my-shop --title "我的商店"
 ```
