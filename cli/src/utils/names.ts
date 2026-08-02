@@ -1,9 +1,9 @@
 /**
  * @file names.ts
- * @description 由 app-id 推导 PascalCase、注册函数名、包名、扩展 ID。
+ * @description 由 app-id / extension-id 推导 PascalCase、注册函数名、npm 包名。
  * @author 池水三两升
  * @date 2026-08-01
- * @version 0.1.0
+ * @version 0.3.2
  */
 
 /**
@@ -31,21 +31,16 @@ export function toRegisterFnName(appId: string): string {
 }
 
 /**
- * npm 包名。
+ * 由扩展包 id 得到 npm `package.json` name（小写；允许点号）。
  *
- * @param appId - 应用 ID
- * @returns 如 `phone-app-demo-shop`
- */
-export function toPackageName(appId: string): string {
-  return `phone-app-${appId}`;
-}
-
-/**
- * extension.json id。
+ * @param extensionId - 用户指定的 extension.json.id
+ * @returns 规范化后的包名
  *
- * @param appId - 应用 ID
- * @returns 如 `ink.zenly.phone-app-demo-shop`
+ * @example
+ * ```ts
+ * toPackageName("com.acme.my-phone"); // => "com.acme.my-phone"
+ * ```
  */
-export function toExtensionId(appId: string): string {
-  return `ink.zenly.phone-app-${appId}`;
+export function toPackageName(extensionId: string): string {
+  return extensionId.trim().toLowerCase();
 }

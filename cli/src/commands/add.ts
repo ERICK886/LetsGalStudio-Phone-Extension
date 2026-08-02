@@ -20,7 +20,6 @@ import {
 import { findHostRepoRoot } from "../utils/fs.ts";
 import { injectPhoneAppRegistry } from "../utils/inject.ts";
 import {
-  toExtensionId,
   toPackageName,
   toPascalCase,
   toRegisterFnName,
@@ -115,8 +114,9 @@ export async function runAdd(opts: RunAddOptions): Promise<void> {
 
   const pascalName = toPascalCase(appId);
   const registerFnName = toRegisterFnName(appId);
+  // add 模板不写 extension.json；占位变量与 app-id 对齐即可
   const packageName = toPackageName(appId);
-  const extensionId = toExtensionId(appId);
+  const extensionId = appId;
   const phoneSdkVersion = resolvePhoneSdkVersion();
   const author = "池水三两升";
   const date = todayDate();

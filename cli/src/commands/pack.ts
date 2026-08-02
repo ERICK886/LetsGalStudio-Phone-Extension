@@ -3,7 +3,7 @@
  * @description `create-phone-app pack`：将宿主内 `src/<app-id>/` 抽离为标准内页包。
  * @author 池水三两升
  * @date 2026-08-01
- * @version 0.3.0
+ * @version 0.3.2
  */
 
 import { spawnSync } from "node:child_process";
@@ -19,7 +19,6 @@ import {
 } from "../utils/escape.ts";
 import { findHostRepoRoot, isDirectoryNonEmpty } from "../utils/fs.ts";
 import {
-  toExtensionId,
   toPackageName,
   toPascalCase,
   toRegisterFnName,
@@ -27,11 +26,14 @@ import {
 import { promptPackAppId } from "../prompts.ts";
 import { copyBundledAvgStudioSdk } from "../utils/sdk-bundle.ts";
 import { copyTemplateDir } from "../utils/template.ts";
-import { assertValidAppId } from "../utils/validate.ts";
+import {
+  assertValidAppId,
+  assertValidExtensionId,
+} from "../utils/validate.ts";
 
 /** pack 命令入参 */
 export type RunPackOptions = {
-  /** 要抽离的内页 app-id；缺省时 Task 3 将接入交互选择 */
+  /** 要抽离的内页 app-id；缺省时交互选择 */
   appId?: string;
   /** 查找宿主根的起始目录，默认 `process.cwd()` */
   cwd?: string;
@@ -41,6 +43,10 @@ export type RunPackOptions = {
   force?: boolean;
   /** 扩展显示标题，默认与 app-id 相同 */
   title?: string;
+  /**
+   * 内页包 extension.json.id；缺省等于 app-id。
+   */
+  extensionId?: string;
 };
 
 /** pack-release 模板目录名 */
@@ -161,10 +167,12 @@ export async function runPack(opts: RunPackOptions): Promise<void> {
   }
 
   const title = opts.title?.trim() || appId;
+  const extensionId = (opts.extensionId?.trim() || appId);
+  assertValidExtensionId(extensionId);
+
   const pascalName = toPascalCase(appId);
   const registerFnName = toRegisterFnName(appId);
-  const packageName = toPackageName(appId);
-  const extensionId = toExtensionId(appId);
+  const packageName = toPackageName(extensionId);
   const phoneSdkVersion = resolvePhoneSdkVersion();
   const author = "池水三两升";
   const date = todayDate();
@@ -205,12 +213,13 @@ export async function runPack(opts: RunPackOptions): Promise<void> {
   console.log();
   console.log(pc.green("✔ 已抽离标准内页包"));
   console.log(`  目录：${pc.cyan(outDir)}`);
-  console.log(`  应用：${pc.cyan(appId)}（${title}）`);
+  console.log(`  扩展包 id：${pc.cyan(extensionId)}`);
+  console.log(`  内页程序 id：${pc.cyan(appId)}（${title}）`);
   console.log(`  入口：${pc.cyan("dist/index.mjs")}`);
   console.log();
   console.log(pc.bold("分发说明："));
   console.log(
-    "  本包为标准内页扩展，需同时启用手机宿主扩展（如 ink.zenly.ext-7a9373）",
+    "  本包为标准内页扩展，需同时启用手机宿主扩展",
   );
   console.log(`  宿主 phoneAppId 须配置为 ${pc.cyan(appId)}`);
   console.log();

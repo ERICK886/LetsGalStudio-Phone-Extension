@@ -6,7 +6,7 @@
 
 1. **`@avg-studio/sdk`**：脚手架已将 SDK 拷贝到本工程 **`sdk/`**，并通过 `dependencies` 的 `file:./sdk` 引用（**不要**把 `file:` 写进 `peerDependencies`）。
 2. **`@ink-zenly/phone-sdk`**：模板使用 npm 版本 `{{phoneSdkVersion}}`。
-3. **程序 ID**：手机内页 app-id 为 **`{{appId}}`**（扩展清单 id：`{{extensionId}}`）。
+3. **两层 ID**：宿主扩展包 id（`extension.json.id`）为 **`{{extensionId}}`**；首个内页程序 id 为 **`{{appId}}`**（二者由脚手架分别指定，互不推导）。
 4. **宿主扩展包 id**：`vite.config.ts` 已配置从 `extension.json` define `__PHONE_HOST_EXTENSION_ID__`（phone-sdk ≥0.4.0 需要）。
 
 ## 开发（含完整手机宿主）

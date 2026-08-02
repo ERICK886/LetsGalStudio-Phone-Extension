@@ -1,6 +1,6 @@
 # LetsGal Studio 自定义手机扩展
 > 扩展包 ID：`ink.zenly.ext-7a9373`（见 `extension.json` → `id`）｜ 程序 UI 模块：`phone`、`phone-toast`  
-> 扩展版本：`0.2.0` ｜ `@ink-zenly/phone-sdk`：`0.4.0` ｜ `@ink-zenly/create-phone-app`：`0.3.1`  
+> 扩展版本：`0.2.0` ｜ `@ink-zenly/phone-sdk`：`0.4.0` ｜ `@ink-zenly/create-phone-app`：`0.3.2`  
 > 要求 LetsGal Studio SDK：`>=1.9.0`
 
 这是一个由剧情挂载、供玩家在游戏中打开的手机扩展。它提供四列 APP 桌面、作者可配置的安全启动动作、玩家个性化、剧情控制的 APP 安装与可用状态、逐条推进的聊天消息，以及独立、非阻塞、可堆叠的 Toast 通知 UI。
@@ -21,8 +21,8 @@
 10. [Preview、缓存与多预览隔离](#10-preview缓存与多预览隔离)
 11. [调试、验收与常见问题](#11-调试验收与常见问题)
 12. [源码结构](#12-源码结构)
-13. [第三方 Phone SDK 接入](#13-第三方-phone-sdk-接入手机内部应用)
-14. [脚手架 create-phone-app（宿主 / 内页 / pack）](#14-脚手架-create-phone-app宿主--内页--pack)
+13. [内页应用完整开发流程](#13-内页应用完整开发流程)
+14. [脚手架 create-phone-app 命令速查](#14-脚手架-create-phone-app-命令速查)
 15. [宿主扩展包 id 注入（phone-sdk ≥ 0.4.0）](#15-宿主扩展包-id-注入phone-sdk--040)
 
 ## 1. 能力范围与限制
@@ -160,7 +160,7 @@ mount-phone
 ink.zenly.ext-7a9373.open-phone
 ```
 
-若使用脚手架生成的其它宿主（例如 `ink.zenly.phone-app-my-shop`），动作名会变为 `ink.zenly.phone-app-my-shop.open-phone`，请按该工程的实际 id 配置 Studio「输入按键」。
+若使用脚手架生成的其它宿主，动作名为 **`<你指定的 extension-id>.open-phone`**（例如 `com.acme.my-phone.open-phone`），请按该工程 `extension.json.id` 配置 Studio「输入按键」。
 
 默认按键来自扩展设置的「打开手机快捷键」，默认值为 `ArrowUp`；可填写 `ArrowUp`、`KeyP`、`Ctrl+KeyP`、`F5` 等 SDK 支持的快捷键格式。作者也可在 Studio 的**输入按键**配置中为该语义动作重映射：玩家级输入映射优先于作者级映射，作者级映射优先于扩展设置的默认键。手机未挂载、消息手机正在显示、普通手机已显示或 UI 正在打开时，打开动作会被安全忽略。
 
@@ -441,7 +441,7 @@ phone-sdk/                     # 发布包 @ink-zenly/phone-sdk（0.4.0+）
    ├─ phone/                   # 目录、扩展、UI、CSS
    ├─ toast/
    └── studio/                 # 编辑器内联卡片等
-cli/                           # 发布包 @ink-zenly/create-phone-app（0.3.1+）
+cli/                           # 发布包 @ink-zenly/create-phone-app（0.3.2+）
 sdk/                           # 本项目使用的 Studio SDK；不要直接修改
 ```
 
@@ -452,43 +452,301 @@ sdk/                           # 本项目使用的 Studio SDK；不要直接修
 | 扩展包 id | `extension.json` → `id` | `ink.zenly.ext-7a9373` | 是（脚手架宿主各自不同） |
 | 模块 id | `@extension({ id })` | `phone` / `phone-toast` | 否（SDK 固定） |
 
-## 13. 第三方 Phone SDK 接入（手机内部应用）
+## 13. 内页应用完整开发流程
 
-完整说明见 [`phone-sdk/README.md`](phone-sdk/README.md)。最小流程：
+「内页应用」指在**手机屏幕内部**打开的 UI：点击桌面 APP 后不关闭手机，底部 Home / Escape 回到桌面。  
+实现依赖 `@ink-zenly/phone-sdk/plugin`；运行时必须同时存在**手机宿主**（`PhoneExtension`）。
 
-1. 依赖 `@ink-zenly/phone-sdk`（推荐 npm `^0.4.0`；本仓开发可用 `file:phone-sdk`）。
-2. 在扩展入口调用 `@ink-zenly/phone-sdk/plugin` 的 `registerPhoneApp({ id, title, render })`（或经 `bootstrapPhonePluginApps` 清单注册）。
-3. 作者在**手机宿主**设置「动作 · 手机内部应用」填写同一 `phoneAppId`，并在应用目录绑定动作 ID。
-4. 玩家点击图标后，界面在手机屏幕内打开；底部 Home / Escape 回桌面；应用内返回由第三方自己实现。
+API 细节见 [`phone-sdk/README.md`](phone-sdk/README.md)；CLI 细节见 [`cli/README.md`](cli/README.md)。
 
-### 本仓库内开发手机内页（`src/<app-id>/`）
+### 13.1 先弄清三条路径
 
-可在 `src/<app-id>/` 下以轻量内页形式开发（参考 `src/demo-shop/`）：`pnpm watch` 预览，`pnpm build` 一并打进本扩展发行包。  
-作者仍需在宿主设置中配置「动作 · 手机内部应用」。也可用 CLI `pack` 抽成独立标准内页包。
+| 路径 | 适用 | 产物 |
+|------|------|------|
+| **A. 本仓库宿主内开发** | 跟本扩展一起联调、示例（如 `demo-shop`） | 打进本仓 `dist/index.mjs`；也可用 `pack` 再拆分发 |
+| **B. 新建独立宿主再开发** | 新项目从零搭手机 + 内页 | `create` 生成宿主工程；内页在 `src/<app-id>/` |
+| **C. 分发标准内页包** | 给别人只装「某个 APP」，对方已有宿主 | `pack` → `release/`，与宿主扩展**同时启用** |
 
-## 14. 脚手架 create-phone-app（宿主 / 内页 / pack）
+```text
+路径 A / B（开发期）
+  宿主工程
+    ├─ PhoneExtension / ToastExtension   ← phone-sdk main
+    ├─ src/index.tsx                     ← bootstrap 注册表
+    └─ src/<app-id>/                     ← 内页（plugin API）
+         ↓ 可选 pack
+路径 C（分发期）
+  release/ 标准内页扩展（无宿主）
+  + 玩家环境中的手机宿主扩展
+```
 
-本仓库提供 CLI（`cli/`，包名 `@ink-zenly/create-phone-app@0.3.1`）：
+### 13.2 必须对齐的 ID
+
+| 名称 | 规则 | 示例 |
+|------|------|------|
+| **程序 ID / app-id** | `^[a-z][a-z0-9-]*$`；=`registerPhoneApp({ id })` | `demo-shop`、`my-mail` |
+| **phoneAppId（作者设置）** | 填程序 ID，或 `扩展包ID/程序ID` | `demo-shop` |
+| **动作 ID** | 作者自定，APP 目录「默认动作 ID」引用它 | `open-demo-shop` |
+| **扩展包 id** | 宿主或内页包自己的 `extension.json.id` | 本仓宿主 `ink.zenly.ext-7a9373`；pack 产物另有 id |
+
+要点：
+
+- 开发期挂在本仓时，内页**没有**独立 `@extension`；程序 ID 仍必须稳定，将来 `pack` 后应与 `@extension({ id })` 一致。
+- 宿主模块 id `phone` / `phone-toast` **不是**内页 app-id，不要填混。
+
+### 13.3 路径 A：在本仓库开发内页（推荐入门）
+
+#### 步骤 1：生成或复制内页骨架
+
+```powershell
+# 在本仓根目录
+pnpm create-phone-app add my-mail --title "邮件"
+```
+
+效果：
+
+1. 创建 `src/my-mail/index.tsx`、`src/my-mail/app.tsx`
+2. 自动改 `src/index.tsx`：增加 `import`，并把 `registerMyMailPhoneApp` 加入 `definePhonePluginRegistry(...)`
+
+也可手写，结构对齐 `src/demo-shop/`：
+
+```text
+src/my-mail/
+├─ index.tsx    # export PROGRAM_ID + registerXxxPhoneApp()
+└─ app.tsx      # React UI，接收 PhoneAppRenderProps
+```
+
+注册函数约定：`register` + PascalCase(app-id) + `PhoneApp`  
+（`my-mail` → `registerMyMailPhoneApp`）
+
+#### 步骤 2：实现注册与 UI
+
+`index.tsx` 最小形态：
+
+```tsx
+import { registerPhoneApp } from "@ink-zenly/phone-sdk/plugin";
+import { MyMailApp } from "./app";
+
+export const PROGRAM_ID = "my-mail";
+
+export function registerMyMailPhoneApp(): void {
+  registerPhoneApp({
+    id: PROGRAM_ID,
+    title: "邮件",
+    description: "示例邮件内页",
+    render: (props) => <MyMailApp {...props} />,
+  });
+}
+```
+
+`app.tsx` 使用宿主注入的 props（类型 `PhoneAppRenderProps`）：
+
+| prop | 用途 |
+|------|------|
+| `appId` | 注册时的程序 ID |
+| `closeApp` | **回桌面**（不关手机） |
+| `closePhone` | 关闭整部手机 UI |
+| `safeAreaInsets` | 刘海 / Home 指示条等安全区（px） |
+
+内页路由、返回键、业务状态由你自己实现；宿主只负责「打开 / Home 回桌面 / 错误边界」。
+
+入口侧保持清单注册（本仓现状）：
+
+```tsx
+// src/index.tsx
+import {
+  bootstrapPhonePluginApps,
+  definePhonePluginRegistry,
+} from "@ink-zenly/phone-sdk/plugin";
+import { registerDemoShopPhoneApp } from "./demo-shop";
+import { registerMyMailPhoneApp } from "./my-mail";
+
+bootstrapPhonePluginApps(
+  definePhonePluginRegistry(
+    registerDemoShopPhoneApp,
+    registerMyMailPhoneApp,
+  ),
+);
+
+export { PhoneExtension, ToastExtension } from "@ink-zenly/phone-sdk";
+export { default } from "@ink-zenly/phone-sdk";
+```
+
+`add` 命令会自动完成上述注入；手写时勿漏掉 `bootstrapPhonePluginApps`。
+
+#### 步骤 3：构建并加载到 Studio
+
+```powershell
+pnpm install
+pnpm watch
+# 或改完后：pnpm build
+```
+
+在 Studio 中重载本扩展（入口 `dist/index.mjs`）。内页与宿主打在**同一个**扩展包里。
+
+#### 步骤 4：作者设置——动作 + 桌面 APP（必做）
+
+仅有代码注册**不会**自动出现图标，必须配置：
+
+**4a. 动作 · 手机内部应用**
+
+| 字段 | 示例 |
+|------|------|
+| ID | `open-my-mail` |
+| 名称 | `邮件` |
+| phoneAppId | `my-mail`（与 `PROGRAM_ID` **完全一致**） |
+| 说明 | 可选 |
+
+**4b. 手机应用目录**
+
+| 字段 | 示例 |
+|------|------|
+| 应用 ID | `mail-app`（桌面项 ID，可与程序 ID 不同） |
+| 应用名称 | `邮件` |
+| 默认动作 ID | `open-my-mail`（与 4a 的动作 ID 一致） |
+| 游戏开始默认预装 | 开启（开发期建议开） |
+| 作者默认可用 | 开启 |
+
+保存后重载扩展 / 重启 Preview。
+
+#### 步骤 5：剧本 Preview 验证
+
+1. 剧情中调用 `mount-phone`（或沿用已有挂载点）。
+2. 按打开手机快捷键（默认 `ArrowUp`）。
+3. 点击「邮件」：应在手机**屏幕内**打开内页，手机外壳仍在。
+4. 点内页「回桌面」或宿主 Home：回到四列桌面，手机不关。
+5. Escape / 遮罩：关闭手机（与内页 `closeApp` 不同）。
+
+程序 Preview 只能看宿主 UI 壳，**不会**跑剧情挂载，也不适合验证内页点击链路；请用**剧本 Preview**。
+
+#### 步骤 6（可选）：pack 成标准内页包
+
+开发稳定后，若要单独分发该内页：
+
+```powershell
+pnpm create-phone-app pack my-mail --title "邮件"
+```
+
+- 默认输出到宿主根下 `release/`（已被 `.gitignore`）
+- 自动 `pnpm install` + `pnpm build`
+- 产物是**只有内页**的扩展：无 `PhoneExtension`，需与手机宿主**同时启用**
+- 对方宿主里 `phoneAppId` 仍填 `my-mail`（或 `其扩展包id/my-mail`）
+
+### 13.4 路径 B：从零创建宿主 + 内页
+
+适合不改本仓、单独开工程：
+
+```powershell
+pnpm dlx @ink-zenly/create-phone-app@0.3.2 create .\my-host `
+  --template default `
+  --extension-id com.acme.my-phone `
+  --app-id my-shop `
+  --title "我的商店"
+
+cd .\my-host
+pnpm install
+pnpm watch
+```
+
+生成物已包含：
+
+- 宿主入口（导出 Phone / Toast）；`extension.json.id` = 你指定的 `--extension-id`
+- 首个内页 `src/my-shop/`（`--app-id`，与宿主 id **独立**）
+- `vite` 注入 `__PHONE_HOST_EXTENSION_ID__`（见 [§15](#15-宿主扩展包-id-注入phone-sdk--040)）
+- 依赖 `@ink-zenly/phone-sdk` 的 npm 版本（`^0.4.0`）与捆绑 `sdk/`
+
+之后在该工程内继续 `add` 更多内页，或改 `src/my-shop/app.tsx`。  
+Studio 中启用的是**该宿主扩展**的 `extension.json.id`（例如 `com.acme.my-phone`），不是本仓官方 id。
+
+作者设置步骤与 [§13.3 步骤 4](#步骤-4作者设置动作--桌面-app必做) 相同，仅扩展换成新宿主。
+
+### 13.5 路径 C：第三方独立扩展（手写 `@extension`）
+
+若内页本身是完整 Studio 扩展（带自己的 `extension.json`），可在控制器 `onRegister` 中注册：
+
+```tsx
+import { Extension, extension } from "@avg-studio/sdk";
+import { registerPhoneApp } from "@ink-zenly/phone-sdk/plugin";
+
+const PROGRAM_ID = "shop";
+
+@extension({ id: PROGRAM_ID, label: "商店", exposeUI: false })
+export class ShopController extends Extension {
+  static onRegister() {
+    registerPhoneApp({
+      id: PROGRAM_ID,
+      title: "商店",
+      render: ({ closeApp, safeAreaInsets }) => (
+        <div style={{ paddingTop: safeAreaInsets.top, color: "#fff" }}>
+          <h2>商店</h2>
+          <button type="button" onClick={closeApp}>回桌面</button>
+        </div>
+      ),
+    });
+  }
+}
+```
+
+注意：
+
+- `@extension({ id })` **必须**等于 `registerPhoneApp({ id })`
+- 构建时将 phone-sdk **打进**内页 bundle；`react` / `@avg-studio/sdk` 保持 external
+- 游戏中须**同时启用**手机宿主扩展，并在宿主设置里把 `phoneAppId` 指到该程序 ID
+
+`pack` 产物即按此形态生成，一般无需手写脚手架。
+
+### 13.6 依赖与构建约定
+
+| 角色 | 依赖 |
+|------|------|
+| 宿主工程 | `@ink-zenly/phone-sdk`（main + 打进 bundle）、`@avg-studio/sdk`（external，本仓/模板为 `file:./sdk`） |
+| 内页（plugin） | 只从 `@ink-zenly/phone-sdk/plugin` 引用 API；由宿主或内页包入口打包 |
+
+本仓开发：`package.json` 可用 `"@ink-zenly/phone-sdk": "file:phone-sdk"`。  
+脚手架默认写 npm `^0.4.0`，不要改成默认 `file:`。
+
+### 13.7 内页开发检查清单
+
+- [ ] `app-id` 合法（小写开头，仅 `a-z` / `0-9` / `-`）
+- [ ] `registerPhoneApp({ id })` 与作者设置 `phoneAppId` 一致
+- [ ] `src/index.tsx`（或独立扩展 `onRegister`）已注册该应用
+- [ ] 已配置「动作 · 手机内部应用」+「手机应用目录」且默认动作 ID 互指正确
+- [ ] `pnpm build` / `watch` 后已在 Studio 重载扩展
+- [ ] 剧本 Preview 中已 `mount-phone`，能打开内页并 Home 回桌面
+- [ ] 安全区：`padding` 使用了 `safeAreaInsets`
+- [ ] 分发前若只要内页：已 `pack`，且说明需同时启用宿主
+
+### 13.8 内页常见问题
+
+| 现象 | 优先检查 |
+|------|----------|
+| 桌面没有图标 | 应用目录是否预装；默认动作 ID 是否有效；是否被剧情删除 |
+| 点击无反应 / 打不开内页 | `phoneAppId` 是否与 `PROGRAM_ID` 一致；扩展是否已 build 并重载；是否已 `mount-phone` |
+| 打开了却立刻回桌面或白屏 | 看控制台内页错误边界；检查 `render` 是否抛错 |
+| 只有程序 Preview 能看见手机壳 | 改用剧本 Preview 验证内页 |
+| pack 后对方打不开 | 对方是否启用了**宿主**；`phoneAppId` 是否仍指向同一程序 ID |
+| 快捷键打开手机异常 | 宿主扩展包 id 是否已 Vite 注入（§15）；勿与内页 app-id 混淆 |
+
+## 14. 脚手架 create-phone-app 命令速查
+
+包名：`@ink-zenly/create-phone-app@0.3.2`。内页完整流程见 [§13](#13-内页应用完整开发流程)；此处仅列命令。
 
 | 命令 | 作用 |
 |------|------|
-| `create` | 生成**手机宿主**工程（`PhoneExtension` + 首个内页 `src/<app-id>/`） |
-| `add` | 在已有宿主中新增内页，并注入 `src/index.tsx` |
-| `pack` | 将 `src/<app-id>/` 抽离为 `release/` **标准内页包**（可单独分发） |
+| `create` | 生成**手机宿主**工程 + 首个内页（须同时指定 `--extension-id` 与 `--app-id`） |
+| `add` | 在已有宿主添加 `src/<app-id>/` 并注入注册表 |
+| `pack` | 抽离 `release/` 标准内页包；`--extension-id` 可选（默认 = app-id） |
 
 ```powershell
-# 本仓
-pnpm create-phone-app create .\my-host --template default --app-id my-shop --title "我的商店"
-pnpm create-phone-app add demo-mail --title "邮件"
-pnpm create-phone-app pack my-shop
+pnpm create-phone-app create .\my-host --template default `
+  --extension-id com.acme.my-phone --app-id my-shop --title "我的商店"
+pnpm create-phone-app add my-mail --title "邮件"
+pnpm create-phone-app pack my-mail --title "邮件"
 
-# 已发布包
-pnpm dlx @ink-zenly/create-phone-app@0.3.1 create .\my-host --template minimal --app-id my-shop --title "我的商店"
+pnpm dlx @ink-zenly/create-phone-app@0.3.2 create .\my-host --template minimal `
+  --extension-id tiny-host --app-id my-shop --title "我的商店"
 ```
 
-依赖始终写 npm 版 `@ink-zenly/phone-sdk`（当前钉选 `^0.4.0`），不用脚手架内 `file:phone-sdk`。  
-`create` 模板的 `vite.config.ts` 已从 `extension.json` 注入 `__PHONE_HOST_EXTENSION_ID__`。  
-完整用法见 [`cli/README.md`](cli/README.md)。
+更多选项与模板说明见 [`cli/README.md`](cli/README.md)。
 
 ## 15. 宿主扩展包 id 注入（phone-sdk ≥ 0.4.0）
 
@@ -515,5 +773,5 @@ CSS 使用通用选择器 `[data-phone-root]` / `[data-phone-toast-root]`；DOM 
 ### 验收要点
 
 - 本仓 `pnpm build` 后，产物中注入值为 `ink.zenly.ext-7a9373`。
-- 脚手架宿主（如 `ink.zenly.phone-app-foo`）构建后，动作与 `data-phone-root` 均为该 id，而不是强制官方 id。
+- 脚手架宿主构建后，动作与 `data-phone-root` 均为用户指定的 `--extension-id`，而不是强制官方 id。
 - 模块 id `phone` / `phone-toast` **不会**随扩展包 id 改变。

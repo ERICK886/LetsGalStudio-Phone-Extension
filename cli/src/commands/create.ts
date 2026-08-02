@@ -3,7 +3,7 @@
  * @description `create-phone-app create`：脚手架手机宿主扩展工程（含首个内页）。
  * @author 池水三两升
  * @date 2026-08-01
- * @version 0.3.0
+ * @version 0.3.2
  */
 
 import { join, resolve } from "node:path";
@@ -18,19 +18,24 @@ import {
 } from "../utils/escape.ts";
 import { isDirectoryNonEmpty } from "../utils/fs.ts";
 import {
-  toExtensionId,
   toPackageName,
   toPascalCase,
   toRegisterFnName,
 } from "../utils/names.ts";
 import { copyBundledAvgStudioSdk } from "../utils/sdk-bundle.ts";
 import { copyTemplateDir } from "../utils/template.ts";
-import { assertValidAppId } from "../utils/validate.ts";
+import {
+  assertValidAppId,
+  assertValidExtensionId,
+} from "../utils/validate.ts";
 
 /** create 命令入参（均可缺省，缺省走交互） */
 export type RunCreateOptions = {
   dir?: string;
   template?: "default" | "minimal";
+  /** 宿主扩展包 id → extension.json.id */
+  extensionId?: string;
+  /** 首个内页程序 id */
   appId?: string;
   title?: string;
   force?: boolean;
@@ -78,6 +83,7 @@ function normalizeTemplate(
 function hasAllCreateFields(opts: RunCreateOptions): boolean {
   return Boolean(
     opts.dir?.trim() &&
+      opts.extensionId?.trim() &&
       opts.appId?.trim() &&
       opts.title?.trim() &&
       (opts.template === "default" ||
@@ -91,20 +97,26 @@ function hasAllCreateFields(opts: RunCreateOptions): boolean {
  *
  * @param opts - 命令行选项；缺失字段会进入交互补全
  * @returns Promise<void>
- * @throws Error app-id 非法、目标非空且未 --force、模板拷贝失败时抛出
+ * @throws Error id 非法、目标非空且未 --force、模板拷贝失败时抛出
  *
  * @example
  * ```ts
  * await runCreate({
- *   dir: "./phone-app-demo-shop",
+ *   dir: "./my-phone",
  *   template: "default",
+ *   extensionId: "com.acme.my-phone",
  *   appId: "demo-shop",
  *   title: "演示商店",
  * });
  * ```
  */
 export async function runCreate(opts: RunCreateOptions): Promise<void> {
+  const extensionIdHint = opts.extensionId?.trim();
   const appIdHint = opts.appId?.trim();
+
+  if (extensionIdHint) {
+    assertValidExtensionId(extensionIdHint);
+  }
 
   if (appIdHint) {
     assertValidAppId(appIdHint);
@@ -119,6 +131,7 @@ export async function runCreate(opts: RunCreateOptions): Promise<void> {
     ? {
         dir: opts.dir!.trim(),
         template: normalizeTemplate(opts.template),
+        extensionId: opts.extensionId!.trim(),
         appId: opts.appId!.trim(),
         title: opts.title!.trim(),
         force: opts.force ?? false,
@@ -126,14 +139,16 @@ export async function runCreate(opts: RunCreateOptions): Promise<void> {
     : await promptCreateOptions({
         dir: opts.dir,
         template: templateHint,
+        extensionId: opts.extensionId,
         appId: opts.appId,
         title: opts.title,
         force: opts.force,
       });
 
   const template = normalizeTemplate(filled.template);
-  const { appId, title, force } = filled;
+  const { extensionId, appId, title, force } = filled;
 
+  assertValidExtensionId(extensionId);
   assertValidAppId(appId);
 
   const dest = resolve(filled.dir);
@@ -146,8 +161,7 @@ export async function runCreate(opts: RunCreateOptions): Promise<void> {
 
   const pascalName = toPascalCase(appId);
   const registerFnName = toRegisterFnName(appId);
-  const packageName = toPackageName(appId);
-  const extensionId = toExtensionId(appId);
+  const packageName = toPackageName(extensionId);
   const phoneSdkVersion = resolvePhoneSdkVersion();
   const author = "池水三两升";
   const date = todayDate();
@@ -182,6 +196,7 @@ export async function runCreate(opts: RunCreateOptions): Promise<void> {
   console.log(pc.green("✔ 已创建手机宿主扩展工程"));
   console.log(`  目录：${pc.cyan(dest)}`);
   console.log(`  模板：${pc.cyan(templateName)}`);
+  console.log(`  宿主扩展包 id：${pc.cyan(extensionId)}`);
   console.log(`  内页：${pc.cyan(`src/${appId}/`)}（${title}）`);
   console.log(
     `  文件：${hostFiles.length + appFiles.length} 个（宿主 ${hostFiles.length} + 内页 ${appFiles.length}）`,
@@ -200,6 +215,6 @@ export async function runCreate(opts: RunCreateOptions): Promise<void> {
   console.log();
   console.log(pc.bold("分发标准内页包："));
   console.log(`  pnpm create-phone-app pack ${appId}`);
-  console.log("  # 产物在 ./release/");
+  console.log("  # 产物在 ./release/；extension.json.id 默认等于 app-id");
   console.log();
 }

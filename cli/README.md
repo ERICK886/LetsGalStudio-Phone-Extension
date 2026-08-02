@@ -41,10 +41,23 @@ pnpm create-phone-app
 ### 已发布包
 
 ```powershell
-pnpm dlx @ink-zenly/create-phone-app@0.3.1 create .\my-host --template default --app-id my-shop --title "我的商店"
+pnpm dlx @ink-zenly/create-phone-app@0.3.2 create .\my-host `
+  --template default `
+  --extension-id com.acme.my-phone `
+  --app-id my-shop `
+  --title "我的商店"
 ```
 
 本仓开发仍推荐：`pnpm create-phone-app`。
+
+**两层 ID（勿混淆）：**
+
+| ID | 含义 | 写入位置 |
+|----|------|----------|
+| `--extension-id` | 宿主扩展包 id | `extension.json.id`、Vite `__PHONE_HOST_EXTENSION_ID__`、`package.json` name |
+| `--app-id` | 首个内页程序 id | `src/<app-id>/`、`registerPhoneApp({ id })` |
+
+二者均由用户指定；**不会**再自动生成 `ink.zenly.phone-app-*`。
 
 ---
 
@@ -53,15 +66,18 @@ pnpm dlx @ink-zenly/create-phone-app@0.3.1 create .\my-host --template default -
 在目标目录生成**宿主** Vite + TypeScript 扩展骨架：入口 `src/index.tsx` 导出 `PhoneExtension` 并注册首个内页 `src/<app-id>/`。依赖 `@ink-zenly/phone-sdk` 的 **npm 版本**（如 `^0.4.0`），捆绑 `@avg-studio/sdk` 于 `./sdk`。`create` 宿主模板的 `vite.config.ts` 已从 `extension.json` 注入 `__PHONE_HOST_EXTENSION_ID__`。
 
 ```powershell
-pnpm create-phone-app create .\my-host --template default --app-id my-shop --title "我的商店"
-pnpm create-phone-app create .\tiny --template minimal --app-id tiny --title 精简 --force
+pnpm create-phone-app create .\my-host --template default `
+  --extension-id com.acme.my-phone --app-id my-shop --title "我的商店"
+pnpm create-phone-app create .\tiny --template minimal `
+  --extension-id tiny-host --app-id tiny --title 精简 --force
 ```
 
 | 选项 | 说明 |
 |------|------|
-| `[dir]` | 目标目录（可缺省，交互询问） |
+| `[dir]` | 目标目录（可缺省，交互询问；默认 `./<extension-id>`） |
 | `--template` | `default`（完整 README）或 `minimal`（最小） |
-| `--app-id` | 程序 ID，须匹配 `^[a-z][a-z0-9-]*$` |
+| `--extension-id` | 宿主扩展包 id，须匹配 `^[a-z][a-z0-9.-]*$`（可含点号） |
+| `--app-id` | 首个内页程序 ID，须匹配 `^[a-z][a-z0-9-]*$` |
 | `--title` | 显示标题 |
 | `--force` | 允许写入非空目录 |
 
@@ -95,6 +111,7 @@ pnpm watch
 pnpm create-phone-app pack demo-shop
 pnpm create-phone-app pack demo-shop --force
 pnpm create-phone-app pack demo-shop --out ./release --title "演示商店"
+pnpm create-phone-app pack demo-shop --extension-id com.acme.demo-shop-ext
 ```
 
 | 选项 | 说明 |
@@ -104,12 +121,13 @@ pnpm create-phone-app pack demo-shop --out ./release --title "演示商店"
 | `--out` | 输出目录，默认 `release`（相对宿主根或绝对路径） |
 | `--force` | 允许写入非空目标目录 |
 | `--title` | 扩展显示标题（默认与 app-id 相同） |
+| `--extension-id` | 内页包 `extension.json.id`（**默认等于 app-id**；可与 app-id 不同） |
 
 产物特点：
 
 - 入口 `dist/index.mjs`，**不含**手机宿主（`PhoneExtension`）
 - **不含** `phone-sdk/`、`scripts/`、`docs/`、`dev-host*`、`extension.dev.json`、`dist-dev/`
-- 分发时需同时启用手机宿主扩展，宿主 `phoneAppId` 须与内页 app-id 一致
+- 分发时需同时启用手机宿主扩展，宿主 `phoneAppId` 须与内页 **app-id** 一致（不是 extension-id，除非二者相同）
 
 非交互环境（CI / 管道）未传 app-id 时会报错「请指定 app-id」。
 

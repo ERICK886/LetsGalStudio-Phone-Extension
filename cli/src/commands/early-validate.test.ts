@@ -1,9 +1,9 @@
 /**
  * @file early-validate.test.ts
- * @description runAdd / runCreate 在交互前校验 CLI 传入的 app-id。
+ * @description runAdd / runCreate 在交互前校验 CLI 传入的 id。
  * @author 池水三两升
  * @date 2026-08-01
- * @version 0.1.0
+ * @version 0.3.2
  */
 
 import assert from "node:assert/strict";
@@ -28,11 +28,30 @@ describe("runAdd 提前校验 app-id", () => {
   });
 });
 
-describe("runCreate 提前校验 app-id", () => {
+describe("runCreate 提前校验 id", () => {
   it("非法 app-id 在交互前即抛出", async () => {
     await assert.rejects(
-      () => runCreate({ appId: "Bad_Id", dir: "./x", title: "x" }),
+      () =>
+        runCreate({
+          appId: "Bad_Id",
+          extensionId: "com.acme.ok",
+          dir: "./x",
+          title: "x",
+        }),
       /非法 app-id「Bad_Id」/,
+    );
+  });
+
+  it("非法 extension-id 在交互前即抛出", async () => {
+    await assert.rejects(
+      () =>
+        runCreate({
+          appId: "demo-shop",
+          extensionId: "Bad_Host",
+          dir: "./x",
+          title: "x",
+        }),
+      /非法 extension-id「Bad_Host」/,
     );
   });
 });

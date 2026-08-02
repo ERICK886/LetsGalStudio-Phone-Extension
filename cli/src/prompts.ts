@@ -3,7 +3,7 @@
  * @description create-phone-app 交互向导问题封装（@clack/prompts）。
  * @author 池水三两升
  * @date 2026-08-01
- * @version 0.3.0
+ * @version 0.3.2
  */
 
 import { existsSync, readdirSync, statSync } from "node:fs";
@@ -11,12 +11,20 @@ import { join } from "node:path";
 
 import * as p from "@clack/prompts";
 
-import { APP_ID_RE, assertValidAppId } from "./utils/validate.ts";
+import {
+  APP_ID_RE,
+  EXTENSION_ID_RE,
+  assertValidAppId,
+  assertValidExtensionId,
+} from "./utils/validate.ts";
 
 /** create 向导可选项（均可缺省，缺省时再提问） */
 export type CreateOptionsPartial = {
   dir?: string;
   template?: "default" | "minimal";
+  /** 宿主扩展包 id（extension.json.id） */
+  extensionId?: string;
+  /** 首个内页程序 id */
   appId?: string;
   title?: string;
   force?: boolean;
@@ -26,6 +34,7 @@ export type CreateOptionsPartial = {
 export type CreateOptions = {
   dir: string;
   template: "default" | "minimal";
+  extensionId: string;
   appId: string;
   title: string;
   force: boolean;
@@ -86,6 +95,26 @@ function validateAppIdInput(value: string): string | undefined {
 }
 
 /**
+ * 校验 extension-id 输入。
+ *
+ * @param value - 用户输入
+ * @returns 错误消息或 undefined
+ */
+function validateExtensionIdInput(value: string): string | undefined {
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return "extension-id 不能为空";
+  }
+
+  if (!EXTENSION_ID_RE.test(trimmed)) {
+    return "须匹配 ^[a-z][a-z0-9.-]*$（小写字母开头，可含点号，如 com.acme.my-phone）";
+  }
+
+  return undefined;
+}
+
+/**
  * 无子命令时询问运行模式：create 或 add。
  *
  * @returns `"create"` | `"add"`
@@ -135,6 +164,20 @@ export async function promptCreateOptions(
 ): Promise<CreateOptions> {
   p.intro("创建手机宿主扩展工程");
 
+  let extensionId = partial.extensionId?.trim();
+
+  if (extensionId) {
+    assertValidExtensionId(extensionId);
+  } else {
+    extensionId = handleCancel(
+      await p.text({
+        message: "宿主扩展包 ID（extension.json.id）",
+        placeholder: "com.acme.my-phone",
+        validate: validateExtensionIdInput,
+      }),
+    ).trim();
+  }
+
   let appId = partial.appId?.trim();
 
   if (appId) {
@@ -142,7 +185,7 @@ export async function promptCreateOptions(
   } else {
     appId = handleCancel(
       await p.text({
-        message: "程序 ID（app-id）",
+        message: "首个内页程序 ID（app-id）",
         placeholder: "demo-shop",
         validate: validateAppIdInput,
       }),
@@ -187,7 +230,7 @@ export async function promptCreateOptions(
   let dir = partial.dir?.trim();
 
   if (!dir) {
-    const defaultDir = `./${appId}`;
+    const defaultDir = `./${extensionId}`;
 
     dir = handleCancel(
       await p.text({
@@ -200,7 +243,7 @@ export async function promptCreateOptions(
 
   const force = partial.force ?? false;
 
-  return { dir, template, appId, title, force };
+  return { dir, template, extensionId, appId, title, force };
 }
 
 /**
@@ -218,7 +261,7 @@ export async function promptCreateOptions(
 export async function promptAddOptions(
   partial: AddOptionsPartial,
 ): Promise<AddOptions> {
-  p.intro("在本仓库添加内页应用");
+  p.intro("添加手机内页应用");
 
   let appId = partial.appId?.trim();
 
@@ -228,7 +271,7 @@ export async function promptAddOptions(
     appId = handleCancel(
       await p.text({
         message: "程序 ID（app-id）",
-        placeholder: "notes",
+        placeholder: "demo-shop",
         validate: validateAppIdInput,
       }),
     ).trim();
@@ -252,12 +295,11 @@ export async function promptAddOptions(
 }
 
 /**
- * 列出宿主 `src/` 下含 `index.tsx` 的内页目录，供 pack 交互选择。
+ * 列出宿主 src 下各内页目录的 index.tsx，作为 pack 候选 app-id。
  *
- * @param hostRoot - 宿主仓库根目录（含 `src/index.tsx` 与 `definePhonePluginRegistry`）
+ * @param hostRoot - 宿主仓库根
  * @returns 用户选择的 app-id；仅一个候选时直接返回该 id
- * @throws Error 无可用内页目录时抛出中文错误
- * @throws 不抛出；用户取消时 `process.exit(0)`
+ * @throws Error 无候选时抛出
  *
  * @example
  * ```ts

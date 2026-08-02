@@ -3,7 +3,7 @@
  * @description create-phone-app CLI 入口（citty）：create / add / pack 子命令与无参向导。
  * @author 池水三两升
  * @date 2026-08-01
- * @version 0.3.1
+ * @version 0.3.2
  */
 
 import { defineCommand, runCommand, showUsage } from "citty";
@@ -64,9 +64,13 @@ const createCmd = defineCommand({
       default: "default",
       description: "模板：default | minimal",
     },
+    extensionId: {
+      type: "string",
+      description: "宿主扩展包 ID（extension.json.id，可含点号）",
+    },
     appId: {
       type: "string",
-      description: "程序 ID（kebab-case）",
+      description: "首个内页程序 ID（kebab-case）",
     },
     title: {
       type: "string",
@@ -82,6 +86,7 @@ const createCmd = defineCommand({
     await runCreate({
       dir: args.dir,
       template: args.template as "default" | "minimal",
+      extensionId: args.extensionId,
       appId: args.appId,
       title: args.title,
       force: args.force,
@@ -153,6 +158,10 @@ const packCmd = defineCommand({
       type: "string",
       description: "扩展显示标题（默认用 app-id）",
     },
+    extensionId: {
+      type: "string",
+      description: "内页包 extension.json.id（默认等于 app-id）",
+    },
   },
   async run({ args }) {
     await runPack({
@@ -161,6 +170,7 @@ const packCmd = defineCommand({
       out: args.out,
       force: args.force,
       title: args.title,
+      extensionId: args.extensionId,
     });
   },
 });
@@ -168,7 +178,7 @@ const packCmd = defineCommand({
 const main = defineCommand({
   meta: {
     name: "create-phone-app",
-    version: "0.3.1",
+    version: "0.3.2",
     description:
       "Scaffold LetsGal phone host + in-app plugins (create / add / pack)",
   },
@@ -226,7 +236,7 @@ async function start(): Promise<void> {
       const meta =
         typeof main.meta === "function" ? await main.meta() : main.meta;
 
-      console.log(meta?.version ?? "0.3.1");
+      console.log(meta?.version ?? "0.3.2");
       return;
     }
 
