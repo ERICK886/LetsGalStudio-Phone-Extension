@@ -1,6 +1,6 @@
 # LetsGal Studio 自定义手机扩展
 > 扩展包 ID：`ink.zenly.ext-7a9373`（见 `extension.json` → `id`）｜ 程序 UI 模块：`phone`、`phone-toast`  
-> 扩展版本：`0.2.0` ｜ `@ink-zenly/phone-sdk`：`0.4.4` ｜ `@ink-zenly/create-phone-app`：`0.3.2`  
+> 扩展版本：`1.1.0` ｜ `@ink-zenly/phone-sdk`：`0.4.6` ｜ `@ink-zenly/create-phone-app`：`0.3.3`  
 > 要求 LetsGal Studio SDK：`>=1.9.0`
 
 这是一个由剧情挂载、供玩家在游戏中打开的手机扩展。它提供四列 APP 桌面、作者可配置的安全启动动作、玩家个性化、剧情控制的 APP 安装与可用状态、逐条推进的聊天消息，以及独立、非阻塞、可堆叠的 Toast 通知 UI。
@@ -299,11 +299,11 @@ Toast 文案使用“手机应用目录”中的**应用名称**，例如 `APP�
 | 头像素材 ID | 仅头像来源为“扩展素材库”时填写；必须与头像素材库中的 ID 一致。 |
 | 显示头像 | 默认开启；关闭后该预设消息不渲染头像。 |
 | 显示名称 | 默认开启；关闭后气泡不显示角色名。 |
-| 字体大小 | 可选；如 `14`、`16px`、`1rem`（等价 10–32px）；未填使用默认字号。 |
-| 文字颜色 | 可选 hex（`#RGB` / `#RRGGBB` / `#RRGGBBAA`）；未填使用默认正文色。 |
-| 名称颜色 | 可选 hex；未填使用默认名称色。 |
-| 对话框颜色 | 可选 hex 或安全 `background` 值（与壁纸 CSS 背景同款规则）；未填使用默认气泡背景。 |
-| 自定义 CSS | 可选多行声明列表（如 `padding: 4px; background: #111`）；与上方结构化字段并存时 **customCss 优先**；非法值整段丢弃。 |
+| 字体大小 | 默认 `14px`（正文）；可改 `16px` / `1rem` 等（等价 10–32px）；清空回退样式表。 |
+| 文字颜色 | 默认 `#ffffff`；支持 hex 或 `rgba()`；清空回退样式表。 |
+| 名称颜色 | 默认 `rgba(255, 255, 255, 0.78)`；支持 hex 或 `rgba()`；清空回退样式表。 |
+| 对话框颜色 | 默认 `rgba(12, 18, 30, 0.84)`（对方气泡）；填写后我方也用该背景；清空回退样式表。 |
+| 自定义 CSS | 新建不预填；说明中有 padding / 边框 / 圆角等占位示例；可写声明列表；与结构化字段并存时 **customCss 优先**；非法值整段丢弃。 |
 
 消息气泡名称固定使用资产角色名称。预设会在消息开始时展开为快照（含上述五字段样式），因此运行中的消息不会被之后的设置修改改写。
 
@@ -313,10 +313,11 @@ Toast 文案使用“手机应用目录”中的**应用名称**，例如 `APP�
 
 | 规则 | 说明 |
 | --- | --- |
-| 未填默认 | 五字段均可留空；留空项不参与 inline style，保留 outgoing/incoming 默认 CSS。 |
+| 表单默认 | 新建预设时字号与颜色预填与 `phone.css` 一致；自定义 CSS 为空（示例仅作说明占位）；已有预设若仍为空则走样式表。 |
+| 清空回退 | 任一字段清空后该项不参与 inline style，保留样式表（含对方/我方气泡差异）。 |
 | customCss 优先 | 结构化字段先映射到 bubble / 正文 / 名称；解析 `customCss` 后，同名声明（如 `background`、`font-size`、`color`）覆盖结构化值。 |
-| 名称色扩展 | 结构化 `名称颜色` 作用于 `<strong>`；`customCss` 中可用 `--phone-name-color` 覆盖名称色。 |
-| 安全消毒 | 字号限定 10–32px 等价；颜色仅 hex；`对话框颜色` 非 hex 时走壁纸同款 background 消毒；`customCss` 禁止 `url()`、`@`、花括号、`expression()`、`javascript:`，最长 2048 字符，任一非法声明则整段丢弃。 |
+| 名称排版 | 名称显示在气泡**上方**并加粗（类似 QQ）；对方左对齐、我方右对齐。`名称颜色` 作用于该名称行；`customCss` 中可用 `--phone-name-color` 覆盖。 |
+| 安全消毒 | 字号限定 10–32px 等价；文字/名称色支持 hex 与 `rgba()`；`对话框颜色` 非 hex 时走壁纸同款 background 消毒；`customCss` 禁止 `url()`、`@`、花括号、`expression()`、`javascript:`，最长 2048 字符，任一非法声明则整段丢弃。 |
 
 ### 头像无法显示时的回退顺序
 1. 预设指定的头像来源。
@@ -462,7 +463,7 @@ phone-sdk/                     # 发布包 @ink-zenly/phone-sdk（0.4.0+）
    ├─ phone/                   # 目录、扩展、UI、CSS
    ├─ toast/
    └── studio/                 # 编辑器内联卡片等
-cli/                           # 发布包 @ink-zenly/create-phone-app（0.3.2+）
+cli/                           # 发布包 @ink-zenly/create-phone-app（0.3.3+）
 sdk/                           # 本项目使用的 Studio SDK；不要直接修改
 ```
 
@@ -665,7 +666,7 @@ pnpm create-phone-app pack my-mail --title "邮件" --extension-id com.acme.my-m
 适合不改本仓、单独开工程：
 
 ```powershell
-pnpm dlx @ink-zenly/create-phone-app@0.3.2 create .\my-host `
+pnpm dlx @ink-zenly/create-phone-app@0.3.3 create .\my-host `
   --template default `
   --extension-id com.acme.my-phone `
   --app-id my-shop `
@@ -758,7 +759,7 @@ export class ShopController extends Extension {
 
 ## 14. 脚手架 create-phone-app 命令速查
 
-包名：`@ink-zenly/create-phone-app@0.3.2`（已发布）。内页完整流程见 [§13](#13-内页应用完整开发流程)；此处仅列命令。
+包名：`@ink-zenly/create-phone-app@0.3.3`（已发布）。内页完整流程见 [§13](#13-内页应用完整开发流程)；此处仅列命令。
 
 | 命令 | 作用 |
 |------|------|
@@ -782,7 +783,7 @@ pnpm create-phone-app pack my-mail --title "邮件"
 pnpm create-phone-app pack my-mail --extension-id com.acme.my-mail-ext --title "邮件"
 
 # 已发布包
-pnpm dlx @ink-zenly/create-phone-app@0.3.2 create .\my-host --template minimal `
+pnpm dlx @ink-zenly/create-phone-app@0.3.3 create .\my-host --template minimal `
   --extension-id tiny-host --app-id my-shop --title "我的商店"
 ```
 

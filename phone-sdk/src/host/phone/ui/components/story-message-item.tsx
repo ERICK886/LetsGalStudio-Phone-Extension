@@ -186,11 +186,16 @@ export const PhoneStoryMessageItem: React.FC<{ storyMessage: PhoneStoryMessage }
       ) : null}
       <div className="phone-story-message-body">
         <div className="phone-story-message-content">
+          {/* 名称在气泡上方加粗显示（类似 QQ），不进入气泡内部。 */}
+          {showName ? (
+            <div className="phone-story-name" style={nameStyle}>
+              {characterName}
+            </div>
+          ) : null}
           <span className="phone-story-status" role="status">
             <MessageStatusIndicator status={storyMessage.status} />
           </span>
           <div className="phone-story-bubble" style={bubbleStyle}>
-            {showName ? <strong style={nameStyle}>{characterName}</strong> : null}
             <p style={bodyStyle}>{storyMessage.message}</p>
           </div>
         </div>

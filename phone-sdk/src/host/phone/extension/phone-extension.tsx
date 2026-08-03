@@ -33,6 +33,11 @@ import {
 } from "../../toast/ui/toast-ui";
 import { getOpenPhoneActionId } from "../../host-extension-id";
 import {
+  DEFAULT_CHAT_ROLE_BUBBLE_COLOR,
+  DEFAULT_CHAT_ROLE_CUSTOM_CSS,
+  DEFAULT_CHAT_ROLE_FONT_SIZE,
+  DEFAULT_CHAT_ROLE_NAME_COLOR,
+  DEFAULT_CHAT_ROLE_TEXT_COLOR,
   normalizeChatRoleBubbleStyle,
   type ChatRoleBubbleStyleFields,
 } from "./chat-role-bubble-style";
@@ -1667,16 +1672,36 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
         avatarAssetId: item.string("头像素材 ID").default(""),
         showAvatar: item.boolean("显示头像").default(true),
         showName: item.boolean("显示名称").default(true),
-        fontSize: item.string("字体大小").default(""),
-        textColor: item.string("文字颜色").default(""),
-        nameColor: item.string("名称颜色").default(""),
-        bubbleColor: item.string("对话框颜色").default(""),
+        fontSize: item
+          .string("字体大小")
+          .default(DEFAULT_CHAT_ROLE_FONT_SIZE)
+          .describe("对应气泡正文默认字号；清空后回退样式表默认。"),
+        textColor: item
+          .string("文字颜色")
+          .default(DEFAULT_CHAT_ROLE_TEXT_COLOR)
+          .describe("正文色，支持 hex 或 rgba()；清空后回退样式表默认。"),
+        nameColor: item
+          .string("名称颜色")
+          .default(DEFAULT_CHAT_ROLE_NAME_COLOR)
+          .describe("名称色，支持 hex 或 rgba()；清空后回退样式表默认。"),
+        bubbleColor: item
+          .string("对话框颜色")
+          .default(DEFAULT_CHAT_ROLE_BUBBLE_COLOR)
+          .describe(
+            "气泡背景（对方消息默认值）。填写后我方消息也使用该背景，不再使用强调色混合。清空后回退样式表默认。",
+          ),
         customCss: item
           .string("自定义 CSS")
           .multiline()
           .default("")
           .describe(
-            "可选。仅填 CSS 声明列表（如 padding: 4px; background: #111），勿写选择器/花括号/url()。与上方结构化字段同时存在时，自定义 CSS 优先。",
+            [
+              "新建不预填；留空即用样式表默认。",
+              "占位示例：",
+              DEFAULT_CHAT_ROLE_CUSTOM_CSS,
+              "。仅写声明列表（如 padding / border-radius），勿写选择器/花括号/url()。",
+              "与上方结构化字段同时存在时，自定义 CSS 优先。",
+            ].join(""),
           ),
       }))
       .itemDefault({
@@ -1685,17 +1710,17 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
         avatarAssetId: "",
         showAvatar: true,
         showName: true,
-        fontSize: "",
-        textColor: "",
-        nameColor: "",
-        bubbleColor: "",
+        fontSize: DEFAULT_CHAT_ROLE_FONT_SIZE,
+        textColor: DEFAULT_CHAT_ROLE_TEXT_COLOR,
+        nameColor: DEFAULT_CHAT_ROLE_NAME_COLOR,
+        bubbleColor: DEFAULT_CHAT_ROLE_BUBBLE_COLOR,
         customCss: "",
       })
       .maxItems(80)
       .addLabel("添加聊天角色预设")
       .emptyHint("未配置聊天角色预设时，显示手机消息会跳过对应消息。")
       .describe(
-        "每条预设绑定一个项目资产角色。消息块填写预设 ID。「显示头像 / 显示名称」默认开启。show-message 方法块另有两个组级枚举（跟随预设 / 显示 / 隐藏，默认跟随预设），作用于本组全部消息且优先于预设。气泡样式五字段（字体大小 / 文字颜色 / 名称颜色 / 对话框颜色 / 自定义 CSS）均可空：未填使用默认外观；自定义 CSS 为声明列表且优先于结构化颜色与字号。样式在 show-message 展开时写入消息快照。只有选择“扩展素材库”时，才需要填写上方素材库的素材 ID。",
+        "每条预设绑定一个项目资产角色。消息块填写预设 ID。「显示头像 / 显示名称」默认开启。show-message 方法块另有两个组级枚举（跟随预设 / 显示 / 隐藏，默认跟随预设），作用于本组全部消息且优先于预设。气泡样式字号与颜色默认填入与手机 CSS 一致的值；自定义 CSS 新建为空（示例见字段说明），填写后优先于结构化颜色与字号。清空任一字段即该字段回退样式表默认（含对方/我方气泡差异）。样式在 show-message 展开时写入消息快照。只有选择“扩展素材库”时，才需要填写上方素材库的素材 ID。",
       ),
     programUiActions: s
       .array("动作 · 程序 UI", (item) => ({

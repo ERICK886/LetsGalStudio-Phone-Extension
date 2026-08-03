@@ -41,7 +41,7 @@ pnpm create-phone-app
 ### 已发布包
 
 ```powershell
-pnpm dlx @ink-zenly/create-phone-app@0.3.2 create .\my-host `
+pnpm dlx @ink-zenly/create-phone-app@0.3.3 create .\my-host `
   --template default `
   --extension-id com.acme.my-phone `
   --app-id my-shop `

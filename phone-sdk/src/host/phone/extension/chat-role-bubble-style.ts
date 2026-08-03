@@ -3,18 +3,42 @@
  * @description 聊天角色预设气泡样式：字段消毒、归一化与 bubble/body/name 三段 style 合并。
  * @author 池水三两升
  * @date 2026-08-04
- * @version 0.4.4
+ * @version 0.4.5
  */
 
-import { sanitizeBackgroundCss } from "../catalog/preferences.ts";
+import { sanitizeBackgroundCss } from "../catalog/preferences";
+
+/**
+ * 与 `phone.css` 中气泡正文 / 气泡上方名称行对齐的默认样式。
+ * 结构化字段供 settings 表单默认值；`DEFAULT_CHAT_ROLE_CUSTOM_CSS` 仅作说明/占位示例（新建不预填）。
+ * 清空字段后仍回退样式表（含 outgoing 差异）。
+ */
+export const DEFAULT_CHAT_ROLE_FONT_SIZE = "14px";
+
+/** 正文默认色（`.phone-story-bubble p`）。 */
+export const DEFAULT_CHAT_ROLE_TEXT_COLOR = "#ffffff";
+
+/** 名称默认色（气泡上方 `.phone-story-name`，≈ `rgba(255, 255, 255, 0.78)`）。 */
+export const DEFAULT_CHAT_ROLE_NAME_COLOR = "rgba(255, 255, 255, 0.78)";
+
+/** 对方气泡默认背景（incoming）；填写后 outgoing 亦使用该值。 */
+export const DEFAULT_CHAT_ROLE_BUBBLE_COLOR = "rgba(12, 18, 30, 0.84)";
+
+/**
+ * 气泡盒模型等声明示例（不含 background / color / font-size，避免与结构化字段重复）。
+ * 对应 `.phone-story-bubble` 的 padding、边框、圆角、阴影与毛玻璃。
+ * 仅用于字段说明占位与文档，不作为新建预设的预填值。
+ */
+export const DEFAULT_CHAT_ROLE_CUSTOM_CSS =
+  "padding: 11px 13px; border: 1px solid rgba(255, 255, 255, 0.18); border-radius: 18px 18px 18px 5px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3); backdrop-filter: blur(12px)";
 
 /** 已归一化、可直接参与 style 合并的气泡样式字段。 */
 export interface ChatRoleBubbleStyleFields {
   /** 正文字号，如 `14px` / `1rem`。 */
   fontSize?: string;
-  /** 正文文字色，hex。 */
+  /** 正文文字色：hex 或 `rgb()` / `rgba()`。 */
   textColor?: string;
-  /** 名称（strong）文字色，hex。 */
+  /** 气泡上方名称行文字色：hex 或 `rgb()` / `rgba()`。 */
   nameColor?: string;
   /** 气泡背景：hex 或单段安全 background 值。 */
   bubbleColor?: string;
@@ -31,6 +55,10 @@ export interface BubbleStyleParts {
 
 /** 合法 hex：`#RGB` / `#RRGGBB` / `#RRGGBBAA`。 */
 const HEX_COLOR_PATTERN = /^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
+
+/** 合法 `rgb()` / `rgba()`（与样式表默认写法一致，禁嵌套括号）。 */
+const RGB_COLOR_PATTERN =
+  /^rgba?\(\s*[\d.%]+\s*(?:,\s*[\d.%]+\s*){2,3}\)$/i;
 
 /** 带单位的字号：`14px`、`1rem`、`1.25em`。 */
 const FONT_SIZE_WITH_UNIT_PATTERN = /^(\d+(?:\.\d+)?)(px|rem|em)$/i;
@@ -143,6 +171,34 @@ export function normalizeHexColor(value: unknown): string | undefined {
   }
 
   return color.toLowerCase();
+}
+
+/**
+ * 归一化文字/名称颜色：hex 或 `rgb()` / `rgba()`。
+ *
+ * @param value - 原始输入
+ * @returns 可用于 `color` 的字符串；非法则 `undefined`
+ *
+ * @example
+ * normalizeCssColor("#fff") // "#fff"
+ * normalizeCssColor("rgba(255, 255, 255, 0.78)") // 原串（保留空格风格）
+ */
+export function normalizeCssColor(value: unknown): string | undefined {
+  const hex = normalizeHexColor(value);
+  if (hex) {
+    return hex;
+  }
+
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const color = value.trim();
+  if (!color || color.length > 128 || !RGB_COLOR_PATTERN.test(color)) {
+    return undefined;
+  }
+
+  return color;
 }
 
 /**
@@ -289,12 +345,12 @@ export function normalizeChatRoleBubbleStyle(
     style.fontSize = fontSize;
   }
 
-  const textColor = normalizeHexColor(raw.textColor);
+  const textColor = normalizeCssColor(raw.textColor);
   if (textColor) {
     style.textColor = textColor;
   }
 
-  const nameColor = normalizeHexColor(raw.nameColor);
+  const nameColor = normalizeCssColor(raw.nameColor);
   if (nameColor) {
     style.nameColor = nameColor;
   }
