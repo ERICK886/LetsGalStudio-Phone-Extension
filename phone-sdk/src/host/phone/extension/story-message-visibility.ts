@@ -1,12 +1,12 @@
 /**
  * @file story-message-visibility.ts
- * @description 消息手机头像/名称显示开关：预设布尔归一化与方法三态覆盖解析。
+ * @description 消息手机头像/名称显示开关：预设布尔归一化与方法组级三态覆盖解析。
  * @author 池水三两升
  * @date 2026-08-04
- * @version 0.4.1
+ * @version 0.4.4
  */
 
-/** `show-message` 单条对预设开关的覆盖。 */
+/** `show-message` 方法块组级对预设开关的覆盖。 */
 export type StoryVisibilityOverride = "inherit" | "show" | "hide";
 
 export const STORY_VISIBILITY_OVERRIDES = [
@@ -30,14 +30,19 @@ export function normalizePresetVisibilityFlag(value: unknown): boolean {
 }
 
 /**
- * 按「方法优先于预设」解析最终是否显示。
+ * 按「方法组级三态优先于预设」解析最终是否显示。
  *
- * @param methodOverride - 方法字段：`inherit` | `show` | `hide`；非法或缺失视为 inherit
- * @param presetShow - 预设侧已归一化的布尔
+ * - `show` → 本组强制显示
+ * - `hide` / 旧布尔 `false` → 本组强制隐藏
+ * - `inherit` / 缺失 / 非法 / 旧布尔 `true` → 跟随该条预设
+ *
+ * @param methodOverride - 方法块组级字段
+ * @param presetShow - 该条消息所属预设侧已归一化的布尔
  * @returns 播放快照应写入的最终布尔
  *
  * @example
  * resolveStoryVisibility("hide", true) // false
+ * resolveStoryVisibility("show", false) // true
  * resolveStoryVisibility("inherit", false) // false
  */
 export function resolveStoryVisibility(
@@ -45,6 +50,6 @@ export function resolveStoryVisibility(
   presetShow: boolean,
 ): boolean {
   if (methodOverride === "show") return true;
-  if (methodOverride === "hide") return false;
+  if (methodOverride === "hide" || methodOverride === false) return false;
   return presetShow;
 }

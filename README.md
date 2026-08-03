@@ -1,6 +1,6 @@
 # LetsGal Studio 自定义手机扩展
 > 扩展包 ID：`ink.zenly.ext-7a9373`（见 `extension.json` → `id`）｜ 程序 UI 模块：`phone`、`phone-toast`  
-> 扩展版本：`0.2.0` ｜ `@ink-zenly/phone-sdk`：`0.4.1` ｜ `@ink-zenly/create-phone-app`：`0.3.2`  
+> 扩展版本：`0.2.0` ｜ `@ink-zenly/phone-sdk`：`0.4.4` ｜ `@ink-zenly/create-phone-app`：`0.3.2`  
 > 要求 LetsGal Studio SDK：`>=1.9.0`
 
 这是一个由剧情挂载、供玩家在游戏中打开的手机扩展。它提供四列 APP 桌面、作者可配置的安全启动动作、玩家个性化、剧情控制的 APP 安装与可用状态、逐条推进的聊天消息，以及独立、非阻塞、可堆叠的 Toast 通知 UI。
@@ -301,7 +301,7 @@ Toast 文案使用“手机应用目录”中的**应用名称**，例如 `APP�
 
 消息气泡名称固定使用资产角色名称。预设会在消息开始时展开为快照，因此运行中的消息不会被之后的设置修改改写。
 
-在 `show-message` 方法中，第 N 条消息的「显示头像 / 显示名称」字段可选 **跟随预设**、**显示** 或 **隐藏**；**方法字段优先于预设**，用于单条消息覆盖预设默认值。
+在 `show-message` 方法块中，组级「显示头像 / 显示名称」为枚举：默认 **跟随预设**；可选 **显示** / **隐藏**，作用于本组全部消息且优先于预设。
 
 ### 头像无法显示时的回退顺序
 1. 预设指定的头像来源。
@@ -329,8 +329,6 @@ Toast 文案使用“手机应用目录”中的**应用名称**，例如 `APP�
 | 发送方 | `direction` | `direction2`…`direction8` | `incoming` 为对方消息（左侧）；`outgoing` 为我方消息（右侧）。 |
 | 消息状态 | `status` | `status2`…`status8` | 默认 `read`。对方消息无论填写什么都会按已读显示。 |
 | 被拉黑提示 | `blockedHint` | `blockedHint2`…`blockedHint8` | 只在我方状态为 `blocked` 时显示；默认“您的消息已发送，但被对方拒收”。 |
-| 显示头像 | `showAvatar` | `showAvatar2`…`showAvatar8` | 默认 `inherit`；`show` / `hide` 覆盖预设。 |
-| 显示名称 | `showName` | `showName2`…`showName8` | 同上。 |
 
 ### 9.2 组级字段
 | 字段 | 默认值 | 说明 |
@@ -339,6 +337,8 @@ Toast 文案使用“手机应用目录”中的**应用名称**，例如 `APP�
 | 本组结束后关闭手机 `closeAfterMessages` | 是 | 最后一条显示后，需要玩家再确认一次才会关闭并继续剧情。关闭后不能再接续。 |
 | 手机消息显示位置 `popupPosition` | 右下 | 只控制当前消息手机的位置，不影响普通手机位置。 |
 | 聊天手机背景图 `storyBackground` | 空 | 可选图片素材。只在本消息组的消息模式中覆盖手机屏幕背景。 |
+| 显示头像 `showAvatar` | `inherit` | 本组共用枚举：`inherit` 跟随各条预设；`show` / `hide` 强制显示或隐藏。 |
+| 显示名称 `showName` | `inherit` | 同上，控制名称。 |
 
 `storyBackground` 不会写入 shared 存档，也不会修改普通手机壁纸。留空时立即使用当前的默认手机背景：作者背景，或在允许个性化时已生效的玩家壁纸/安全 CSS 背景。接续消息时以**当前块**为准：选择新图会替换上组背景，留空会撤销上组自定义图并恢复默认背景。
 

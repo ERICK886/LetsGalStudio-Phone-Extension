@@ -177,8 +177,8 @@ const DEFAULT_BLOCKED_HINT = "您的消息已发送，但被对方拒收";
  * @property characterId - 绑定的资产角色 ID
  * @property avatarSource - 头像来源策略
  * @property avatarAsset - `avatarSource === "asset"` 时解析出的素材 URI
- * @property showAvatar - 默认是否显示头像（可被方法三态覆盖）
- * @property showName - 默认是否显示名称（可被方法三态覆盖）
+ * @property showAvatar - 默认是否显示头像（可被方法块组级三态覆盖）
+ * @property showName - 默认是否显示名称（可被方法块组级三态覆盖）
  */
 interface ChatRolePreset {
   id: string;
@@ -1166,14 +1166,18 @@ function collectStoryMessages(
       message: params[`message${suffix}`],
       direction: params[`direction${suffix}`],
       status: params[`status${suffix}`],
-      // 调试对照：原始方法覆盖值（未与预设合并）。
-      showAvatar: params[`showAvatar${suffix}`],
-      showName: params[`showName${suffix}`],
     };
   });
+    /**
+     * 组级三态（整块共用）：inherit → 各条跟随预设；show/hide → 本组强制显示或隐藏。
+     */
+    const groupShowAvatarOverride = params.showAvatar;
+    const groupShowNameOverride = params.showName;
   phoneDebug("method-params", {
     keys: Object.keys(params),
     slots,
+    groupShowAvatar: groupShowAvatarOverride,
+    groupShowName: groupShowNameOverride,
     availableChatRoleIds: [...presets.keys()],
   });
 
@@ -1202,16 +1206,16 @@ function collectStoryMessages(
           DEFAULT_BLOCKED_HINT)
         : undefined;
     /**
-     * 方法三态覆盖优先于预设布尔：
-     * - inherit / 非法 / 缺失 → 使用预设
-     * - show / hide → 强制显示或隐藏
+     * 方法组级三态优先于预设：
+     * - inherit / 缺失 → 该条跟随自身预设
+     * - show / hide → 本组强制显示或隐藏
      */
     const showAvatar = resolveStoryVisibility(
-      params[`showAvatar${suffix}`],
+      groupShowAvatarOverride,
       preset.showAvatar,
     );
     const showName = resolveStoryVisibility(
-      params[`showName${suffix}`],
+      groupShowNameOverride,
       preset.showName,
     );
     messages.push({
@@ -1283,6 +1287,32 @@ function createStoryMessageSchema() {
       label: "聊天手机背景图（可选）",
       assetType: "image",
     } as const,
+    /**
+     * 组级三态枚举：默认「跟随预设」。
+     * 作用于本方法块全部消息；不对第 1～8 条分别配置。
+     */
+    showAvatar: {
+      type: "enum",
+      label: "显示头像",
+      options: [
+        { label: "跟随预设", value: STORY_VISIBILITY_OVERRIDES[0] },
+        { label: "显示", value: STORY_VISIBILITY_OVERRIDES[1] },
+        { label: "隐藏", value: STORY_VISIBILITY_OVERRIDES[2] },
+      ],
+      default: "inherit",
+      required: true,
+    } as const,
+    showName: {
+      type: "enum",
+      label: "显示名称",
+      options: [
+        { label: "跟随预设", value: STORY_VISIBILITY_OVERRIDES[0] },
+        { label: "显示", value: STORY_VISIBILITY_OVERRIDES[1] },
+        { label: "隐藏", value: STORY_VISIBILITY_OVERRIDES[2] },
+      ],
+      default: "inherit",
+      required: true,
+    } as const,
     ...Object.fromEntries(
       Array.from({ length: 8 }, (_, offset) => {
         const index = offset + 1;
@@ -1333,35 +1363,6 @@ function createStoryMessageSchema() {
               type: "string",
               label: `第 ${index} 条 · 被拉黑提示文本`,
               multiline: true,
-            } as const,
-          ],
-          [
-            `showAvatar${suffix}`,
-            {
-              type: "enum",
-              label: `第 ${index} 条 · 显示头像`,
-              // value 字面量与 STORY_VISIBILITY_OVERRIDES 对齐。
-              options: [
-                { label: "跟随预设", value: STORY_VISIBILITY_OVERRIDES[0] },
-                { label: "显示", value: STORY_VISIBILITY_OVERRIDES[1] },
-                { label: "隐藏", value: STORY_VISIBILITY_OVERRIDES[2] },
-              ],
-              default: "inherit",
-              required: true,
-            } as const,
-          ],
-          [
-            `showName${suffix}`,
-            {
-              type: "enum",
-              label: `第 ${index} 条 · 显示名称`,
-              options: [
-                { label: "跟随预设", value: STORY_VISIBILITY_OVERRIDES[0] },
-                { label: "显示", value: STORY_VISIBILITY_OVERRIDES[1] },
-                { label: "隐藏", value: STORY_VISIBILITY_OVERRIDES[2] },
-              ],
-              default: "inherit",
-              required: true,
             } as const,
           ],
         ];
@@ -1624,7 +1625,7 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
       .addLabel("添加聊天角色预设")
       .emptyHint("未配置聊天角色预设时，显示手机消息会跳过对应消息。")
       .describe(
-        "每条预设绑定一个项目资产角色。消息块填写预设 ID。「显示头像 / 显示名称」默认开启；show-message 可用「跟随预设 / 显示 / 隐藏」按条覆盖，方法优先。只有选择“扩展素材库”时，才需要填写上方素材库的素材 ID。",
+        "每条预设绑定一个项目资产角色。消息块填写预设 ID。「显示头像 / 显示名称」默认开启。show-message 方法块另有两个组级枚举（跟随预设 / 显示 / 隐藏，默认跟随预设），作用于本组全部消息且优先于预设。只有选择“扩展素材库”时，才需要填写上方素材库的素材 ID。",
       ),
     programUiActions: s
       .array("动作 · 程序 UI", (item) => ({

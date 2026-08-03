@@ -1,6 +1,6 @@
 {
   "name": "@ink-zenly/phone-sdk",
-  "version": "0.4.1",
+  "version": "0.4.4",
   "description": "LetsGal 自定义手机扩展 SDK：宿主 PhoneExtension / ToastExtension，以及内页 registerPhoneApp 插件 API",
   "author": "池水三两升",
   "license": "MIT",

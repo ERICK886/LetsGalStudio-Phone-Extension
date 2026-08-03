@@ -3,8 +3,8 @@
 > 文件名：`2026-08-04-message-phone-hide-avatar-name-design.md`  
 > 作者：Cursor Agent  
 > 日期：2026-08-04  
-> 版本：1.0  
-> 状态：已批准（对话确认）
+> 版本：1.1  
+> 状态：已批准；1.1 更正为方法块组级双开关（非每条）
 
 ## 1. 背景与目标
 
@@ -13,14 +13,14 @@
 ### 目标
 
 - 聊天角色预设提供两个开关：显示头像、显示名称（默认均开启）。
-- `show-message` 方法块中**每一条**消息可覆盖上述两项。
-- **方法优先级高于预设**；未覆盖时跟随预设。
+- `show-message` 方法块提供**两个组级开关**（非每条），作用于本组全部消息。
+- **方法优先级高于预设**；选「跟随预设」时各条仍用各自预设。
 - 隐藏后采用紧凑布局：不占头像位、不占名称行。
 
 ### 非目标
 
 - 自定义显示名（改名）或自定义气泡 CSS。
-- 方法块「组级」总开关（整块一次改 8 条）。
+- 每条消息各自一套显示开关。
 - 改变现有头像回退链路（`avatarSource` / 素材库 / 立绘）；仅控制是否渲染。
 
 ## 2. 配置模型
@@ -36,26 +36,26 @@
 
 旧项目无这两字段时，归一化视为 `true`。
 
-### 2.2 `show-message` 单条字段（method schema）
+### 2.2 `show-message` 组级字段（method schema）
 
-第 `N` 条（`N=1…8`，后缀规则与现有 `presetId` / `message` 一致：第 1 条无后缀）新增：
+方法块仅增加**两个**组级字段（与 `appendToExisting` / `storyBackground` 同级），不对第 1～8 条分别配置：
 
 | 字段 | Studio 标签 | 类型 | 默认 | 取值 |
 |------|-------------|------|------|------|
-| `showAvatar` / `showAvatar2`… | 第 N 条 · 显示头像 | `enum` | `inherit` | `inherit` 跟随预设 · `show` 显示 · `hide` 隐藏 |
-| `showName` / `showName2`… | 第 N 条 · 显示名称 | `enum` | `inherit` | 同上 |
+| `showAvatar` | 显示头像（本组） | `enum` | `inherit` | `inherit` 跟随预设 · `show` 显示 · `hide` 隐藏 |
+| `showName` | 显示名称（本组） | `enum` | `inherit` | 同上 |
 
 不使用「缺省 boolean」表示跟随：Studio 勾选框无法区分「未设置」与「关闭」。
 
 ### 2.3 解析优先级
 
-对每条有效消息，最终布尔值：
+对组内每条有效消息，最终布尔值：
 
 ```text
-resolve(methodEnum, presetBool):
-  if methodEnum === "show" → true
-  if methodEnum === "hide" → false
-  if methodEnum === "inherit" 或非法/缺失 → presetBool（缺失预设字段时为 true）
+resolve(groupMethodEnum, presetBool):
+  if groupMethodEnum === "show" → true（本组全部）
+  if groupMethodEnum === "hide" → false（本组全部）
+  if groupMethodEnum === "inherit" 或非法/缺失 → 该条自身的 presetBool（缺失预设字段时为 true）
 ```
 
 头像与名称**各自独立**解析，互不影响。
@@ -129,7 +129,7 @@ showName: boolean;
 
 | 决策 | 选择 | 原因 |
 |------|------|------|
-| 控制粒度 | 预设默认 + 每条方法覆盖 | 作者要求 A+B，方法优先 |
+| 控制粒度 | 预设默认 + 方法块组级双开关 | 作者更正：方法内不按条配置，整组两个开关 |
 | 方法字段形态 | 三态 enum | 避免 boolean 与「跟随」冲突 |
 | 隐藏布局 | 紧凑、不占位 | 匿名/正文向场景更干净 |
 | 显示名改写 | 不做 | 本轮只要隐藏，不改名 |
