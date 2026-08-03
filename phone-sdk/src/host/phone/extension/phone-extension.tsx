@@ -33,6 +33,10 @@ import {
 } from "../../toast/ui/toast-ui";
 import { getOpenPhoneActionId } from "../../host-extension-id";
 import {
+  normalizeChatRoleBubbleStyle,
+  type ChatRoleBubbleStyleFields,
+} from "./chat-role-bubble-style";
+import {
   normalizePresetVisibilityFlag,
   resolveStoryVisibility,
   STORY_VISIBILITY_OVERRIDES,
@@ -179,8 +183,13 @@ const DEFAULT_BLOCKED_HINT = "您的消息已发送，但被对方拒收";
  * @property avatarAsset - `avatarSource === "asset"` 时解析出的素材 URI
  * @property showAvatar - 默认是否显示头像（可被方法块组级三态覆盖）
  * @property showName - 默认是否显示名称（可被方法块组级三态覆盖）
+ * @property fontSize - 可选正文字号（已归一化，如 `14px`）
+ * @property textColor - 可选正文色（已归一化 hex）
+ * @property nameColor - 可选名称色（已归一化 hex）
+ * @property bubbleColor - 可选气泡背景（hex 或已消毒 background）
+ * @property customCss - 可选自定义 CSS 声明串（已消毒；优先于结构化字段）
  */
-interface ChatRolePreset {
+interface ChatRolePreset extends ChatRoleBubbleStyleFields {
   id: string;
   characterId: string;
   avatarSource: ChatRoleAvatarSource;
@@ -503,6 +512,12 @@ function normalizeChatRolePresets(
         ? ((avatarAssetId ? avatarAssets.get(avatarAssetId) : undefined) ??
           legacyAvatarAsset)
         : undefined;
+    /**
+     * 气泡样式：非法字段在 normalizeChatRoleBubbleStyle 内静默丢弃；
+     * 仅展开合法键，避免把空对象写进预设。
+     */
+    const bubbleStyle = normalizeChatRoleBubbleStyle(raw);
+
     presets.set(id, {
       id,
       characterId,
@@ -511,6 +526,7 @@ function normalizeChatRolePresets(
       // 旧项目缺字段时视为显示，仅严格 false 才隐藏。
       showAvatar: normalizePresetVisibilityFlag(raw.showAvatar),
       showName: normalizePresetVisibilityFlag(raw.showName),
+      ...bubbleStyle,
     });
   }
   return presets;
@@ -553,6 +569,31 @@ export interface PhoneStoryMessage {
   showAvatar: boolean;
   /** 最终是否渲染名称（已合并方法覆盖）。 */
   showName: boolean;
+  /**
+   * 可选正文字号（快照自预设；已归一化，如 `14px`）。
+   * 未填则 UI 使用默认样式。
+   */
+  fontSize?: string;
+  /**
+   * 可选正文文字色（快照自预设；已归一化 hex）。
+   * 未填则 UI 使用默认样式。
+   */
+  textColor?: string;
+  /**
+   * 可选名称（strong）文字色（快照自预设；已归一化 hex）。
+   * 未填则 UI 使用默认样式。
+   */
+  nameColor?: string;
+  /**
+   * 可选气泡背景（快照自预设；hex 或已消毒 background）。
+   * 未填则 UI 使用默认 incoming/outgoing 背景。
+   */
+  bubbleColor?: string;
+  /**
+   * 可选自定义 CSS 声明串（快照自预设；已消毒）。
+   * 优先级高于结构化样式字段；未填则不追加。
+   */
+  customCss?: string;
 }
 
 type PhoneStoryMessageListener = (
@@ -1218,6 +1259,18 @@ function collectStoryMessages(
       groupShowNameOverride,
       preset.showName,
     );
+    /**
+     * 样式打进快照：播放期不随 settings 热改。
+     * 仅拷贝预设上已存在的合法字段（未填则省略，UI 走默认）。
+     */
+    const bubbleStyle: ChatRoleBubbleStyleFields = {
+      ...(preset.fontSize ? { fontSize: preset.fontSize } : {}),
+      ...(preset.textColor ? { textColor: preset.textColor } : {}),
+      ...(preset.nameColor ? { nameColor: preset.nameColor } : {}),
+      ...(preset.bubbleColor ? { bubbleColor: preset.bubbleColor } : {}),
+      ...(preset.customCss ? { customCss: preset.customCss } : {}),
+    };
+
     messages.push({
       characterId: preset.characterId,
       chatRoleId: preset.id,
@@ -1229,6 +1282,7 @@ function collectStoryMessages(
       ...(blockedHint ? { blockedHint } : {}),
       showAvatar,
       showName,
+      ...bubbleStyle,
     });
   }
 
@@ -1613,6 +1667,17 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
         avatarAssetId: item.string("头像素材 ID").default(""),
         showAvatar: item.boolean("显示头像").default(true),
         showName: item.boolean("显示名称").default(true),
+        fontSize: item.string("字体大小").default(""),
+        textColor: item.string("文字颜色").default(""),
+        nameColor: item.string("名称颜色").default(""),
+        bubbleColor: item.string("对话框颜色").default(""),
+        customCss: item
+          .string("自定义 CSS")
+          .multiline()
+          .default("")
+          .describe(
+            "可选。仅填 CSS 声明列表（如 padding: 4px; background: #111），勿写选择器/花括号/url()。与上方结构化字段同时存在时，自定义 CSS 优先。",
+          ),
       }))
       .itemDefault({
         id: "new-chat-role",
@@ -1620,12 +1685,17 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
         avatarAssetId: "",
         showAvatar: true,
         showName: true,
+        fontSize: "",
+        textColor: "",
+        nameColor: "",
+        bubbleColor: "",
+        customCss: "",
       })
       .maxItems(80)
       .addLabel("添加聊天角色预设")
       .emptyHint("未配置聊天角色预设时，显示手机消息会跳过对应消息。")
       .describe(
-        "每条预设绑定一个项目资产角色。消息块填写预设 ID。「显示头像 / 显示名称」默认开启。show-message 方法块另有两个组级枚举（跟随预设 / 显示 / 隐藏，默认跟随预设），作用于本组全部消息且优先于预设。只有选择“扩展素材库”时，才需要填写上方素材库的素材 ID。",
+        "每条预设绑定一个项目资产角色。消息块填写预设 ID。「显示头像 / 显示名称」默认开启。show-message 方法块另有两个组级枚举（跟随预设 / 显示 / 隐藏，默认跟随预设），作用于本组全部消息且优先于预设。气泡样式五字段（字体大小 / 文字颜色 / 名称颜色 / 对话框颜色 / 自定义 CSS）均可空：未填使用默认外观；自定义 CSS 为声明列表且优先于结构化颜色与字号。样式在 show-message 展开时写入消息快照。只有选择“扩展素材库”时，才需要填写上方素材库的素材 ID。",
       ),
     programUiActions: s
       .array("动作 · 程序 UI", (item) => ({
@@ -1972,6 +2042,14 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
                 DEFAULT_BLOCKED_HINT)
               : undefined;
 
+          /**
+           * 宿主/快照透传样式：再走一遍消毒，非法字段静默丢弃。
+           * 缺失视为未自定义，UI 保持默认 incoming/outgoing 外观。
+           */
+          const bubbleStyle = normalizeChatRoleBubbleStyle(
+            inputMessage as unknown as Record<string, unknown>,
+          );
+
           return [
             {
               characterId: inputMessage.characterId,
@@ -1994,6 +2072,7 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
               // 宿主已带最终布尔则透传；缺失或非 false 时默认显示。
               showAvatar: inputMessage.showAvatar !== false,
               showName: inputMessage.showName !== false,
+              ...bubbleStyle,
             },
           ];
         })

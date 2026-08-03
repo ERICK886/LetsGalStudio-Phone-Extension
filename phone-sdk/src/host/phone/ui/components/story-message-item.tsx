@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useExtensionContext } from "@avg-studio/sdk";
 import type { PhoneMessageStatus, PhoneStoryMessage } from "../../extension/phone-extension";
+import { buildBubbleStyleParts } from "../../extension/chat-role-bubble-style";
 import { firstGlyph, resolveAssetUrl } from "../asset-utils";
 
 const MessageStatusIndicator: React.FC<{ status: PhoneMessageStatus }> = ({ status }) => {
@@ -125,6 +126,41 @@ export const PhoneStoryMessageItem: React.FC<{ storyMessage: PhoneStoryMessage }
   const showAvatar = storyMessage.showAvatar !== false;
   const showName = storyMessage.showName !== false;
 
+  /** 快照样式字段 → bubble / strong / p 三段 inline style；全无则 undefined，保留 outgoing 默认 CSS。 */
+  const bubbleStyleParts = useMemo(() => {
+    const { fontSize, textColor, nameColor, bubbleColor, customCss } = storyMessage;
+    if (!fontSize && !textColor && !nameColor && !bubbleColor && !customCss) {
+      return undefined;
+    }
+
+    return buildBubbleStyleParts({
+      ...(fontSize ? { fontSize } : {}),
+      ...(textColor ? { textColor } : {}),
+      ...(nameColor ? { nameColor } : {}),
+      ...(bubbleColor ? { bubbleColor } : {}),
+      ...(customCss ? { customCss } : {}),
+    });
+  }, [
+    storyMessage.fontSize,
+    storyMessage.textColor,
+    storyMessage.nameColor,
+    storyMessage.bubbleColor,
+    storyMessage.customCss,
+  ]);
+
+  const bubbleStyle =
+    bubbleStyleParts && Object.keys(bubbleStyleParts.bubble).length > 0
+      ? bubbleStyleParts.bubble
+      : undefined;
+  const nameStyle =
+    bubbleStyleParts && Object.keys(bubbleStyleParts.name).length > 0
+      ? bubbleStyleParts.name
+      : undefined;
+  const bodyStyle =
+    bubbleStyleParts && Object.keys(bubbleStyleParts.body).length > 0
+      ? bubbleStyleParts.body
+      : undefined;
+
   return (
     <div
       className="phone-story-message-row"
@@ -153,9 +189,9 @@ export const PhoneStoryMessageItem: React.FC<{ storyMessage: PhoneStoryMessage }
           <span className="phone-story-status" role="status">
             <MessageStatusIndicator status={storyMessage.status} />
           </span>
-          <div className="phone-story-bubble">
-            {showName ? <strong>{characterName}</strong> : null}
-            <p>{storyMessage.message}</p>
+          <div className="phone-story-bubble" style={bubbleStyle}>
+            {showName ? <strong style={nameStyle}>{characterName}</strong> : null}
+            <p style={bodyStyle}>{storyMessage.message}</p>
           </div>
         </div>
       </div>
