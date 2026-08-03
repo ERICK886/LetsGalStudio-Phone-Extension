@@ -1675,7 +1675,7 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
           .multiline()
           .default("")
           .describe(
-            "可选。仅填 CSS 声明列表（如 padding: 4px; background: #111），勿写选择器/花括号/url()。与下方结构化字段同时存在时，自定义 CSS 优先。",
+            "可选。仅填 CSS 声明列表（如 padding: 4px; background: #111），勿写选择器/花括号/url()。与上方结构化字段同时存在时，自定义 CSS 优先。",
           ),
       }))
       .itemDefault({
