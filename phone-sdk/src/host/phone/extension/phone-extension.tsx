@@ -32,6 +32,11 @@ import {
   type PhoneToastStackDirection,
 } from "../../toast/ui/toast-ui";
 import { getOpenPhoneActionId } from "../../host-extension-id";
+import {
+  normalizePresetVisibilityFlag,
+  resolveStoryVisibility,
+  STORY_VISIBILITY_OVERRIDES,
+} from "./story-message-visibility";
 
 const OPEN_PHONE_ACTION = getOpenPhoneActionId();
 const DEFAULT_OPEN_PHONE_SHORTCUT = "ArrowUp";
@@ -165,11 +170,23 @@ const OUTGOING_MESSAGE_STATUSES = [
 ] as const;
 const DEFAULT_BLOCKED_HINT = "您的消息已发送，但被对方拒收";
 
+/**
+ * 聊天角色预设（settings 归一化后的内部结构）。
+ *
+ * @property id - 预设稳定 ID，供 show-message 槽位引用
+ * @property characterId - 绑定的资产角色 ID
+ * @property avatarSource - 头像来源策略
+ * @property avatarAsset - `avatarSource === "asset"` 时解析出的素材 URI
+ * @property showAvatar - 默认是否显示头像（可被方法三态覆盖）
+ * @property showName - 默认是否显示名称（可被方法三态覆盖）
+ */
 interface ChatRolePreset {
   id: string;
   characterId: string;
   avatarSource: ChatRoleAvatarSource;
   avatarAsset?: string;
+  showAvatar: boolean;
+  showName: boolean;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -491,6 +508,9 @@ function normalizeChatRolePresets(
       characterId,
       avatarSource,
       ...(avatarAsset ? { avatarAsset } : {}),
+      // 旧项目缺字段时视为显示，仅严格 false 才隐藏。
+      showAvatar: normalizePresetVisibilityFlag(raw.showAvatar),
+      showName: normalizePresetVisibilityFlag(raw.showName),
     });
   }
   return presets;
@@ -529,6 +549,10 @@ export interface PhoneStoryMessage {
   status: PhoneMessageStatus;
   /** 仅在 `status === "blocked"` 时显示。 */
   blockedHint?: string;
+  /** 最终是否渲染头像（已合并方法覆盖）。 */
+  showAvatar: boolean;
+  /** 最终是否渲染名称（已合并方法覆盖）。 */
+  showName: boolean;
 }
 
 type PhoneStoryMessageListener = (
@@ -1142,6 +1166,9 @@ function collectStoryMessages(
       message: params[`message${suffix}`],
       direction: params[`direction${suffix}`],
       status: params[`status${suffix}`],
+      // 调试对照：原始方法覆盖值（未与预设合并）。
+      showAvatar: params[`showAvatar${suffix}`],
+      showName: params[`showName${suffix}`],
     };
   });
   phoneDebug("method-params", {
@@ -1174,6 +1201,19 @@ function collectStoryMessages(
         ? (nonEmptyString(params[`blockedHint${suffix}`], 240) ??
           DEFAULT_BLOCKED_HINT)
         : undefined;
+    /**
+     * 方法三态覆盖优先于预设布尔：
+     * - inherit / 非法 / 缺失 → 使用预设
+     * - show / hide → 强制显示或隐藏
+     */
+    const showAvatar = resolveStoryVisibility(
+      params[`showAvatar${suffix}`],
+      preset.showAvatar,
+    );
+    const showName = resolveStoryVisibility(
+      params[`showName${suffix}`],
+      preset.showName,
+    );
     messages.push({
       characterId: preset.characterId,
       chatRoleId: preset.id,
@@ -1183,6 +1223,8 @@ function collectStoryMessages(
       direction,
       status,
       ...(blockedHint ? { blockedHint } : {}),
+      showAvatar,
+      showName,
     });
   }
 
@@ -1291,6 +1333,35 @@ function createStoryMessageSchema() {
               type: "string",
               label: `第 ${index} 条 · 被拉黑提示文本`,
               multiline: true,
+            } as const,
+          ],
+          [
+            `showAvatar${suffix}`,
+            {
+              type: "enum",
+              label: `第 ${index} 条 · 显示头像`,
+              // value 字面量与 STORY_VISIBILITY_OVERRIDES 对齐。
+              options: [
+                { label: "跟随预设", value: STORY_VISIBILITY_OVERRIDES[0] },
+                { label: "显示", value: STORY_VISIBILITY_OVERRIDES[1] },
+                { label: "隐藏", value: STORY_VISIBILITY_OVERRIDES[2] },
+              ],
+              default: "inherit",
+              required: true,
+            } as const,
+          ],
+          [
+            `showName${suffix}`,
+            {
+              type: "enum",
+              label: `第 ${index} 条 · 显示名称`,
+              options: [
+                { label: "跟随预设", value: STORY_VISIBILITY_OVERRIDES[0] },
+                { label: "显示", value: STORY_VISIBILITY_OVERRIDES[1] },
+                { label: "隐藏", value: STORY_VISIBILITY_OVERRIDES[2] },
+              ],
+              default: "inherit",
+              required: true,
             } as const,
           ],
         ];
@@ -1539,17 +1610,21 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
             asset: "扩展素材库",
           }),
         avatarAssetId: item.string("头像素材 ID").default(""),
+        showAvatar: item.boolean("显示头像").default(true),
+        showName: item.boolean("显示名称").default(true),
       }))
       .itemDefault({
         id: "new-chat-role",
         avatarSource: "first-portrait",
         avatarAssetId: "",
+        showAvatar: true,
+        showName: true,
       })
       .maxItems(80)
       .addLabel("添加聊天角色预设")
       .emptyHint("未配置聊天角色预设时，显示手机消息会跳过对应消息。")
       .describe(
-        "每条预设绑定一个项目资产角色。消息块填写预设 ID；角色名可覆盖资产角色名。只有选择“扩展素材库”时，才需要填写上方素材库的素材 ID。",
+        "每条预设绑定一个项目资产角色。消息块填写预设 ID。「显示头像 / 显示名称」默认开启；show-message 可用「跟随预设 / 显示 / 隐藏」按条覆盖，方法优先。只有选择“扩展素材库”时，才需要填写上方素材库的素材 ID。",
       ),
     programUiActions: s
       .array("动作 · 程序 UI", (item) => ({
@@ -1915,6 +1990,9 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
               direction,
               status,
               ...(blockedHint ? { blockedHint } : {}),
+              // 宿主已带最终布尔则透传；缺失或非 false 时默认显示。
+              showAvatar: inputMessage.showAvatar !== false,
+              showName: inputMessage.showName !== false,
             },
           ];
         })
