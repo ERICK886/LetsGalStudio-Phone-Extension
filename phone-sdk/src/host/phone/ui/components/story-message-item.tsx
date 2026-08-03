@@ -118,21 +118,43 @@ export const PhoneStoryMessageItem: React.FC<{ storyMessage: PhoneStoryMessage }
     });
   }, [avatarCandidates, storyMessage.characterId, storyMessage.chatRoleId]);
 
+  /**
+   * Task 2 已在快照/render 阶段写入最终布尔；此处沿用「仅严格 false 为隐藏」语义。
+   * @see PhoneStoryMessage.showAvatar / showName
+   */
+  const showAvatar = storyMessage.showAvatar !== false;
+  const showName = storyMessage.showName !== false;
+
   return (
     <div
       className="phone-story-message-row"
       data-direction={storyMessage.direction}
       data-status={storyMessage.status}
+      data-show-avatar={showAvatar ? "true" : "false"}
+      data-show-name={showName ? "true" : "false"}
       aria-label={storyMessage.direction === "incoming" ? "对方发来的消息" : "我方发送的消息"}
     >
-      <div className="phone-story-avatar" aria-hidden="true">
-        {avatarUrl ? <img src={avatarUrl} alt="" onLoad={reportAvatarLoaded} onError={tryNextAvatar} /> : firstGlyph(characterName)}
-      </div>
+      {showAvatar ? (
+        <div className="phone-story-avatar" aria-hidden="true">
+          {avatarUrl ? (
+            <img
+              src={avatarUrl}
+              alt=""
+              onLoad={reportAvatarLoaded}
+              onError={tryNextAvatar}
+            />
+          ) : (
+            firstGlyph(characterName)
+          )}
+        </div>
+      ) : null}
       <div className="phone-story-message-body">
         <div className="phone-story-message-content">
-          <span className="phone-story-status" role="status"><MessageStatusIndicator status={storyMessage.status} /></span>
+          <span className="phone-story-status" role="status">
+            <MessageStatusIndicator status={storyMessage.status} />
+          </span>
           <div className="phone-story-bubble">
-            <strong>{characterName}</strong>
+            {showName ? <strong>{characterName}</strong> : null}
             <p>{storyMessage.message}</p>
           </div>
         </div>

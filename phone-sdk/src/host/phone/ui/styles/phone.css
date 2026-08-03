@@ -994,6 +994,16 @@
   max-width: calc(100% - 78px);
 }
 
+/* 隐藏头像时不保留占位，消息体占满行宽（Task 3：showAvatar=false） */
+[data-phone-root] .phone-story-message-row[data-show-avatar="false"] .phone-story-message-body {
+  max-width: 100%;
+}
+
+/* 无角色名时 p 为 bubble 首子元素，顶距归零；有 strong 时仍沿用下方 p 的 margin */
+[data-phone-root] .phone-story-bubble > p:first-child {
+  margin-top: 0;
+}
+
 [data-phone-root] .phone-story-message-content {
   position: relative;
   display: inline-block;
