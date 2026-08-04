@@ -2,7 +2,7 @@
 
 > 面向开发者：在本仓或脚手架工程中开发手机内页、使用 CLI / phone-sdk。  
 > 作者侧「如何使用手机」（挂载、设置、消息、Toast）见根目录 [README.md](../README.md)。  
-> 当前推荐：`@ink-zenly/phone-sdk@^0.4.7` ｜ `@ink-zenly/create-phone-app@0.3.3` ｜ Studio SDK `>=1.9.0`
+> 当前推荐：`@ink-zenly/phone-sdk@^0.4.7` ｜ `@ink-zenly/create-phone-app@0.3.4` ｜ Studio SDK `>=1.9.0`
 
 本目录 `src/` 是本仓宿主扩展的入口与内页应用（如 `demo-shop/`）。宿主实现在 `@ink-zenly/phone-sdk`，脚手架在 `cli/`。
 
@@ -21,7 +21,7 @@
 | 目标 | 路径 |
 |------|------|
 | 在本仓加内页 | `pnpm create-phone-app add <app-id>` → [§2.3](#23-路径-a在本仓库开发内页推荐入门) |
-| 从零新建宿主 | `pnpm dlx @ink-zenly/create-phone-app@0.3.3 create …` → [§2.4](#24-路径-b从零创建宿主--内页) / [§3](#3-脚手架-create-phone-app-详解) |
+| 从零新建宿主 | `pnpm dlx @ink-zenly/create-phone-app@0.3.4 create …` → [§2.4](#24-路径-b从零创建宿主--内页) / [§3](#3-脚手架-create-phone-app-详解) |
 | 分发标准内页包 | `pnpm create-phone-app pack <app-id>` → [§2.3 步骤 6](#步骤-6可选pack-成标准内页包) |
 | SDK 双入口与依赖 | [§5](#5-phone-sdk-包说明与-api-要点) |
 | 版本变更 | [§6](#6-版本更新日志) |
@@ -42,7 +42,7 @@
 LetsGal Studio SDK          >= 1.9.0
 本仓扩展 / 自建宿主          1.1.0+
 @ink-zenly/phone-sdk        ^0.4.7
-@ink-zenly/create-phone-app 0.3.3
+@ink-zenly/create-phone-app 0.3.4
 ```
 
 本仓联调可用 `"@ink-zenly/phone-sdk": "file:phone-sdk"`。
@@ -74,7 +74,7 @@ phone-sdk/                     # 发布包 @ink-zenly/phone-sdk（0.4.0+）
    ├─ phone/                   # 目录、扩展、UI、CSS
    ├─ toast/
    └── studio/                 # 编辑器内联卡片等
-cli/                           # 发布包 @ink-zenly/create-phone-app（0.3.3+）
+cli/                           # 发布包 @ink-zenly/create-phone-app（0.3.4+）
 sdk/                           # 本项目使用的 Studio SDK；不要直接修改
 ```
 
@@ -277,7 +277,7 @@ pnpm create-phone-app pack my-mail --title "邮件" --extension-id com.acme.my-m
 适合不改本仓、单独开工程：
 
 ```powershell
-pnpm dlx @ink-zenly/create-phone-app@0.3.3 create .\my-host `
+pnpm dlx @ink-zenly/create-phone-app@0.3.4 create .\my-host `
   --template default `
   --extension-id com.acme.my-phone `
   --app-id my-shop `
@@ -293,7 +293,7 @@ pnpm watch
 - 宿主入口（导出 Phone / Toast）；`extension.json.id` = 你指定的 `--extension-id`
 - 首个内页 `src/my-shop/`（`--app-id`，与宿主 id **独立**）
 - `vite` 注入 `__PHONE_HOST_EXTENSION_ID__`（见 [§4](#4-宿主扩展包-id-注入phone-sdk--040)）
-- 依赖 `@ink-zenly/phone-sdk` 的 npm 版本（当前脚手架写入 `^0.4.6`）与捆绑 `sdk/`
+- 依赖 `@ink-zenly/phone-sdk` 的 npm 版本（当前脚手架写入 `^0.4.7`）与捆绑 `sdk/`
 
 之后在该工程内继续 `add` 更多内页，或改 `src/my-shop/app.tsx`。  
 Studio 中启用的是**该宿主扩展**的 `extension.json.id`（例如 `com.acme.my-phone`），不是本仓官方 id。
@@ -343,7 +343,7 @@ export class ShopController extends Extension {
 | 内页（plugin） | 只从 `@ink-zenly/phone-sdk/plugin` 引用 API；由宿主或内页包入口打包 |
 
 本仓开发：`package.json` 可用 `"@ink-zenly/phone-sdk": "file:phone-sdk"`。  
-脚手架默认写 npm `^0.4.6`（见 CLI `inkZenly.phoneSdkVersion`），不要改成默认 `file:`。
+脚手架默认写 npm `^0.4.7`（见 CLI `inkZenly.phoneSdkVersion`），不要改成默认 `file:`。
 
 ### 2.7 内页开发检查清单
 
@@ -370,7 +370,7 @@ export class ShopController extends Extension {
 
 ## 3. 脚手架 create-phone-app 详解
 
-包名：`@ink-zenly/create-phone-app@0.3.3`（[npm](https://www.npmjs.com/package/@ink-zenly/create-phone-app)）。  
+包名：`@ink-zenly/create-phone-app@0.3.4`（[npm](https://www.npmjs.com/package/@ink-zenly/create-phone-app)）。  
 源码在仓库 `cli/`；完整选项见 [`../cli/README.md`](../cli/README.md)。内页联调步骤见 [§2](#2-内页应用完整开发流程)。
 
 ### 3.1 三条命令各干什么
@@ -393,7 +393,7 @@ pnpm create-phone-app add --help
 pnpm create-phone-app pack --help
 
 # 无本仓：用已发布包（注意钉版本）
-pnpm dlx @ink-zenly/create-phone-app@0.3.3 create .\my-host `
+pnpm dlx @ink-zenly/create-phone-app@0.3.4 create .\my-host `
   --template default `
   --extension-id com.acme.my-phone `
   --app-id my-shop `
@@ -478,7 +478,7 @@ pnpm create-phone-app pack my-mail --title "邮件"
 pnpm create-phone-app pack my-mail --extension-id com.acme.my-mail-ext --title "邮件"
 
 # 已发布包
-pnpm dlx @ink-zenly/create-phone-app@0.3.3 create .\my-host --template minimal `
+pnpm dlx @ink-zenly/create-phone-app@0.3.4 create .\my-host --template minimal `
   --extension-id tiny-host --app-id my-shop --title "我的商店"
 ```
 
@@ -629,7 +629,7 @@ export function registerMyMailPhoneApp(): void {
 ## 6. 版本更新日志
 
 下列要点依据本仓库 `git` 历史与 npm 已发布版本整理。  
-**npm 已发布**的 phone-sdk：`0.3.0`、`0.3.1`、`0.4.0`、`0.4.6`（`0.4.7` 为仓库当前）；create-phone-app：`0.1.0`–`0.1.5`、`0.3.0`–`0.3.3`。  
+**npm 已发布**的 phone-sdk：`0.3.0`、`0.3.1`、`0.4.0`、`0.4.6`、`0.4.7`；create-phone-app：`0.1.0`–`0.1.5`、`0.3.0`–`0.3.4`。  
 中间仅出现在 git、未单独发到 npm 的版本号，会标注「仓库版本」。
 
 ### 6.1 本仓扩展（`extension.json`）
@@ -648,7 +648,7 @@ export function registerMyMailPhoneApp(): void {
 
 | 版本 | npm | 要点 |
 |------|-----|------|
-| **0.4.7**（仓库） | ❌ 未发 npm | 设置「对方回复前将我方未读标为已读」（默认开）：下一条为对方消息时，点击先把已显示的我方 `unread` 改为 `read`，再点才追加对方消息。 |
+| **0.4.7** | ✅ | 设置「对方回复前将我方未读标为已读」（默认开）：下一条为对方消息时，点击先把已显示的我方 `unread` 改为 `read`，再点才追加对方消息；未读改已读不重播入场动画。 |
 | **0.4.6** | ✅ | 气泡名称改为气泡**上方加粗**（QQ 风）；字号/颜色表单预填与 `phone.css` 对齐；**自定义 CSS 新建不预填**（说明中保留占位示例）；文字/名称色支持 `rgba()`；发布包清理临时单测文件。 |
 | **0.4.4～0.4.5**（仓库） | ❌ 未单独发 npm | 聊天角色预设气泡样式（字号、文字/名称/对话框色、`customCss` 消毒与合并）；`show-message` 快照写入样式；组级头像/名称枚举定稿为「跟随预设 / 显示 / 隐藏」。内容合入 **0.4.6** 发布。 |
 | **0.4.1**（仓库） | ❌ 未单独发 npm | 预设与 `show-message` 支持头像/名称可见性；气泡按开关隐藏头像与名称。合入后续 0.4.x。 |
@@ -662,6 +662,7 @@ export function registerMyMailPhoneApp(): void {
 
 | 版本 | npm | 要点 |
 |------|-----|------|
+| **0.3.4** | ✅ | `inkZenly.phoneSdkVersion` → `^0.4.7`；跟进 phone-sdk 未读→已读相关能力。 |
 | **0.3.3** | ✅ | `inkZenly.phoneSdkVersion` → `^0.4.6`；修复 Windows 下 bin 入口 CRLF 导致 npm 丢弃 `bin` 的问题；文档钉版本更新。 |
 | **0.3.2** | ✅ | **宿主扩展包 id 与内页 app-id 分开指定**；不再生成 `ink.zenly.phone-app-*`；`pack` 的内页包 `extension.json.id` 默认同 app-id，可用 `--extension-id` 覆盖。 |
 | **0.3.1** | ✅ | 跟进 phone-sdk `0.4.0` 宿主 id 注入；模板 `vite.config.ts` 写入 `__PHONE_HOST_EXTENSION_ID__`。 |
@@ -680,7 +681,7 @@ export function registerMyMailPhoneApp(): void {
 6. **Phone SDK 内页**：`registerPhoneApp`、bootstrap 注册表、本仓 `src/<app-id>/` 开发模型。  
 7. **脚手架**：`create` / `add` / `pack`，两层 ID，标准内页包分发。  
 8. **多宿主就绪**：宿主扩展包 id 注入（phone-sdk ≥ 0.4.0）。  
-9. **消息表现增强**：头像/名称可见性（预设 + 组级三态）；气泡自定义样式；名称 QQ 风排版。
+9. **消息表现增强**：头像/名称可见性（预设 + 组级三态）；气泡自定义样式；名称 QQ 风排版；对方回复前未读→已读。
 
 ### 6.5 升级建议
 
@@ -688,7 +689,7 @@ export function registerMyMailPhoneApp(): void {
 |---------|------|
 | 旧宿主（写死官方扩展 id）→ phone-sdk ≥ 0.4.0 | 确认 Vite `define` 注入 `__PHONE_HOST_EXTENSION_ID__`；核对 Studio「输入按键」是否改为 `<你的扩展包 id>.open-phone`。 |
 | CLI ≤ 0.3.1 → ≥ 0.3.2 | `create` 必须同时传 `--extension-id` 与 `--app-id`；检查文档/脚本里是否仍假设自动生成 `ink.zenly.phone-app-*`。 |
-| phone-sdk ≤ 0.4.0 → 0.4.6 | 可直接升 `^0.4.6`；新气泡样式字段可选；已有空字段行为与样式表回退兼容。 |
+| phone-sdk ≤ 0.4.0 → 0.4.7 | 可直接升 `^0.4.7`；新气泡样式与未读→已读设置可选；已有空字段行为与样式表回退兼容。 |
 | 仅用本仓扩展、不写内页 | 升级扩展构建产物即可；CLI / plugin API 可忽略。 |
 
 查 npm 最新版：

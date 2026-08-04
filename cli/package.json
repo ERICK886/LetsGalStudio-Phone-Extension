@@ -1,6 +1,6 @@
 {
   "name": "@ink-zenly/create-phone-app",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "Scaffold LetsGal phone host + in-app plugins (create / add / pack)",
   "author": "池水三两升",
   "license": "MIT",
@@ -19,7 +19,7 @@
     "node": ">=18"
   },
   "inkZenly": {
-    "phoneSdkVersion": "^0.4.6"
+    "phoneSdkVersion": "^0.4.7"
   },
   "publishConfig": {
     "access": "public",
