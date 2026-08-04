@@ -1417,7 +1417,11 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
               aria-label="手机消息列表"
             >
               {displayStoryMessages.map((storyMessage, index) => {
-                const messageKey = `${storyMessage.chatRoleId}-${storyMessage.direction}-${storyMessage.status}-${index}`;
+                /**
+                 * key 不含 status：未读→已读只更新文案，避免 remount 重播入场动画。
+                 * 列表仅追加增长，用 index + 方向 + 角色即可稳定标识一行。
+                 */
+                const messageKey = `${index}-${storyMessage.direction}-${storyMessage.chatRoleId}`;
                 return (
                   <React.Fragment key={messageKey}>
                     <PhoneStoryMessageItem storyMessage={storyMessage} />

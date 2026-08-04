@@ -608,7 +608,20 @@ type PhoneStoryMessageListener = (
   storyBackground?: string,
 ) => void;
 
-export type PhoneStoryAdvanceResult = "appended" | "finished" | "close" | false;
+/**
+ * 推进剧情消息一次的结果。
+ * - `appended`：追加下一条可见消息
+ * - `marked-read`：仅将我方「未读」改为「已读」（下一条为对方消息时，且设置开启）
+ * - `finished`：本组结束且不关闭手机
+ * - `close`：请求关闭手机 UI
+ * - `false`：无待推进序列
+ */
+export type PhoneStoryAdvanceResult =
+  | "appended"
+  | "marked-read"
+  | "finished"
+  | "close"
+  | false;
 
 export interface PhoneUIProps extends ExtensionProps {
   loadPreferences: () => readonly PlayerPhonePreferences[];
@@ -948,8 +961,24 @@ function finishStoryMessageSequence(
   return true;
 }
 
-/** 推进当前 Preview 中的消息会话一次。 */
-function advanceStoryMessage(runtime: PhoneRuntime): PhoneStoryAdvanceResult {
+/**
+ * 推进当前 Preview 中的消息会话一次。
+ *
+ * @param runtime - 当前 Preview 的手机运行时
+ * @param options.markUnreadBeforeIncoming - 为 true 且下一条为对方消息时，
+ *   若屏幕上已有我方 `unread`，先改为 `read` 并返回 `marked-read`（本次不追加消息）
+ * @returns 推进结果；无 pending 序列时为 `false`
+ *
+ * @example
+ * ```ts
+ * // 设置开启：未读我方 → 点击 → 已读 → 再点击 → 对方消息
+ * advanceStoryMessage(runtime, { markUnreadBeforeIncoming: true });
+ * ```
+ */
+function advanceStoryMessage(
+  runtime: PhoneRuntime,
+  options: { markUnreadBeforeIncoming?: boolean } = {},
+): PhoneStoryAdvanceResult {
   const sequence = runtime.pendingStorySequence;
   if (!sequence) {
     runtimeDebug(runtime, "advance-ignored", { pending: false });
@@ -962,9 +991,38 @@ function advanceStoryMessage(runtime: PhoneRuntime): PhoneStoryAdvanceResult {
     totalCount: sequence.messages.length,
     visibleMessageCount: runtime.activeStoryMessages.length,
     closeAfterMessages: sequence.closeAfterMessages,
+    markUnreadBeforeIncoming: Boolean(options.markUnreadBeforeIncoming),
   });
 
   const nextMessage = sequence.messages[sequence.nextIndex];
+
+  // 下一条为对方消息前：先把已显示的我方「未读」标为「已读」，占用一次点击。
+  if (
+    options.markUnreadBeforeIncoming &&
+    nextMessage &&
+    nextMessage.direction === "incoming"
+  ) {
+    const hasUnreadOutgoing = runtime.activeStoryMessages.some(
+      (message) =>
+        message.direction === "outgoing" && message.status === "unread",
+    );
+
+    if (hasUnreadOutgoing) {
+      runtime.activeStoryMessages = runtime.activeStoryMessages.map((message) =>
+        message.direction === "outgoing" && message.status === "unread"
+          ? { ...message, status: "read" as const }
+          : message,
+      );
+      runtimeDebug(runtime, "advance-marked-outgoing-read", {
+        sequenceId: sequence.debugId,
+        nextIndex: sequence.nextIndex,
+        visibleMessageCount: runtime.activeStoryMessages.length,
+      });
+      publishStoryMessages(runtime);
+      return "marked-read";
+    }
+  }
+
   if (nextMessage) {
     const appendedIndex = sequence.nextIndex;
     sequence.nextIndex += 1;
@@ -1884,6 +1942,13 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
       .describe("例如 linear-gradient(135deg, #182848, #4b6cb7)"),
     accentColor: s.string("默认强调色").default("#79c7ff"),
     shellColor: s.string("默认外壳颜色").default("#11151f"),
+    markOutgoingUnreadReadBeforeIncoming: s
+      .boolean("对方回复前将我方未读标为已读")
+      .default(true)
+      .describe(
+        "开启后：当屏幕上已有我方「未读」消息，且下一条为对方消息时，点击屏幕（或 Enter / Space）会先把这些未读改为「已读」，需再操作一次才显示对方消息。下一条仍是我方、或没有未读时，行为与关闭相同。关闭则点击直接推进下一条。",
+      ),
+
     allowPlayerCustomization: s
       .boolean("允许玩家个性化手机")
       .default(true)
@@ -2131,7 +2196,14 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
         // 不依赖 ctx.ui.show() 的初始 data：首次 render 若尚未拿到消息快照，UI 也能订阅并回放当前会话。
         subscribeStoryMessages: (listener) =>
           subscribeStoryMessages(runtime, listener),
-        advanceStoryMessage: () => advanceStoryMessage(runtime),
+        advanceStoryMessage: () =>
+          advanceStoryMessage(runtime, {
+            // 缺省或非 false 时开启（与 settings 默认 true 对齐）。
+            markUnreadBeforeIncoming:
+              this.context.settings.get<boolean>(
+                "markOutgoingUnreadReadBeforeIncoming",
+              ) !== false,
+          }),
         ...(storyMessages
           ? {
               storyMessages,
