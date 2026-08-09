@@ -53,10 +53,12 @@ import type {
 import {
   EMPTY_PHONE_SAFE_AREA,
   diagnosePhoneAppLookup,
+  getLatestPhoneNavigate,
   phoneSdkDebug,
   phoneSdkDiag,
   phoneSdkDiagWarn,
   publishPhoneSafeAreaInsets,
+  subscribePhoneNavigate,
   type PhoneSafeAreaInsets,
 } from "@ink-zenly/phone-sdk/plugin";
 import {
@@ -208,6 +210,12 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
   const messageTimer = useRef<number | undefined>();
   const closeTimer = useRef<number | undefined>();
   const closePromise = useRef<Promise<void> | null>(null);
+  /** 最新 openInPhoneAppById，供订阅回调读取而无需重新订阅。 */
+  const openInPhoneAppByIdRef = useRef<(phoneAppId: string, originAppId?: string) => void>(() => {});
+  /** 最新 messageMode，供订阅回调读取。 */
+  const messageModeRef = useRef(false);
+  /** 最新 closing，供订阅回调读取。 */
+  const closingRef = useRef(false);
   const appDragTimer = useRef<number | undefined>();
   const appDragStart = useRef<AppDragStart | null>(null);
   const activeAppDrag = useRef<{ appId: string; pointerId: number } | null>(null);
@@ -336,6 +344,16 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
       setDisplayStoryBackground(nextStoryBackground);
     });
   }, [subscribeStoryMessages]);
+
+  // 订阅导航总线：收到 openPhoneApp 请求时打开对应内页。
+  // subscribePhoneNavigate 在订阅时会立即回放最新 pending，因此挂载即消费 getLatestPhoneNavigate()，
+  // 不会漏掉 UI 挂载前发布的请求。messageMode / closing 期间忽略，避免覆盖剧情模式或关闭动画。
+  useEffect(() => {
+    return subscribePhoneNavigate((req) => {
+      if (messageModeRef.current || closingRef.current) return;
+      openInPhoneAppByIdRef.current(req.appId);
+    });
+  }, []);
 
   useEffect(() => {
     if (!messageMode) return undefined;
@@ -969,6 +987,69 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
   }, [advanceStoryMessage, closeWithAnimation]);
 
   /**
+   * 打开手机内部应用（Phone SDK 注册的内页）。
+   *
+   * 抽自 `launchApp` 的 `in-phone-app` 分支，供桌面图标点击与导航总线订阅共用。
+   * 仅依赖 `registerPhoneApp` 注册表，不要求桌面目录存在对应图标；未注册时 warn 并退出，不抛错。
+   *
+   * @param phoneAppId Phone SDK 应用 id（Studio 程序 ID）
+   * @param originAppId 可选的桌面图标 id，用于苹果预设下从图标中心放大的 transform-origin；
+   *   未提供（如导航总线驱动）时回退屏幕中部偏上。
+   */
+  const openInPhoneAppById = (phoneAppId: string, originAppId?: string) => {
+    const lookupDiag = diagnosePhoneAppLookup(phoneAppId);
+    const registered = lookupPhoneSdkApp(phoneAppId);
+    if (!registered) {
+      phoneSdkDiagWarn("打开内页失败：注册表未命中", {
+        phase: "open-in-phone-app-miss",
+        phoneAppId,
+        ...lookupDiag,
+      });
+      showMessage(
+        `应用不可用：未找到「${phoneAppId}」。`
+          + "请确认已通过 @ink-zenly/phone-sdk/plugin 完成 registerPhoneApp，"
+          + "且 Phone SDK 应用 ID 与程序 ID 一致。",
+      );
+      return;
+    }
+    phoneSdkDiag("打开内页：注册表命中", {
+      phase: "open-in-phone-app-hit",
+      phoneAppId,
+      title: registered.title,
+    });
+    setEditorOpen(false);
+    // 进入内页前先写入状态栏高度，避免首帧 safeAreaInsets 为 0 导致标题顶到状态栏。
+    const provisional: PhoneSafeAreaInsets = {
+      top: Math.round(statusBarRef.current?.offsetHeight || (phoneStylePreset === "apple" ? 52 : 46)),
+      right: 0,
+      bottom: Math.round(homeButtonRef.current?.offsetHeight || 44),
+      left: 0,
+    };
+    setSafeAreaInsets(provisional);
+    publishPhoneSafeAreaInsets(provisional);
+    // 苹果：从图标中心放大；安卓：自底部升起，原点固定为屏幕底部中心。
+    // 无桌面图标（导航总线驱动）时 resolveInAppOriginFromIcon 回退屏幕中部偏上。
+    const origin = phoneStylePreset === "apple"
+      ? resolveInAppOriginFromIcon(originAppId ?? phoneAppId)
+      : { x: "50%", y: "100%" };
+    setInAppOrigin(origin);
+    phoneSdkDebug("进入手机内部应用", {
+      phoneAppId,
+      title: registered.title,
+      stylePreset: phoneStylePreset,
+      provisionalSafeArea: provisional,
+      statusBarOffsetHeight: statusBarRef.current?.offsetHeight ?? null,
+      homeButtonOffsetHeight: homeButtonRef.current?.offsetHeight ?? null,
+      origin,
+    });
+    setInAppPhase("entering");
+    setActiveInPhoneAppId(phoneAppId);
+  };
+  openInPhoneAppByIdRef.current = openInPhoneAppById;
+  messageModeRef.current = messageMode;
+  closingRef.current = closing;
+
+  /**
    * 统一启动应用目标，保证鼠标与键盘最终走相同的 Studio API 分支。
    * `in-phone-app`：保持手机打开，切到屏幕内页渲染 Phone SDK 注册组件。
    * 其它目标：先关闭手机再调用对应 Runtime API。
@@ -986,57 +1067,7 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
     if (busy || closing || inAppPhase === "entering" || inAppPhase === "leaving") return;
 
     if (app.action.target.kind === "in-phone-app") {
-      const phoneAppId = app.action.target.phoneAppId;
-      const lookupDiag = diagnosePhoneAppLookup(phoneAppId);
-      const registered = lookupPhoneSdkApp(phoneAppId);
-      if (!registered) {
-        phoneSdkDiagWarn("打开内页失败：注册表未命中", {
-          phase: "open-in-phone-app-miss",
-          catalogAppId: app.id,
-          catalogAppName: app.displayName,
-          actionId: app.action.id,
-          ...lookupDiag,
-        });
-        showMessage(
-          `应用不可用：未找到「${phoneAppId}」。`
-            + "请确认已通过 @ink-zenly/phone-sdk/plugin 完成 registerPhoneApp，"
-            + "且 Phone SDK 应用 ID 与程序 ID 一致。",
-        );
-        return;
-      }
-      phoneSdkDiag("打开内页：注册表命中", {
-        phase: "open-in-phone-app-hit",
-        catalogAppId: app.id,
-        actionId: app.action.id,
-        phoneAppId,
-        title: registered.title,
-      });
-      setEditorOpen(false);
-      // 进入内页前先写入状态栏高度，避免首帧 safeAreaInsets 为 0 导致标题顶到状态栏。
-      const provisional: PhoneSafeAreaInsets = {
-        top: Math.round(statusBarRef.current?.offsetHeight || (phoneStylePreset === "apple" ? 52 : 46)),
-        right: 0,
-        bottom: Math.round(homeButtonRef.current?.offsetHeight || 44),
-        left: 0,
-      };
-      setSafeAreaInsets(provisional);
-      publishPhoneSafeAreaInsets(provisional);
-      // 苹果：从图标中心放大；安卓：自底部升起，原点固定为屏幕底部中心。
-      const origin = phoneStylePreset === "apple"
-        ? resolveInAppOriginFromIcon(app.id)
-        : { x: "50%", y: "100%" };
-      setInAppOrigin(origin);
-      phoneSdkDebug("进入手机内部应用", {
-        phoneAppId,
-        title: registered.title,
-        stylePreset: phoneStylePreset,
-        provisionalSafeArea: provisional,
-        statusBarOffsetHeight: statusBarRef.current?.offsetHeight ?? null,
-        homeButtonOffsetHeight: homeButtonRef.current?.offsetHeight ?? null,
-        origin,
-      });
-      setInAppPhase("entering");
-      setActiveInPhoneAppId(phoneAppId);
+      openInPhoneAppById(app.action.target.phoneAppId, app.id);
       return;
     }
 
