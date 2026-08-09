@@ -16,8 +16,16 @@ import {
   definePhonePluginRegistry,
 } from "@ink-zenly/phone-sdk/plugin";
 import { registerDemoShopPhoneApp } from "./demo-shop";
+import { registerPhoneAlbumPhoneApp } from "./phone-album/ui";
+import { PhoneAlbumExtension } from "./phone-album";
 
-bootstrapPhonePluginApps(definePhonePluginRegistry(registerDemoShopPhoneApp));
+bootstrapPhonePluginApps(
+  definePhonePluginRegistry(
+    registerDemoShopPhoneApp,
+    registerPhoneAlbumPhoneApp,
+  ),
+);
 
 export { PhoneExtension, ToastExtension } from "@ink-zenly/phone-sdk";
 export { default } from "@ink-zenly/phone-sdk";
+export { PhoneAlbumExtension };
