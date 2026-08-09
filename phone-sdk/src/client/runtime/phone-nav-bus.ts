@@ -65,12 +65,20 @@ export function getLatestPhoneNavigate(): NavigateRequest | null {
 }
 
 /**
+ * 清除 pending navigate 请求；UI 消费后或手机关闭时调用，避免后续订阅回放 stale pending。
+ */
+export function clearPhoneNavigatePending(): void {
+  delete getPhoneSdkSlot().phoneNavigatePending;
+}
+
+/**
  * 发出手机关闭事件，唤醒所有等待中的 waiter 并清空 waiter 集合。
  *
  * @remarks 一次性：emit 后 waiter 集合清空，后续 `waitForPhoneClosed` 调用立即 resolve。
  */
 export function emitPhoneClosed(): void {
   const slot = getPhoneSdkSlot();
+  clearPhoneNavigatePending();
   const waiters = slot.phoneClosedWaiters;
   if (waiters) {
     slot.phoneClosedWaiters = new Set();

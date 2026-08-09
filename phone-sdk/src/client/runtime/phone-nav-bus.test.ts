@@ -11,6 +11,7 @@ import { PHONE_SDK_GLOBAL_KEY, getPhoneSdkSlot } from "./slot.ts";
 import {
   publishPhoneNavigate,
   subscribePhoneNavigate,
+  clearPhoneNavigatePending,
   emitPhoneClosed,
   waitForPhoneClosed,
   getLatestPhoneNavigate,
@@ -93,6 +94,26 @@ describe("phone-nav-bus", () => {
 
   it("getLatestPhoneNavigate 无 pending 时为 null", () => {
     assert.equal(getLatestPhoneNavigate(), null);
+  });
+
+  it("clearPhoneNavigatePending 后 getLatestPhoneNavigate 为 null 且新 subscribe 不回放", () => {
+    publishPhoneNavigate({ appId: "chat", seq: 1 });
+    clearPhoneNavigatePending();
+    assert.equal(getLatestPhoneNavigate(), null);
+    const received: unknown[] = [];
+    const unsub = subscribePhoneNavigate((req) => received.push(req));
+    assert.equal(received.length, 0);
+    unsub();
+  });
+
+  it("emitPhoneClosed 清除 pending navigate", () => {
+    publishPhoneNavigate({ appId: "chat", seq: 1 });
+    emitPhoneClosed();
+    assert.equal(getLatestPhoneNavigate(), null);
+    const received: unknown[] = [];
+    const unsub = subscribePhoneNavigate((req) => received.push(req));
+    assert.equal(received.length, 0);
+    unsub();
   });
 
   it("带 payload 的 navigate 请求被正确传递", () => {

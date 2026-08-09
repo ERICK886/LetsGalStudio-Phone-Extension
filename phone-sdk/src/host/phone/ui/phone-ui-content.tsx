@@ -53,7 +53,7 @@ import type {
 import {
   EMPTY_PHONE_SAFE_AREA,
   diagnosePhoneAppLookup,
-  getLatestPhoneNavigate,
+  clearPhoneNavigatePending,
   phoneSdkDebug,
   phoneSdkDiag,
   phoneSdkDiagWarn,
@@ -352,6 +352,7 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
     return subscribePhoneNavigate((req) => {
       if (messageModeRef.current || closingRef.current) return;
       openInPhoneAppByIdRef.current(req.appId);
+      clearPhoneNavigatePending();
     });
   }, []);
 

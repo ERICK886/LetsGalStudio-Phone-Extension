@@ -48,6 +48,7 @@ export {
 export { getPhoneSdkHost, installPhoneSdkHost } from "./runtime/host";
 export { openPhoneApp } from "./runtime/open-phone-app";
 export {
+  clearPhoneNavigatePending,
   emitPhoneClosed,
   getLatestPhoneNavigate,
   publishPhoneNavigate,
