@@ -6,12 +6,15 @@
  * @version 0.1.0
  *
  * @remarks
- * 本文件为 Task 5 阶段的最小 stub：仅注册 phoneAppId = phone-album，
- * 渲染一个占位 div。Task 6 将替换 render 为真实相册内页组件。
+ * 注册 `phoneAppId = phone-album` 的内页；render 委托给 `AlbumApp`。
+ * title 取注册时缓存的 `getCachedAuthorSettings().appTitle`；设置变更不强制 re-register。
  */
 
 import { registerPhoneApp } from "@ink-zenly/phone-sdk/plugin";
+
 import { PROGRAM_ID } from "../constants";
+import { getCachedAuthorSettings } from "../runtime/index";
+import { AlbumApp } from "./AlbumApp";
 
 /**
  * 注册 `phoneAppId = phone-album` 的内页。
@@ -28,12 +31,8 @@ import { PROGRAM_ID } from "../constants";
 export function registerPhoneAlbumPhoneApp(): void {
   registerPhoneApp({
     id: PROGRAM_ID,
-    title: "相册",
+    title: getCachedAuthorSettings().appTitle,
     description: "手机相册内页",
-    render: () => (
-      <div data-phone-album-stub style={{ padding: 16 }}>
-        相册加载中…
-      </div>
-    ),
+    render: (props) => <AlbumApp {...props} />,
   });
 }
