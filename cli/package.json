@@ -19,7 +19,7 @@
     "node": ">=18"
   },
   "inkZenly": {
-    "phoneSdkVersion": "^0.4.7"
+    "phoneSdkVersion": "^0.5.0"
   },
   "publishConfig": {
     "access": "public",

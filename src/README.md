@@ -2,7 +2,7 @@
 
 > 面向开发者：在本仓或脚手架工程中开发手机内页、使用 CLI / phone-sdk。  
 > 作者侧「如何使用手机」（挂载、设置、消息、Toast）见根目录 [README.md](../README.md)。  
-> 当前推荐：`@ink-zenly/phone-sdk@^0.4.7` ｜ `@ink-zenly/create-phone-app@0.3.4` ｜ Studio SDK `>=1.9.0`
+> 当前推荐：`@ink-zenly/phone-sdk@^0.5.0` ｜ `@ink-zenly/create-phone-app@0.3.4` ｜ Studio SDK `>=1.9.0`
 
 本目录 `src/` 是本仓宿主扩展的入口与内页应用（如 `demo-shop/`、`phone-album/`）。宿主实现在 `@ink-zenly/phone-sdk`，脚手架在 `cli/`。  
 独立 release 形态的聊天内页示例见旁路工程 [`../app-015abe`](../../app-015abe)（扩展包 id `app-015abe`，`phoneAppId=chat`）。
@@ -42,7 +42,7 @@
 ```text
 LetsGal Studio SDK          >= 1.9.0
 本仓扩展 / 自建宿主          1.1.0+
-@ink-zenly/phone-sdk        ^0.4.7
+@ink-zenly/phone-sdk        ^0.5.0
 @ink-zenly/create-phone-app 0.3.4
 ```
 
@@ -294,7 +294,7 @@ pnpm watch
 - 宿主入口（导出 Phone / Toast）；`extension.json.id` = 你指定的 `--extension-id`
 - 首个内页 `src/my-shop/`（`--app-id`，与宿主 id **独立**）
 - `vite` 注入 `__PHONE_HOST_EXTENSION_ID__`（见 [§4](#4-宿主扩展包-id-注入phone-sdk--040)）
-- 依赖 `@ink-zenly/phone-sdk` 的 npm 版本（当前脚手架写入 `^0.4.7`）与捆绑 `sdk/`
+- 依赖 `@ink-zenly/phone-sdk` 的 npm 版本（当前脚手架写入 `^0.5.0`）与捆绑 `sdk/`
 
 之后在该工程内继续 `add` 更多内页，或改 `src/my-shop/app.tsx`。  
 Studio 中启用的是**该宿主扩展**的 `extension.json.id`（例如 `com.acme.my-phone`），不是本仓官方 id。
@@ -344,7 +344,7 @@ export class ShopController extends Extension {
 | 内页（plugin） | 只从 `@ink-zenly/phone-sdk/plugin` 引用 API；由宿主或内页包入口打包 |
 
 本仓开发：`package.json` 可用 `"@ink-zenly/phone-sdk": "file:phone-sdk"`。  
-脚手架默认写 npm `^0.4.7`（见 CLI `inkZenly.phoneSdkVersion`），不要改成默认 `file:`。
+脚手架默认写 npm `^0.5.0`（见 CLI `inkZenly.phoneSdkVersion`），不要改成默认 `file:`。
 
 ### 2.7 内页开发检查清单
 
@@ -546,7 +546,7 @@ phone-sdk/src/
 ```json
 {
   "dependencies": {
-    "@ink-zenly/phone-sdk": "^0.4.7"
+    "@ink-zenly/phone-sdk": "^0.5.0"
   }
 }
 ```
@@ -606,6 +606,16 @@ export function registerMyMailPhoneApp(): void {
 
 独立扩展形态（`pack` 产物）须在 `@extension({ id })` 的 `onRegister` 里调用 `registerPhoneApp`，且 **`@extension.id` === `registerPhoneApp.id`**。完整步骤见 [§2](#2-内页应用完整开发流程)。
 
+从剧本或动作逻辑打开手机并深开内页（≥ 0.5.0）：
+
+```ts
+import { openPhoneApp } from "@ink-zenly/phone-sdk/plugin";
+
+await openPhoneApp({ appId: "chat", waitUntil: "close" });
+```
+
+`waitUntil: "close"` 会在玩家关手机后 resolve；`"none"` 则显示后立即返回。
+
 ### 5.5 从「写好代码」到「桌面能点开」
 
 仅 `registerPhoneApp` **不会**自动出现图标。还必须在**宿主**的作者设置中：
@@ -630,7 +640,7 @@ export function registerMyMailPhoneApp(): void {
 ## 6. 版本更新日志
 
 下列要点依据本仓库 `git` 历史与 npm 已发布版本整理。  
-**npm 已发布**的 phone-sdk：`0.3.0`、`0.3.1`、`0.4.0`、`0.4.6`、`0.4.7`；create-phone-app：`0.1.0`–`0.1.5`、`0.3.0`–`0.3.4`。  
+**npm 已发布**的 phone-sdk：`0.3.0`、`0.3.1`、`0.4.0`、`0.4.6`、`0.4.7`、`0.5.0`；create-phone-app：`0.1.0`–`0.1.5`、`0.3.0`–`0.3.4`。  
 中间仅出现在 git、未单独发到 npm 的版本号，会标注「仓库版本」。
 
 ### 6.1 本仓扩展（`extension.json`）
@@ -649,6 +659,7 @@ export function registerMyMailPhoneApp(): void {
 
 | 版本 | npm | 要点 |
 |------|-----|------|
+| **0.5.0** | ✅ | 导出 `openPhoneApp`：剧本/动作可打开手机并深开内页；`waitUntil: "close" \| "none"`；导航总线 `publishPhoneNavigate` / `subscribePhoneNavigate`。 |
 | **0.4.7** | ✅ | 设置「对方回复前将我方未读标为已读」（默认开）：下一条为对方消息时，点击先把已显示的我方 `unread` 改为 `read`，再点才追加对方消息；未读改已读不重播入场动画。 |
 | **0.4.6** | ✅ | 气泡名称改为气泡**上方加粗**（QQ 风）；字号/颜色表单预填与 `phone.css` 对齐；**自定义 CSS 新建不预填**（说明中保留占位示例）；文字/名称色支持 `rgba()`；发布包清理临时单测文件。 |
 | **0.4.4～0.4.5**（仓库） | ❌ 未单独发 npm | 聊天角色预设气泡样式（字号、文字/名称/对话框色、`customCss` 消毒与合并）；`show-message` 快照写入样式；组级头像/名称枚举定稿为「跟随预设 / 显示 / 隐藏」。内容合入 **0.4.6** 发布。 |

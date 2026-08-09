@@ -405,7 +405,7 @@ ink.zenly.ext-7a9373.open-phone
 
 ---
 
-写内页、CLI、phone-sdk 的说明和更细的版本表 → [`src/README.md`](src/README.md)
+写内页、CLI、phone-sdk 的说明和更细的版本表 → [`src/README.md`](src/README.md)（phone-sdk ≥ 0.5.0 可从剧本用 `openPhoneApp` 深开内页）
 
 ## 12. 更新日志
 
