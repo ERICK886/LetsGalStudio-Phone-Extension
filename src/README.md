@@ -4,7 +4,8 @@
 > 作者侧「如何使用手机」（挂载、设置、消息、Toast）见根目录 [README.md](../README.md)。  
 > 当前推荐：`@ink-zenly/phone-sdk@^0.4.7` ｜ `@ink-zenly/create-phone-app@0.3.4` ｜ Studio SDK `>=1.9.0`
 
-本目录 `src/` 是本仓宿主扩展的入口与内页应用（如 `demo-shop/`）。宿主实现在 `@ink-zenly/phone-sdk`，脚手架在 `cli/`。
+本目录 `src/` 是本仓宿主扩展的入口与内页应用（如 `demo-shop/`）。宿主实现在 `@ink-zenly/phone-sdk`，脚手架在 `cli/`。  
+独立 release 形态的聊天内页示例见旁路工程 [`../app-015abe`](../../app-015abe)（扩展包 id `app-015abe`，`phoneAppId=chat`）。
 
 ## 目录
 

@@ -6,7 +6,8 @@
 这是一个**游戏里的手机**：剧情里挂上之后，玩家可以打开桌面、点 APP、看聊天消息，还能收到简单的提示（Toast）。
 
 本文只讲**作者怎么在 Studio 里用这个扩展**。  
-若要自己写手机里的小应用（内页）、用脚手架，请看 [`src/README.md`](src/README.md)。
+若要自己写手机里的小应用（内页）、用脚手架，请看 [`src/README.md`](src/README.md)。  
+示例聊天内页（独立 release 扩展）见旁路工程 [`../app-015abe`](../app-015abe)（扩展包 id `app-015abe`），宿主 `phoneAppId` 填 `chat`。
 
 ## 目录
 
