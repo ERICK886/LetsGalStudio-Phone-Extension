@@ -1,6 +1,6 @@
-{
+﻿{
   "name": "ink.zenly.ext-7a9373",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -26,7 +26,8 @@
     "vite": "^5.3.1"
   },
   "dependencies": {
-    "@ink-zenly/create-phone-app": "0.3.4",
+    "@ink-zenly/create-phone-app": "0.3.5",
     "@ink-zenly/phone-sdk": "file:phone-sdk"
   }
 }
+
