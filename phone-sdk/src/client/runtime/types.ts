@@ -2,8 +2,8 @@
  * @file types.ts
  * @description Phone SDK 公共类型：应用注册描述、render props、安全区与宿主接口。
  * @author 池水三两升
- * @date 2026-08-01
- * @version 0.1.1
+ * @date 2026-08-09
+ * @version 0.5.0
  */
 
 import type { ReactNode } from "react";
@@ -65,6 +65,32 @@ export interface PhoneAppRegistration {
   title?: string;
   description?: string;
   render: (props: PhoneAppRenderProps) => ReactNode;
+}
+
+/** `openPhoneApp` 的等待策略：关闭应用后返回，或不等待。 */
+export type OpenPhoneAppWaitUntil = "close" | "none";
+
+/** 打开手机内页应用的选项。 */
+export interface OpenPhoneAppOptions {
+  /** 目标应用 id（Studio 程序 ID） */
+  appId: string;
+  /** 等待策略；默认 `"close"` */
+  waitUntil?: OpenPhoneAppWaitUntil;
+  /** 可选启动参数，透传给宿主 */
+  payload?: Record<string, unknown>;
+}
+
+/**
+ * 手机导航控制器（由宿主安装）。
+ * 插件侧通过 `openPhoneApp` 调用，不直接操作 DOM。
+ */
+export interface PhoneNavigationController {
+  /**
+   * 打开指定内页应用。
+   *
+   * @param options 目标应用与等待策略
+   */
+  openPhoneApp(options: OpenPhoneAppOptions): Promise<void>;
 }
 
 /**
@@ -130,4 +156,6 @@ export interface PhoneSdkGlobalSlot {
   pluginDevReregister?: () => void;
   /** 宿主最近一次发布的安全区；未发布时为 `undefined` */
   safeAreaInsets?: PhoneSafeAreaInsets;
+  /** 可选：宿主安装的导航控制器（`openPhoneApp` 等） */
+  navigation?: PhoneNavigationController;
 }

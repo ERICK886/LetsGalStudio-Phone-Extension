@@ -16,8 +16,11 @@
  */
 
 export type {
+  OpenPhoneAppOptions,
+  OpenPhoneAppWaitUntil,
   PhoneAppRegistration,
   PhoneAppRenderProps,
+  PhoneNavigationController,
   PhoneSafeAreaInsets,
   PhoneSdkGlobalSlot,
   PhoneSdkHost,
@@ -42,6 +45,7 @@ export {
   unregisterPhoneApp,
 } from "./runtime/register";
 export { getPhoneSdkHost, installPhoneSdkHost } from "./runtime/host";
+export { openPhoneApp } from "./runtime/open-phone-app";
 export {
   EMPTY_PHONE_SAFE_AREA,
   getPhoneSafeAreaInsets,
