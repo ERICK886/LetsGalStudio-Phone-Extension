@@ -18,6 +18,8 @@ import {
   type PlayerPhonePreferences,
 } from "../catalog";
 import { installPhoneExtensionSdkHost } from "../runtime/install-host";
+import { bindPhoneNavigationController } from "../runtime/phone-navigation";
+import { emitPhoneClosed } from "@ink-zenly/phone-sdk/plugin";
 import { PhoneUI } from "../ui/phone-ui";
 import { enqueueToast } from "../../toast/core/toast-runtime";
 import {
@@ -731,7 +733,7 @@ function bindPhoneRuntimeKeys(
   for (const candidate of candidates) phoneRuntimes.set(candidate.key, runtime);
 }
 
-function getPhoneRuntime(ctx: ExtensionContext): PhoneRuntime {
+export function getPhoneRuntime(ctx: ExtensionContext): PhoneRuntime {
   const candidates = collectPhoneRuntimeKeys(ctx);
   for (const candidate of candidates) {
     const existing = phoneRuntimes.get(candidate.key);
@@ -810,11 +812,29 @@ function publishStoryMessages(runtime: PhoneRuntime): void {
 }
 
 /** 启用一个 Preview 的手机能力；不自动打开 UI，也不改动任何存档数据。 */
-function activatePhoneRuntime(runtime: PhoneRuntime): void {
+export function activatePhoneRuntime(runtime: PhoneRuntime): void {
   if (runtime.phoneMounted) return;
   runtime.phoneMounted = true;
   runtime.phoneMountEpoch += 1;
   runtimeDebug(runtime, "phone-mounted", { epoch: runtime.phoneMountEpoch });
+}
+
+/**
+ * 隐藏当前 Preview 的手机 UI；未显示时为 no-op。
+ *
+ * @param ctx 手机扩展的 ExtensionContext
+ *
+ * @remarks
+ * `closePhone` 在 `this.close()` 之后调用本函数，确保 `phone` 容器被释放，
+ * 随后再 `emitPhoneClosed` 唤醒等待中的 `openPhoneApp` 调用方。
+ */
+export async function hidePhoneUi(ctx: ExtensionContext): Promise<void> {
+  if (!ctx.ui.isVisible("phone")) return;
+  try {
+    await ctx.ui.hide("phone");
+  } catch (error) {
+    console.error("[phone] 关闭手机 UI 失败", error);
+  }
 }
 
 /** 立即让当前 Preview 的手机入口失效，并清理其临时消息会话。 */
@@ -1990,6 +2010,8 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
   static onRegister(ctx: ExtensionContext): void {
     // 尽早安装 Phone SDK 宿主，便于第三方扩展在其后（或排队在其前）完成 registerPhoneApp。
     installPhoneExtensionSdkHost();
+    // 闭包住手机扩展的 ctx，供插件侧 openPhoneApp 委托 ui.show("phone")。
+    bindPhoneNavigationController(ctx);
 
     let registeredShortcut = normalizeOpenPhoneShortcut(
       ctx.settings.get<unknown>("openPhoneShortcut"),
@@ -2192,6 +2214,9 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
           runtime.activeStoryBackground = undefined;
           publishStoryMessages(runtime);
           this.close();
+          // 关闭动画已由 UI 播放完毕（closeWithAnimation）；此处释放 phone 容器，
+          // 再唤醒等待中的 openPhoneApp 调用方。hide 与 emit 串行，避免在 UI 仍可见时提前返回。
+          void hidePhoneUi(this.context).finally(() => emitPhoneClosed());
         },
         // 不依赖 ctx.ui.show() 的初始 data：首次 render 若尚未拿到消息快照，UI 也能订阅并回放当前会话。
         subscribeStoryMessages: (listener) =>
