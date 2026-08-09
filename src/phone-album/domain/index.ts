@@ -13,3 +13,10 @@ export {
   listVisibleAlbumIds,
   type AlbumCatalog,
 } from "./merge.js";
+export {
+  applyAddAlbum,
+  applyAddMedia,
+  applyRemoveAlbum,
+  applyRemoveMedia,
+  applySetMediaAlbums,
+} from "./mutations.js";
