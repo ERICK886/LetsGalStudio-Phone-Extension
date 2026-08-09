@@ -4,7 +4,7 @@
 > 作者侧「如何使用手机」（挂载、设置、消息、Toast）见根目录 [README.md](../README.md)。  
 > 当前推荐：`@ink-zenly/phone-sdk@^0.4.7` ｜ `@ink-zenly/create-phone-app@0.3.4` ｜ Studio SDK `>=1.9.0`
 
-本目录 `src/` 是本仓宿主扩展的入口与内页应用（如 `demo-shop/`）。宿主实现在 `@ink-zenly/phone-sdk`，脚手架在 `cli/`。  
+本目录 `src/` 是本仓宿主扩展的入口与内页应用（如 `demo-shop/`、`phone-album/`）。宿主实现在 `@ink-zenly/phone-sdk`，脚手架在 `cli/`。  
 独立 release 形态的聊天内页示例见旁路工程 [`../app-015abe`](../../app-015abe)（扩展包 id `app-015abe`，`phoneAppId=chat`）。
 
 ## 目录
@@ -66,7 +66,7 @@ vite.config.ts                 # 构建；注入 __PHONE_HOST_EXTENSION_ID__
 src/
 ├─ index.tsx                   # 扩展入口：导出 Phone/Toast，bootstrap 内页清单
 ├─ vite-env.d.ts
-└─ <app-id>/                   # 内页应用（如 demo-shop/）：registerPhoneApp + UI
+└─ <app-id>/                   # 内页应用（如 demo-shop/、phone-album/）：registerPhoneApp + UI
 phone-sdk/                     # 发布包 @ink-zenly/phone-sdk（0.4.0+）
 ├─ src/index.ts                # main：宿主 PhoneExtension / ToastExtension
 ├─ src/client/                 # → @ink-zenly/phone-sdk/plugin（内页 API）
@@ -699,3 +699,19 @@ export function registerMyMailPhoneApp(): void {
 npm view @ink-zenly/phone-sdk version --registry https://registry.npmjs.org/
 npm view @ink-zenly/create-phone-app version --registry https://registry.npmjs.org/
 ```
+
+## 7. 内页应用：phone-album（相册）
+
+本仓内置相册内页；程序 ID 与作者设置 **`phoneAppId`** 均为 **`phone-album`**。Studio 扩展模块 id 同为 `phone-album`，显示名「**手机相册**」。
+
+### 作者怎么用
+
+1. **桌面 APP**：按 [§2.3 步骤 4](#步骤-4作者设置动作--桌面-app必做) 配置「动作 · 手机内部应用」与「手机应用目录」，`phoneAppId` 填 `phone-album`。
+2. **默认相册 / 媒体**：在扩展设置「手机相册」中配置「默认相册」「默认媒体」及文案（应用标题、「全部」显示名、空相册提示）。媒体的「所属相册 ID」为逗号分隔，可属多个相册。
+3. **剧情 Fragment 方法**：在模块「手机相册」上调用（快进 / skip 与正常执行一致，均写入存档）：
+   - `add-album` — 新增或覆盖相册
+   - `remove-album` — 隐藏相册
+   - `add-media` — 新增或覆盖媒体
+   - `remove-media` — 隐藏媒体
+   - `set-media-albums` — 替换媒体所属相册
+4. **玩家侧只读**：打开内页仅浏览相册与媒体，不能上传、删除或编辑。
