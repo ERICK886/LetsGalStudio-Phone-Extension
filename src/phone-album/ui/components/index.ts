@@ -12,5 +12,12 @@ export { EmptyHint } from "./EmptyHint";
 export type { EmptyHintProps } from "./EmptyHint";
 export { AlbumCard } from "./AlbumCard";
 export type { AlbumCardProps } from "./AlbumCard";
-export { MediaThumb, resolveMediaUrl } from "./MediaThumb";
+export { MediaThumb, resolveMediaUrl, formatDuration } from "./MediaThumb";
 export type { MediaThumbProps } from "./MediaThumb";
+export { VideoPlayer } from "./VideoPlayer";
+export type { VideoPlayerProps } from "./VideoPlayer";
+export { PageTransition } from "./PageTransition";
+export type {
+  PageTransitionProps,
+  PageTransitionDirection,
+} from "./PageTransition";

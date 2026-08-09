@@ -3,7 +3,7 @@
  * @description 手机 UI 主状态编排（桌面 / 编辑器 / 消息 / 内页）。
  * @author 池水三两升
  * @date 2026-08-01
- * @version 0.5.0
+ * @version 0.5.1
  */
 
 import React, {
@@ -54,6 +54,7 @@ import {
   EMPTY_PHONE_SAFE_AREA,
   diagnosePhoneAppLookup,
   clearPhoneNavigatePending,
+  getPhoneSdkSlot,
   phoneSdkDebug,
   phoneSdkDiag,
   phoneSdkDiagWarn,
@@ -898,6 +899,21 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
     });
     return closePromise.current;
   }, [closePhone]);
+
+  /**
+   * 把带动画的关闭回调挂到全局槽位，供插件侧 `closePhoneApp` 调用。
+   * 卸载时清除，避免指向已卸载组件。
+   */
+  useEffect(() => {
+    const slot = getPhoneSdkSlot();
+    const request = (): Promise<void> => closeWithAnimation();
+    slot.requestAnimatedClosePhone = request;
+    return () => {
+      if (slot.requestAnimatedClosePhone === request) {
+        delete slot.requestAnimatedClosePhone;
+      }
+    };
+  }, [closeWithAnimation]);
 
   /**
    * 根据桌面图标位置计算内页开合动画的 transform-origin（相对屏幕百分比）。

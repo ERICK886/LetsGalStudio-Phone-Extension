@@ -1,14 +1,13 @@
 /**
  * @file ViewerScreen.tsx
- * @description 查看器：图片全屏 + 左右按钮/滑动；视频播放器；素材失败占位。
+ * @description 查看器：图片全屏滑动；视频手机风播放器。
  * @author 池水三两升
  * @date 2026-08-09
- * @version 0.1.0
+ * @version 0.2.0
  *
  * @remarks
- * - 仅图片支持左右滑动切页；视频页显示 `<video controls>`，不参与滑动。
+ * - 仅图片支持左右滑动切页；视频页使用自定义控件，不参与滑动。
  * - 同列表相邻 mediaId 切换；到边界时禁用对应按钮。
- * - 素材加载失败显示占位块，仍可继续左右切换。
  */
 
 import { useExtensionContext } from "@avg-studio/sdk";
@@ -17,7 +16,11 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { ALL_ALBUM_ID } from "../../constants";
 import type { AlbumCatalog } from "../../domain/index";
 import type { AlbumAuthorSettings, MediaView } from "../../types";
-import { AppHeader, resolveMediaUrl } from "../components/index";
+import {
+  AppHeader,
+  resolveMediaUrl,
+  VideoPlayer,
+} from "../components/index";
 
 export interface ViewerScreenProps {
   /** 当前相册 id（可为 ALL_ALBUM_ID） */
@@ -60,7 +63,6 @@ export function ViewerScreen(props: ViewerScreenProps) {
   const stageRef = useRef<HTMLDivElement>(null);
   const touchStartX = useRef<number | null>(null);
 
-  // 切换媒体时重置失败标记
   useEffect(() => {
     setFailed(false);
   }, [mediaId, albumId]);
@@ -68,6 +70,11 @@ export function ViewerScreen(props: ViewerScreenProps) {
   const url = useMemo(() => {
     if (!current) return undefined;
     return resolveMediaUrl(ctx, current.asset);
+  }, [ctx, current]);
+
+  const posterUrl = useMemo(() => {
+    if (!current?.posterAsset) return undefined;
+    return resolveMediaUrl(ctx, current.posterAsset);
   }, [ctx, current]);
 
   const goPrev = () => {
@@ -115,10 +122,9 @@ export function ViewerScreen(props: ViewerScreenProps) {
             </div>
           ) : current.type === "video" ? (
             url && !failed ? (
-              <video
+              <VideoPlayer
                 src={url}
-                controls
-                autoPlay
+                poster={posterUrl}
                 onError={() => setFailed(true)}
               />
             ) : (

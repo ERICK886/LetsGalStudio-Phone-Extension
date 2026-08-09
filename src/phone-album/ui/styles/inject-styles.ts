@@ -24,10 +24,95 @@ const CSS_TEXT = `
   color: #f5f5f5;
   font-family: "PingFang SC", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
+  overflow: hidden;
 }
 .pa-root *,
 .pa-root *::before,
 .pa-root *::after { box-sizing: border-box; }
+
+/* 页面过渡舞台 */
+.pa-stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+.pa-page {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: #0f1419;
+  will-change: transform, opacity;
+}
+.pa-page-steady {
+  position: absolute;
+  inset: 0;
+}
+.pa-page-enter-forward {
+  z-index: 2;
+  animation: pa-slide-in-right 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.pa-page-exit-forward {
+  z-index: 1;
+  animation: pa-slide-out-left 280ms cubic-bezier(0.4, 0, 0.2, 1) both;
+  pointer-events: none;
+}
+.pa-page-enter-back {
+  z-index: 1;
+  animation: pa-slide-in-left 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.pa-page-exit-back {
+  z-index: 2;
+  animation: pa-slide-out-right 280ms cubic-bezier(0.4, 0, 0.2, 1) both;
+  pointer-events: none;
+}
+.pa-page-enter-crossfade {
+  z-index: 2;
+  animation: pa-fade-in 220ms ease both;
+}
+.pa-page-exit-crossfade {
+  z-index: 1;
+  animation: pa-fade-out 220ms ease both;
+  pointer-events: none;
+}
+
+@keyframes pa-slide-in-right {
+  from { transform: translateX(28%); opacity: 0.35; }
+  to { transform: translateX(0); opacity: 1; }
+}
+@keyframes pa-slide-out-left {
+  from { transform: translateX(0); opacity: 1; }
+  to { transform: translateX(-12%); opacity: 0.2; }
+}
+@keyframes pa-slide-in-left {
+  from { transform: translateX(-18%); opacity: 0.35; }
+  to { transform: translateX(0); opacity: 1; }
+}
+@keyframes pa-slide-out-right {
+  from { transform: translateX(0); opacity: 1; }
+  to { transform: translateX(28%); opacity: 0.15; }
+}
+@keyframes pa-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes pa-fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pa-page-enter-forward,
+  .pa-page-exit-forward,
+  .pa-page-enter-back,
+  .pa-page-exit-back,
+  .pa-page-enter-crossfade,
+  .pa-page-exit-crossfade {
+    animation-duration: 1ms !important;
+  }
+}
 
 .pa-header {
   flex: 0 0 auto;
@@ -169,6 +254,20 @@ const CSS_TEXT = `
   font-size: 12px;
   background: #1c232f;
 }
+.pa-tile .pa-tile-fallback-video {
+  background: linear-gradient(160deg, #1a2330, #121820);
+}
+.pa-tile .pa-tile-fallback-play {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 12px;
+  padding-left: 2px;
+}
 .pa-tile-badge {
   position: absolute;
   left: 4px;
@@ -226,6 +325,74 @@ const CSS_TEXT = `
   max-width: 100%;
   max-height: 100%;
 }
+
+/* 手机风视频播放器 */
+.pa-video-player {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  background: #000;
+  cursor: pointer;
+}
+.pa-video-player > video {
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  background: #000;
+}
+.pa-vctrl {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.72));
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease;
+}
+.pa-video-player.is-controls .pa-vctrl {
+  opacity: 1;
+  pointer-events: auto;
+}
+.pa-vctrl-play,
+.pa-vctrl-mute {
+  flex: 0 0 auto;
+  border: none;
+  border-radius: 8px;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
+}
+.pa-vctrl-seek {
+  flex: 1 1 auto;
+  min-width: 0;
+  accent-color: #7ec8ff;
+}
+.pa-vctrl-time {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.85);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.pa-album-thumb video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
 .pa-viewer-fallback {
   display: grid;
   place-items: center;

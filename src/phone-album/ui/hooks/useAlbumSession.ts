@@ -3,13 +3,14 @@
  * @description 订阅 album bus / store，提供相册目录快照与导航。
  * @author 池水三两升
  * @date 2026-08-09
- * @version 0.1.0
+ * @version 0.2.0
  *
  * @remarks
  * - 挂载时若 save 未 bind，仍可用空存档 + 缓存设置渲染默认种子。
  * - 每次 bus emit 用 `buildAlbumCatalog(getCachedAuthorSettings(), getAlbumSaveState())`
  *   重新计算 `{ settings, catalog }`。
  * - 导航状态由本 hook 管理：home → grid → viewer；返回路径 viewer→grid→home→closeApp。
+ * - `transitionDirection` 与 `nav` 同状态更新，供 PageTransition 同步使用。
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -22,12 +23,18 @@ import {
   getAlbumSaveState,
   subscribeAlbumStore,
 } from "../../runtime/index";
+import type { PageTransitionDirection } from "../components/PageTransition";
 
 /** 三层屏幕导航状态。 */
 export type AlbumNav =
   | { screen: "home" }
   | { screen: "grid"; albumId: string }
   | { screen: "viewer"; albumId: string; mediaId: string };
+
+interface NavBundle {
+  nav: AlbumNav;
+  transitionDirection: PageTransitionDirection;
+}
 
 /** useAlbumSession 返回结构。 */
 export interface AlbumSession {
@@ -37,6 +44,8 @@ export interface AlbumSession {
   catalog: AlbumCatalog;
   /** 当前导航状态 */
   nav: AlbumNav;
+  /** 最近一次导航的过渡方向 */
+  transitionDirection: PageTransitionDirection;
   /** 进入某相册网格 */
   openGrid: (albumId: string) => void;
   /** 进入查看器 */
@@ -60,7 +69,10 @@ export interface AlbumSession {
  */
 export function useAlbumSession(onExitHome: () => void): AlbumSession {
   const [tick, setTick] = useState(0);
-  const [nav, setNav] = useState<AlbumNav>({ screen: "home" });
+  const [bundle, setBundle] = useState<NavBundle>({
+    nav: { screen: "home" },
+    transitionDirection: "forward",
+  });
 
   const refresh = useCallback(() => {
     setTick((value) => value + 1);
@@ -77,27 +89,38 @@ export function useAlbumSession(onExitHome: () => void): AlbumSession {
     const save = getAlbumSaveState();
     const catalog = buildAlbumCatalog(settings, save);
     return { settings, catalog };
-    // tick 触发重算；catalog 与 nav 无关，故不依赖 nav
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tick]);
 
   const openGrid = useCallback((albumId: string) => {
-    setNav({ screen: "grid", albumId });
+    setBundle({
+      nav: { screen: "grid", albumId },
+      transitionDirection: "forward",
+    });
   }, []);
 
   const openViewer = useCallback((albumId: string, mediaId: string) => {
-    setNav({ screen: "viewer", albumId, mediaId });
+    setBundle((prev) => ({
+      nav: { screen: "viewer", albumId, mediaId },
+      transitionDirection:
+        prev.nav.screen === "viewer" ? "crossfade" : "forward",
+    }));
   }, []);
 
   const goBack = useCallback(() => {
-    setNav((prev) => {
-      if (prev.screen === "viewer") {
-        return { screen: "grid", albumId: prev.albumId };
+    setBundle((prev) => {
+      if (prev.nav.screen === "viewer") {
+        return {
+          nav: { screen: "grid", albumId: prev.nav.albumId },
+          transitionDirection: "back",
+        };
       }
-      if (prev.screen === "grid") {
-        return { screen: "home" };
+      if (prev.nav.screen === "grid") {
+        return {
+          nav: { screen: "home" },
+          transitionDirection: "back",
+        };
       }
-      // home：交由调用方决定（通常 closeApp）
       onExitHome();
       return prev;
     });
@@ -106,7 +129,8 @@ export function useAlbumSession(onExitHome: () => void): AlbumSession {
   return {
     settings: snapshot.settings,
     catalog: snapshot.catalog,
-    nav,
+    nav: bundle.nav,
+    transitionDirection: bundle.transitionDirection,
     openGrid,
     openViewer,
     goBack,

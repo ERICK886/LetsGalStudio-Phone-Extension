@@ -25,6 +25,7 @@ describe("openPhoneApp", () => {
       async openPhoneApp(options) {
         calls.push(options);
       },
+      async closePhoneApp() {},
     };
     await openPhoneApp({ appId: "chat", waitUntil: "none" });
     assert.deepEqual(calls, [{ appId: "chat", waitUntil: "none" }]);

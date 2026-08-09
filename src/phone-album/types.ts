@@ -3,7 +3,7 @@
  * @description 手机相册设置、存档与视图模型类型。
  * @author 池水三两升
  * @date 2026-08-09
- * @version 0.1.0
+ * @version 0.2.0
  */
 
 /** 媒体类型。 */
@@ -16,6 +16,8 @@ export interface AlbumMedia {
   asset: string;
   createdAt: number;
   durationSec?: number;
+  /** 视频封面图（可选）；网格优先使用。 */
+  posterAsset?: string;
 }
 
 /** 相册元数据（动态相册或覆盖默认相册显示名/封面）。 */
@@ -56,6 +58,8 @@ export interface DefaultMediaSeed {
   asset: string;
   albumIds: string[];
   durationSec?: number;
+  /** 视频封面图（可选）。 */
+  posterAsset?: string;
 }
 
 /** 作者设置快照。 */
@@ -82,4 +86,6 @@ export interface MediaView {
   type: MediaType;
   asset: string;
   durationSec?: number;
+  /** 视频封面图（可选）。 */
+  posterAsset?: string;
 }

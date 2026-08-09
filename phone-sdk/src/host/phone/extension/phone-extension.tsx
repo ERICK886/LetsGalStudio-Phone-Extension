@@ -161,7 +161,12 @@ export type PhoneMessageStatus =
   | "unread"
   | "read"
   | "failed"
-  | "blocked";
+  | "blocked"
+  | "recalled";
+
+/** 撤回展示阶段：pending 气泡 → recalling 消失动画 → done 系统行。 */
+export type PhoneMessageRecallPhase = "pending" | "recalling" | "done";
+
 export type ChatRoleAvatarSource =
   | "first-portrait"
   | "character-avatar"
@@ -180,6 +185,12 @@ const OUTGOING_MESSAGE_STATUSES = [
   "blocked",
 ] as const;
 const DEFAULT_BLOCKED_HINT = "您的消息已发送，但被对方拒收";
+/** 撤回系统行后缀默认文案（前缀角色名由 UI 拼接）。 */
+const DEFAULT_RECALL_TEXT = "撤回了一条消息";
+/** 作者未填或非法时的撤回延迟（毫秒）。 */
+const DEFAULT_RECALL_DELAY_MS = 3000;
+/** 气泡消失动画时长（毫秒）。 */
+const RECALL_EXIT_MS = 240;
 
 /**
  * 聊天角色预设（settings 归一化后的内部结构）。
@@ -539,15 +550,47 @@ function normalizeChatRolePresets(
   return presets;
 }
 
+/**
+ * 规范化消息状态。
+ *
+ * @remarks
+ * - `recalled` 对 incoming / outgoing 均合法（不被 incoming→read 覆盖）。
+ * - 其余对方消息固定 `read`；我方非法/缺省为 `read`。
+ */
 function normalizeMessageStatus(
   value: unknown,
   direction: PhoneMessageDirection,
 ): PhoneMessageStatus {
+  if (value === "recalled") return "recalled";
   // 对方消息固定已读；我方消息未指定或非法时也默认显示已读。
   if (direction === "incoming") return "read";
   return (OUTGOING_MESSAGE_STATUSES as readonly unknown[]).includes(value)
     ? (value as PhoneMessageStatus)
     : "read";
+}
+
+/**
+ * 规范化撤回延迟毫秒数。
+ *
+ * @param value - 原始参数；缺省或非法时回退默认 3000
+ * @returns 夹在 `0…60000` 的整数毫秒
+ */
+function normalizeRecallDelayMs(value: unknown): number {
+  if (value === undefined || value === null || value === "") {
+    return DEFAULT_RECALL_DELAY_MS;
+  }
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n) || n < 0) return DEFAULT_RECALL_DELAY_MS;
+  return Math.min(60_000, Math.floor(n));
+}
+
+/**
+ * 规范化撤回后缀文案。
+ *
+ * @param value - 原始参数；空则回退默认后缀
+ */
+function normalizeRecallText(value: unknown): string {
+  return nonEmptyString(value, 240) ?? DEFAULT_RECALL_TEXT;
 }
 
 function normalizeStoryPopupPosition(value: unknown): PhonePopupPosition {
@@ -572,6 +615,15 @@ export interface PhoneStoryMessage {
   status: PhoneMessageStatus;
   /** 仅在 `status === "blocked"` 时显示。 */
   blockedHint?: string;
+  /** 撤回延迟（毫秒）；仅 `status === "recalled"` 时有值。 */
+  recallDelayMs?: number;
+  /** 撤回系统行后缀；仅 `status === "recalled"` 时有值。 */
+  recallText?: string;
+  /**
+   * 撤回展示阶段；仅 `status === "recalled"` 时有值。
+   * `pending` 显示气泡，`recalling` 播消失动画，`done` 仅系统行。
+   */
+  recallPhase?: PhoneMessageRecallPhase;
   /** 最终是否渲染头像（已合并方法覆盖）。 */
   showAvatar: boolean;
   /** 最终是否渲染名称（已合并方法覆盖）。 */
@@ -665,6 +717,11 @@ interface PhoneRuntime {
   opening: boolean;
   toastSequence: number;
   toastTimer: number | undefined;
+  /**
+   * 撤回计时器：key = `activeStoryMessages` 下标，value = setTimeout 句柄。
+   * 延迟阶段与消失动画阶段共用同一 key（后写覆盖前写）。
+   */
+  recallTimers: Map<number, ReturnType<typeof globalThis.setTimeout>>;
 }
 
 /**
@@ -759,6 +816,7 @@ export function getPhoneRuntime(ctx: ExtensionContext): PhoneRuntime {
     opening: false,
     toastSequence: 0,
     toastTimer: undefined,
+    recallTimers: new Map(),
   };
   bindPhoneRuntimeKeys(runtime, candidates);
   phoneDebug("runtime-created", {
@@ -811,6 +869,132 @@ function publishStoryMessages(runtime: PhoneRuntime): void {
   }
 }
 
+/**
+ * 清除当前 Preview 上全部撤回计时器。
+ *
+ * @param runtime - 手机运行时
+ */
+function clearStoryRecallTimers(runtime: PhoneRuntime): void {
+  for (const timer of runtime.recallTimers.values()) {
+    globalThis.clearTimeout(timer);
+  }
+  runtime.recallTimers.clear();
+}
+
+/**
+ * 清除指定下标的撤回计时器。
+ *
+ * @param runtime - 手机运行时
+ * @param index - `activeStoryMessages` 下标
+ */
+function clearStoryRecallTimerAt(runtime: PhoneRuntime, index: number): void {
+  const timer = runtime.recallTimers.get(index);
+  if (timer === undefined) return;
+  globalThis.clearTimeout(timer);
+  runtime.recallTimers.delete(index);
+}
+
+/**
+ * 将仍在撤回流程中的消息立刻置为 `done`，并取消计时器。
+ *
+ * @param runtime - 手机运行时
+ * @returns 是否有消息被改写（调用方据此决定是否 publish）
+ */
+function finalizePendingRecalls(runtime: PhoneRuntime): boolean {
+  clearStoryRecallTimers(runtime);
+  let changed = false;
+  runtime.activeStoryMessages = runtime.activeStoryMessages.map((message) => {
+    if (message.status === "recalled" && message.recallPhase !== "done") {
+      changed = true;
+      return { ...message, recallPhase: "done" as const };
+    }
+    return message;
+  });
+  return changed;
+}
+
+/**
+ * 为指定下标的撤回消息安排：延迟 → recalling → done。
+ *
+ * @param runtime - 手机运行时
+ * @param index - `activeStoryMessages` 下标
+ */
+function scheduleStoryMessageRecall(
+  runtime: PhoneRuntime,
+  index: number,
+): void {
+  const message = runtime.activeStoryMessages[index];
+  if (
+    !message ||
+    message.status !== "recalled" ||
+    message.recallPhase !== "pending"
+  ) {
+    return;
+  }
+
+  clearStoryRecallTimerAt(runtime, index);
+
+  const delayMs = message.recallDelayMs ?? DEFAULT_RECALL_DELAY_MS;
+  const reduceMotion =
+    typeof globalThis.matchMedia === "function" &&
+    globalThis.matchMedia("(prefers-reduced-motion: reduce)").matches === true;
+  const exitMs = reduceMotion ? 0 : RECALL_EXIT_MS;
+
+  const beginExit = () => {
+    runtime.recallTimers.delete(index);
+    const current = runtime.activeStoryMessages[index];
+    if (
+      !current ||
+      current.status !== "recalled" ||
+      current.recallPhase !== "pending"
+    ) {
+      return;
+    }
+
+    runtime.activeStoryMessages = runtime.activeStoryMessages.map((item, i) =>
+      i === index ? { ...item, recallPhase: "recalling" as const } : item,
+    );
+    publishStoryMessages(runtime);
+
+    const exitTimer = globalThis.setTimeout(() => {
+      runtime.recallTimers.delete(index);
+      const latest = runtime.activeStoryMessages[index];
+      if (!latest || latest.status !== "recalled") return;
+      runtime.activeStoryMessages = runtime.activeStoryMessages.map(
+        (item, i) =>
+          i === index ? { ...item, recallPhase: "done" as const } : item,
+      );
+      publishStoryMessages(runtime);
+    }, exitMs);
+    runtime.recallTimers.set(index, exitTimer);
+  };
+
+  if (delayMs <= 0) {
+    beginExit();
+    return;
+  }
+
+  const delayTimer = globalThis.setTimeout(beginExit, delayMs);
+  runtime.recallTimers.set(index, delayTimer);
+}
+
+/**
+ * 为当前可见列表中所有 `pending` 撤回消息补挂计时器（已有 timer 的下标跳过）。
+ *
+ * @param runtime - 手机运行时
+ */
+function schedulePendingRecalls(runtime: PhoneRuntime): void {
+  runtime.activeStoryMessages.forEach((message, index) => {
+    if (
+      message.status === "recalled" &&
+      message.recallPhase === "pending" &&
+      !runtime.recallTimers.has(index)
+    ) {
+      scheduleStoryMessageRecall(runtime, index);
+    }
+  });
+}
+
 /** 启用一个 Preview 的手机能力；不自动打开 UI，也不改动任何存档数据。 */
 export function activatePhoneRuntime(runtime: PhoneRuntime): void {
   if (runtime.phoneMounted) return;
@@ -850,6 +1034,7 @@ async function deactivatePhoneRuntime(
     globalThis.clearTimeout(runtime.toastTimer);
     runtime.toastTimer = undefined;
   }
+  clearStoryRecallTimers(runtime);
   try {
     await ctx.ui.hide("phone-toast");
   } catch (error) {
@@ -1005,6 +1190,15 @@ function advanceStoryMessage(
     return false;
   }
 
+  // 推进前：未完成的撤回立刻变成系统行，再继续本轮逻辑。
+  if (finalizePendingRecalls(runtime)) {
+    runtimeDebug(runtime, "advance-finalize-recalls", {
+      sequenceId: sequence.debugId,
+      visibleMessageCount: runtime.activeStoryMessages.length,
+    });
+    publishStoryMessages(runtime);
+  }
+
   runtimeDebug(runtime, "advance-received", {
     sequenceId: sequence.debugId,
     nextIndex: sequence.nextIndex,
@@ -1055,6 +1249,7 @@ function advanceStoryMessage(
       visibleMessageCount: runtime.activeStoryMessages.length,
     });
     publishStoryMessages(runtime);
+    schedulePendingRecalls(runtime);
     return "appended";
   }
 
@@ -1131,6 +1326,7 @@ async function showStoryMessages(
       });
       runtime.pendingStorySequence = undefined;
       runtime.storyMessageSessionVisible = false;
+      clearStoryRecallTimers(runtime);
       runtime.activeStoryMessages = [];
       runtime.activeStoryPopupPosition = "bottom-right";
       runtime.activeStoryBackground = undefined;
@@ -1207,6 +1403,7 @@ async function showStoryMessages(
     messages,
   });
   publishStoryMessages(runtime);
+  schedulePendingRecalls(runtime);
 
   try {
     if (shouldCreateStoryUi) {
@@ -1329,6 +1526,16 @@ function collectStoryMessages(
         ? (nonEmptyString(params[`blockedHint${suffix}`], 240) ??
           DEFAULT_BLOCKED_HINT)
         : undefined;
+    const recallFields =
+      status === "recalled"
+        ? {
+            recallDelayMs: normalizeRecallDelayMs(
+              params[`recallDelayMs${suffix}`],
+            ),
+            recallText: normalizeRecallText(params[`recallText${suffix}`]),
+            recallPhase: "pending" as const,
+          }
+        : {};
     /**
      * 方法组级三态优先于预设：
      * - inherit / 缺失 → 该条跟随自身预设
@@ -1363,6 +1570,7 @@ function collectStoryMessages(
       direction,
       status,
       ...(blockedHint ? { blockedHint } : {}),
+      ...recallFields,
       showAvatar,
       showName,
       ...bubbleStyle,
@@ -1391,6 +1599,7 @@ function createStoryMessageSchema() {
     { label: "已读", value: "read" },
     { label: "发送失败（仅我方）", value: "failed" },
     { label: "被拉黑（仅我方）", value: "blocked" },
+    { label: "撤回（双方）", value: "recalled" },
   ] as const;
 
   return {
@@ -1499,6 +1708,26 @@ function createStoryMessageSchema() {
             {
               type: "string",
               label: `第 ${index} 条 · 被拉黑提示文本`,
+              multiline: true,
+            } as const,
+          ],
+          [
+            `recallDelayMs${suffix}`,
+            {
+              type: "number",
+              label: `第 ${index} 条 · 撤回延迟（毫秒）`,
+              default: DEFAULT_RECALL_DELAY_MS,
+              min: 0,
+              max: 60_000,
+              step: 100,
+            } as const,
+          ],
+          [
+            `recallText${suffix}`,
+            {
+              type: "string",
+              label: `第 ${index} 条 · 撤回后缀文案`,
+              default: DEFAULT_RECALL_TEXT,
               multiline: true,
             } as const,
           ],
@@ -2153,6 +2382,20 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
               ? (nonEmptyString(inputMessage.blockedHint, 240) ??
                 DEFAULT_BLOCKED_HINT)
               : undefined;
+          const recallPhase = inputMessage.recallPhase;
+          const recallFields =
+            status === "recalled"
+              ? {
+                  recallDelayMs: normalizeRecallDelayMs(
+                    inputMessage.recallDelayMs,
+                  ),
+                  recallText: normalizeRecallText(inputMessage.recallText),
+                  recallPhase:
+                    recallPhase === "recalling" || recallPhase === "done"
+                      ? recallPhase
+                      : ("pending" as const),
+                }
+              : {};
 
           /**
            * 宿主/快照透传样式：再走一遍消毒，非法字段静默丢弃。
@@ -2181,6 +2424,7 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
               direction,
               status,
               ...(blockedHint ? { blockedHint } : {}),
+              ...recallFields,
               // 宿主已带最终布尔则透传；缺失或非 false 时默认显示。
               showAvatar: inputMessage.showAvatar !== false,
               showName: inputMessage.showName !== false,
@@ -2209,6 +2453,7 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
         closePhone: () => {
           finishStoryMessageSequence(runtime, "ui-close");
           runtime.storyMessageSessionVisible = false;
+          clearStoryRecallTimers(runtime);
           runtime.activeStoryMessages = [];
           runtime.activeStoryPopupPosition = "bottom-right";
           runtime.activeStoryBackground = undefined;

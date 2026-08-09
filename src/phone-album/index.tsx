@@ -106,16 +106,37 @@ function executeAddMediaMethod(
   prepareRuntime(instanceSave, ctx);
   const type = parseMediaType(params.type) ?? "image";
   const durationSec =
-    typeof params.durationSec === "number" && Number.isFinite(params.durationSec)
+    typeof params.durationSec === "number" &&
+    Number.isFinite(params.durationSec) &&
+    params.durationSec > 0
       ? params.durationSec
       : undefined;
+  const asset = coerceMethodAsset(params.asset);
+  const posterRaw = coerceMethodAsset(params.posterAsset);
   executeAddMedia({
     mediaId: String(params.mediaId ?? ""),
     type,
-    asset: String(params.asset ?? ""),
+    asset,
     albumIds: parseCommaIds(params.albumIds),
     durationSec,
+    ...(posterRaw ? { posterAsset: posterRaw } : {}),
   });
+}
+
+/**
+ * 方法参数中的 asset 可能是字符串或 `{ url }` / `{ uri }`。
+ *
+ * @param value - 原始方法参数
+ * @returns URI 字符串
+ */
+function coerceMethodAsset(value: unknown): string {
+  if (typeof value === "string") return value.trim();
+  if (value && typeof value === "object") {
+    const raw = value as { url?: unknown; uri?: unknown };
+    if (typeof raw.url === "string" && raw.url.trim()) return raw.url.trim();
+    if (typeof raw.uri === "string" && raw.uri.trim()) return raw.uri.trim();
+  }
+  return String(value ?? "").trim();
 }
 
 /**
@@ -192,6 +213,10 @@ export class PhoneAlbumExtension extends Extension {
           .default("")
           .describe("逗号分隔，可属多个相册"),
         durationSec: item.number("视频时长秒（可选）").default(0),
+        posterAsset: item
+          .asset("视频封面图（可选）")
+          .accepts("image")
+          .describe("网格缩略优先用此图；未填则尝试抽视频首帧"),
       }))
       .maxItems(200)
       .addLabel("添加默认媒体"),
@@ -357,6 +382,11 @@ export class PhoneAlbumExtension extends Extension {
       mediaId: { type: "string", label: "媒体 ID", required: true },
       type: { type: "string", label: "类型 image|video", default: "image" },
       asset: { type: "asset", label: "素材", assetType: "any", required: true },
+      posterAsset: {
+        type: "asset",
+        label: "视频封面图（可选）",
+        assetType: "image",
+      },
       albumIds: {
         type: "string",
         label: "所属相册 ID（逗号分隔）",

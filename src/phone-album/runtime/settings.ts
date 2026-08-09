@@ -34,16 +34,28 @@ function nonEmpty(value: unknown, fallback: string, max = 40): string {
   return trimmed ? trimmed.slice(0, max) : fallback;
 }
 
-/** 解析默认相册设置行：`id` / `name` 必填；`coverAsset` 取 `asset` 字段，空则省略。 */
+/** 解析默认相册设置行：`id` / `name` 必填；`coverAsset` 空则省略。 */
 function parseDefaultAlbum(row: unknown): DefaultAlbumSeed | null {
   if (!row || typeof row !== "object") return null;
-  const raw = row as { id?: unknown; name?: unknown; asset?: unknown };
+  const raw = row as {
+    id?: unknown;
+    name?: unknown;
+    coverAsset?: unknown;
+    asset?: unknown;
+  };
   const id = nonEmpty(raw.id, "");
   if (id === "") return null;
   const name = nonEmpty(raw.name, id);
-  const asset = typeof raw.asset === "string" ? raw.asset.trim() : "";
+  // 兼容旧字段名 asset
+  const coverRaw =
+    typeof raw.coverAsset === "string"
+      ? raw.coverAsset
+      : typeof raw.asset === "string"
+        ? raw.asset
+        : "";
+  const coverAsset = coverRaw.trim();
   const seed: DefaultAlbumSeed = { id, name };
-  if (asset !== "") seed.coverAsset = asset;
+  if (coverAsset !== "") seed.coverAsset = coverAsset;
   return seed;
 }
 
@@ -56,19 +68,42 @@ function parseDefaultMedia(row: unknown): DefaultMediaSeed | null {
     asset?: unknown;
     albumIds?: unknown;
     durationSec?: unknown;
+    posterAsset?: unknown;
   };
   const id = nonEmpty(raw.id, "");
   if (id === "") return null;
   const type = parseMediaType(raw.type) as MediaType | null;
   if (type === null) return null;
-  const asset = typeof raw.asset === "string" ? raw.asset.trim() : "";
+  const asset = coerceSettingsAsset(raw.asset);
   if (asset === "") return null;
   const albumIds = parseCommaIds(raw.albumIds);
   const seed: DefaultMediaSeed = { id, type, asset, albumIds };
-  if (typeof raw.durationSec === "number" && Number.isFinite(raw.durationSec)) {
+  if (
+    typeof raw.durationSec === "number" &&
+    Number.isFinite(raw.durationSec) &&
+    raw.durationSec > 0
+  ) {
     seed.durationSec = raw.durationSec;
   }
+  const poster = coerceSettingsAsset(raw.posterAsset);
+  if (poster !== "") seed.posterAsset = poster;
   return seed;
+}
+
+/**
+ * 设置里的 asset 字段可能是字符串，也可能是 `{ url }` / `{ uri }`。
+ *
+ * @param value - 原始设置值
+ * @returns trim 后的 URI 字符串
+ */
+function coerceSettingsAsset(value: unknown): string {
+  if (typeof value === "string") return value.trim();
+  if (value && typeof value === "object") {
+    const raw = value as { url?: unknown; uri?: unknown };
+    if (typeof raw.url === "string" && raw.url.trim()) return raw.url.trim();
+    if (typeof raw.uri === "string" && raw.uri.trim()) return raw.uri.trim();
+  }
+  return "";
 }
 
 /**

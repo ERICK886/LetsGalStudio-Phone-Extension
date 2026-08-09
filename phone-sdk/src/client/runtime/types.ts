@@ -82,7 +82,7 @@ export interface OpenPhoneAppOptions {
 
 /**
  * 手机导航控制器（由宿主安装）。
- * 插件侧通过 `openPhoneApp` 调用，不直接操作 DOM。
+ * 插件侧通过 `openPhoneApp` / `closePhoneApp` 调用，不直接操作 DOM。
  */
 export interface PhoneNavigationController {
   /**
@@ -91,6 +91,13 @@ export interface PhoneNavigationController {
    * @param options 目标应用与等待策略
    */
   openPhoneApp(options: OpenPhoneAppOptions): Promise<void>;
+
+  /**
+   * 关闭整部手机 UI（优先走关闭动画）。
+   *
+   * @returns 动画结束并释放容器后 resolve；未显示时立即 resolve
+   */
+  closePhoneApp(): Promise<void>;
 }
 
 /**
@@ -156,8 +163,13 @@ export interface PhoneSdkGlobalSlot {
   pluginDevReregister?: () => void;
   /** 宿主最近一次发布的安全区；未发布时为 `undefined` */
   safeAreaInsets?: PhoneSafeAreaInsets;
-  /** 可选：宿主安装的导航控制器（`openPhoneApp` 等） */
+  /** 可选：宿主安装的导航控制器（`openPhoneApp` / `closePhoneApp` 等） */
   navigation?: PhoneNavigationController;
+  /**
+   * 由手机 UI 挂载时注册的动画关闭回调；卸载时清除。
+   * `closePhoneApp` 优先调用此回调以复用关闭动画。
+   */
+  requestAnimatedClosePhone?: () => Promise<void>;
   /**
    * 导航总线：当前 pending 的 navigate 请求（仅保留最新一条）。
    * 由 `publishPhoneNavigate` 写入，`subscribePhoneNavigate` 订阅时回放。

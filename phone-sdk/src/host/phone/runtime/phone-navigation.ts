@@ -1,22 +1,23 @@
 /**
  * @file phone-navigation.ts
- * @description 宿主侧手机导航控制器：把 `openPhoneApp` 落到 PhoneExtension 的 ctx 上。
+ * @description 宿主侧手机导航控制器：把 `openPhoneApp` / `closePhoneApp` 落到 PhoneExtension 的 ctx 上。
  * @author 池水三两升
  * @date 2026-08-09
- * @version 0.5.0
+ * @version 0.5.1
  *
  * @remarks
  * 聊天扩展的 ctx 不是手机扩展的 ctx，不能用聊天 ctx 去 `ui.show("phone")`。
  * 控制器在 `PhoneExtension.onRegister` 中通过 `bindPhoneNavigationController(ctx)` 闭包住手机 ctx，
- * 写入全局槽位 `getPhoneSdkSlot().navigation`，供插件侧 `openPhoneApp` 委托调用。
+ * 写入全局槽位 `getPhoneSdkSlot().navigation`，供插件侧 `openPhoneApp` / `closePhoneApp` 委托调用。
  *
  * 与 `phone-extension.tsx` 存在循环引用：phone-extension 导入 `bindPhoneNavigationController`，
- * 本文件导入 `getPhoneRuntime` / `activatePhoneRuntime`。两端均在运行时（函数调用）才使用对方绑定，
+ * 本文件导入 `getPhoneRuntime` / `activatePhoneRuntime` / `hidePhoneUi`。两端均在运行时（函数调用）才使用对方绑定，
  * 且被导入的是 hoisted 的 `export function` 声明，循环求值阶段即可见，故安全。
  */
 
 import type { ExtensionContext } from "@avg-studio/sdk";
 import {
+  emitPhoneClosed,
   getPhoneSdkSlot,
   publishPhoneNavigate,
   waitForPhoneClosed,
@@ -26,6 +27,7 @@ import {
 import {
   activatePhoneRuntime,
   getPhoneRuntime,
+  hidePhoneUi,
 } from "../extension/phone-extension";
 
 /** `waitUntil: "close"` 的保险释放时间，避免宿主 show 失败时永久挂起调用方。 */
@@ -78,6 +80,24 @@ export function createPhoneNavigationController(
 
       if (options.waitUntil === "none") return;
       await waitForPhoneClosedWithTimeout();
+    },
+
+    async closePhoneApp(): Promise<void> {
+      const animated = getPhoneSdkSlot().requestAnimatedClosePhone;
+      if (animated) {
+        await animated();
+        return;
+      }
+
+      if (!ctx.ui.isVisible("phone")) return;
+
+      try {
+        await hidePhoneUi(ctx);
+      } catch (error) {
+        console.error("[phone] closePhoneApp: 隐藏手机失败", error);
+      } finally {
+        emitPhoneClosed();
+      }
     },
   };
 }

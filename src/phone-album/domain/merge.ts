@@ -3,7 +3,7 @@
  * @description 默认设置 + 存档 → 可见相册 / 媒体视图模型的合并纯函数。
  * @author 池水三两升
  * @date 2026-08-09
- * @version 0.1.0
+ * @version 0.2.0
  */
 
 import { ALL_ALBUM_ID } from "../constants.js";
@@ -86,7 +86,8 @@ export function buildAlbumCatalog(
       id: d.id,
       type: d.type,
       asset: d.asset,
-      durationSec: d.durationSec,
+      ...(d.durationSec !== undefined ? { durationSec: d.durationSec } : {}),
+      ...(d.posterAsset ? { posterAsset: d.posterAsset } : {}),
     });
   }
   for (const m of save.media) {
@@ -95,7 +96,8 @@ export function buildAlbumCatalog(
       id: m.id,
       type: m.type,
       asset: m.asset,
-      durationSec: m.durationSec,
+      ...(m.durationSec !== undefined ? { durationSec: m.durationSec } : {}),
+      ...(m.posterAsset ? { posterAsset: m.posterAsset } : {}),
     });
   }
   const allMedia: MediaView[] = [...mediaById.values()];
@@ -122,12 +124,23 @@ export function buildAlbumCatalog(
     addEdge(link.albumId, link.mediaId);
   }
 
+  /**
+   * 封面展示源：视频优先 poster，否则用媒体 asset（UI 可再抽帧）。
+   *
+   * @param media - 媒体视图
+   */
+  const coverSourceOf = (media: MediaView): string =>
+    media.type === "video" && media.posterAsset
+      ? media.posterAsset
+      : media.asset;
+
   const albums: AlbumView[] = [
     {
       id: ALL_ALBUM_ID,
       name: settings.allAlbumsLabel,
       count: allMedia.length,
-      coverAsset: allMedia.length > 0 ? allMedia[0].asset : undefined,
+      coverAsset:
+        allMedia.length > 0 ? coverSourceOf(allMedia[0]) : undefined,
       isVirtualAll: true,
     },
   ];
@@ -138,11 +151,11 @@ export function buildAlbumCatalog(
       meta?.coverAsset ?? defaultAlbumById.get(id)?.coverAsset;
     let coverAsset: string | undefined;
     if (meta?.coverMediaId && mediaById.has(meta.coverMediaId)) {
-      coverAsset = mediaById.get(meta.coverMediaId)!.asset;
+      coverAsset = coverSourceOf(mediaById.get(meta.coverMediaId)!);
     } else if (fallbackCover) {
       coverAsset = fallbackCover;
     } else if (list.length > 0) {
-      coverAsset = list[0].asset;
+      coverAsset = coverSourceOf(list[0]);
     }
     albums.push({
       id,

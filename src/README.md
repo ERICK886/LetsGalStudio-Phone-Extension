@@ -2,7 +2,7 @@
 
 > 面向开发者：在本仓或脚手架工程中开发手机内页、使用 CLI / phone-sdk。  
 > 作者侧「如何使用手机」（挂载、设置、消息、Toast）见根目录 [README.md](../README.md)。  
-> 当前推荐：`@ink-zenly/phone-sdk@^0.5.0` ｜ `@ink-zenly/create-phone-app@0.3.5` ｜ Studio SDK `>=1.9.0`
+> 当前推荐：`@ink-zenly/phone-sdk@^0.5.3` ｜ `@ink-zenly/create-phone-app@0.3.6` ｜ Studio SDK `>=1.9.0`
 
 本目录 `src/` 是本仓宿主扩展的入口与内页应用（如 `demo-shop/`、`phone-album/`）。宿主实现在 `@ink-zenly/phone-sdk`，脚手架在 `cli/`。  
 独立 release 形态的聊天内页示例见旁路工程 [`../app-015abe`](../../app-015abe)（扩展包 id `app-015abe`，`phoneAppId=chat`）。
@@ -647,7 +647,12 @@ await openPhoneApp({ appId: "chat", waitUntil: "close" });
 
 | 版本 | 要点 |
 |------|------|
-| **1.2.0**（当前） | 内置 `phone-album`；对齐 phone-sdk `0.5.0`（`openPhoneApp`）/ CLI `0.3.5`。 |
+| **1.2.5**（当前） | 相册页面过渡；视频缩略修复；作者文档补齐相册章节。 |
+| **1.2.4** | 相册视频：封面/抽帧 + 手机风播放器。 |
+| **1.2.3** | 对齐 phone-sdk `0.5.3`（`show-message` 撤回状态）。 |
+| **1.2.2** | 对齐 phone-sdk `0.5.2`（撤回首发）。 |
+| **1.2.1** | 对齐 phone-sdk `0.5.1`（`closePhoneApp`）/ CLI `0.3.6`。 |
+| **1.2.0** | 内置 `phone-album`；对齐 phone-sdk `0.5.0`（`openPhoneApp`）/ CLI `0.3.5`。 |
 | **1.1.1** | 对方回复前将我方未读标为已读（默认开）；未读→已读不重播入场动画。 |
 | **1.1.0** | 对齐 phone-sdk `0.4.6+` / CLI `0.3.3`。气泡样式、头像/名称可见性、QQ 风名称排版；文档拆分使用/开发。 |
 | **0.2.0** | 能力成型期：Toast、APP 安装/禁用、消息聊天背景、苹果/安卓外壳、可配置打开快捷键、剧本块内联展示优化、多 Preview 隔离修复等（相对 0.1.x 的大版本说明）。 |
@@ -660,6 +665,9 @@ await openPhoneApp({ appId: "chat", waitUntil: "close" });
 
 | 版本 | npm | 要点 |
 |------|-----|------|
+| **0.5.3** | ✅ | 撤回计时器在关手机/清理会话时完整释放。 |
+| **0.5.2** | ✅ | `show-message` 支持 `recalled`：延迟后气泡消失并显示「角色名+后缀」系统行；推进时立刻撤回。 |
+| **0.5.1** | ✅ | 导出 `closePhoneApp`：剧本/动作可带动画关闭手机；导航控制器补齐关闭路径。 |
 | **0.5.0** | ✅ | 导出 `openPhoneApp`：剧本/动作可打开手机并深开内页；`waitUntil: "close" \| "none"`；导航总线 `publishPhoneNavigate` / `subscribePhoneNavigate`。 |
 | **0.4.7** | ✅ | 设置「对方回复前将我方未读标为已读」（默认开）：下一条为对方消息时，点击先把已显示的我方 `unread` 改为 `read`，再点才追加对方消息；未读改已读不重播入场动画。 |
 | **0.4.6** | ✅ | 气泡名称改为气泡**上方加粗**（QQ 风）；字号/颜色表单预填与 `phone.css` 对齐；**自定义 CSS 新建不预填**（说明中保留占位示例）；文字/名称色支持 `rgba()`；发布包清理临时单测文件。 |
@@ -675,6 +683,7 @@ await openPhoneApp({ appId: "chat", waitUntil: "close" });
 
 | 版本 | npm | 要点 |
 |------|-----|------|
+| **0.3.6** | ✅ | `inkZenly.phoneSdkVersion` → `^0.5.1`；脚手架默认依赖支持 `closePhoneApp`。 |
 | **0.3.5** | ✅ | `inkZenly.phoneSdkVersion` → `^0.5.0`；脚手架默认依赖支持 `openPhoneApp` 深开内页。 |
 | **0.3.4** | ✅ | `inkZenly.phoneSdkVersion` → `^0.4.7`；跟进 phone-sdk 未读→已读相关能力。 |
 | **0.3.3** | ✅ | `inkZenly.phoneSdkVersion` → `^0.4.6`；修复 Windows 下 bin 入口 CRLF 导致 npm 丢弃 `bin` 的问题；文档钉版本更新。 |

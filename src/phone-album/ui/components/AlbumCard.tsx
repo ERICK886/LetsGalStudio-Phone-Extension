@@ -3,10 +3,10 @@
  * @description 相册卡片：封面 + 名称 + 数量角标。
  * @author 池水三两升
  * @date 2026-08-09
- * @version 0.1.0
+ * @version 0.2.0
  *
  * @remarks
- * 封面失败时回落到首字占位；点击触发 onOpen。
+ * 封面失败时回落到首字占位。封面若为视频 URL，用 muted video 抽帧。
  */
 
 import { useExtensionContext } from "@avg-studio/sdk";
@@ -22,6 +22,11 @@ export interface AlbumCardProps {
   onOpen: (albumId: string) => void;
 }
 
+/** 粗略判断 URL / 路径是否像视频。 */
+function looksLikeVideo(source: string): boolean {
+  return /\.(mp4|webm|ogg|mov|m4v)(\?|$)/i.test(source);
+}
+
 /**
  * @param props - AlbumCardProps
  * @returns 相册卡片节点
@@ -34,7 +39,9 @@ export function AlbumCard(props: AlbumCardProps) {
     () => resolveMediaUrl(ctx, album.coverAsset ?? ""),
     [ctx, album.coverAsset],
   );
-  const showImg = Boolean(url) && !failed;
+  const asVideo =
+    Boolean(album.coverAsset) && looksLikeVideo(album.coverAsset!);
+  const showMedia = Boolean(url) && !failed;
   const glyph = Array.from(album.name.trim())[0]?.toUpperCase() ?? "?";
 
   return (
@@ -44,8 +51,19 @@ export function AlbumCard(props: AlbumCardProps) {
       onClick={() => onOpen(album.id)}
     >
       <div className="pa-album-thumb">
-        {showImg ? (
-          <img src={url} alt="" onError={() => setFailed(true)} />
+        {showMedia ? (
+          asVideo ? (
+            <video
+              src={url}
+              muted
+              playsInline
+              // 不 seek：Studio local:// 常因无 Range 支持而在 seek 时 error。
+              preload="auto"
+              onError={() => setFailed(true)}
+            />
+          ) : (
+            <img src={url} alt="" onError={() => setFailed(true)} />
+          )
         ) : (
           <span className="pa-album-glyph">{glyph}</span>
         )}

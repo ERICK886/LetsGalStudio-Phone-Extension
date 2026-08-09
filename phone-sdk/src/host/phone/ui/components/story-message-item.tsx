@@ -1,10 +1,22 @@
+/**
+ * @file story-message-item.tsx
+ * @description 手机剧情消息单条渲染：气泡 / 撤回系统行。
+ * @author 池水三两升
+ * @date 2026-08-09
+ * @version 0.5.2
+ */
+
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useExtensionContext } from "@avg-studio/sdk";
 import type { PhoneMessageStatus, PhoneStoryMessage } from "../../extension/phone-extension";
 import { buildBubbleStyleParts } from "../../extension/chat-role-bubble-style";
 import { firstGlyph, resolveAssetUrl } from "../asset-utils";
 
+/** 与宿主 DEFAULT_RECALL_TEXT 对齐的 UI 回退后缀。 */
+const DEFAULT_RECALL_TEXT = "撤回了一条消息";
+
 const MessageStatusIndicator: React.FC<{ status: PhoneMessageStatus }> = ({ status }) => {
+  if (status === "recalled") return null;
   if (status === "sending") {
     return (
       <span className="phone-story-status-icon phone-story-status-loading" aria-label="发送中">
@@ -34,6 +46,9 @@ const MessageStatusIndicator: React.FC<{ status: PhoneMessageStatus }> = ({ stat
 /**
  * 渲染一条手机剧情消息。聊天角色预设在方法执行时已经展开为快照，
  * 所以播放中不会因为作者修改预设而改变历史消息。
+ *
+ * @param props.storyMessage - 运行时消息快照
+ * @returns 气泡行，或撤回完成后的居中系统行
  */
 export const PhoneStoryMessageItem: React.FC<{ storyMessage: PhoneStoryMessage }> = ({
   storyMessage,
@@ -119,14 +134,9 @@ export const PhoneStoryMessageItem: React.FC<{ storyMessage: PhoneStoryMessage }
     });
   }, [avatarCandidates, storyMessage.characterId, storyMessage.chatRoleId]);
 
-  /**
-   * Task 2 已在快照/render 阶段写入最终布尔；此处沿用「仅严格 false 为隐藏」语义。
-   * @see PhoneStoryMessage.showAvatar / showName
-   */
   const showAvatar = storyMessage.showAvatar !== false;
   const showName = storyMessage.showName !== false;
 
-  /** 快照样式字段 → bubble / strong / p 三段 inline style；全无则 undefined，保留 outgoing 默认 CSS。 */
   const bubbleStyleParts = useMemo(() => {
     const { fontSize, textColor, nameColor, bubbleColor, customCss } = storyMessage;
     if (!fontSize && !textColor && !nameColor && !bubbleColor && !customCss) {
@@ -161,14 +171,44 @@ export const PhoneStoryMessageItem: React.FC<{ storyMessage: PhoneStoryMessage }
       ? bubbleStyleParts.body
       : undefined;
 
+  // 撤回完成：仅居中系统行（角色名 + 后缀）。
+  if (
+    storyMessage.status === "recalled" &&
+    storyMessage.recallPhase === "done"
+  ) {
+    const suffix = storyMessage.recallText?.trim() || DEFAULT_RECALL_TEXT;
+    const recallLine = `${characterName}${suffix}`;
+    return (
+      <p
+        className="phone-story-recall-hint"
+        role="status"
+        aria-label={recallLine}
+      >
+        {recallLine}
+      </p>
+    );
+  }
+
+  const recallPhase =
+    storyMessage.status === "recalled"
+      ? (storyMessage.recallPhase ?? "pending")
+      : undefined;
+
   return (
     <div
       className="phone-story-message-row"
       data-direction={storyMessage.direction}
       data-status={storyMessage.status}
+      data-recall-phase={recallPhase}
       data-show-avatar={showAvatar ? "true" : "false"}
       data-show-name={showName ? "true" : "false"}
-      aria-label={storyMessage.direction === "incoming" ? "对方发来的消息" : "我方发送的消息"}
+      aria-label={
+        storyMessage.status === "recalled"
+          ? "即将撤回的消息"
+          : storyMessage.direction === "incoming"
+            ? "对方发来的消息"
+            : "我方发送的消息"
+      }
     >
       {showAvatar ? (
         <div className="phone-story-avatar" aria-hidden="true">
@@ -186,15 +226,16 @@ export const PhoneStoryMessageItem: React.FC<{ storyMessage: PhoneStoryMessage }
       ) : null}
       <div className="phone-story-message-body">
         <div className="phone-story-message-content">
-          {/* 名称在气泡上方加粗显示（类似 QQ），不进入气泡内部。 */}
           {showName ? (
             <div className="phone-story-name" style={nameStyle}>
               {characterName}
             </div>
           ) : null}
-          <span className="phone-story-status" role="status">
-            <MessageStatusIndicator status={storyMessage.status} />
-          </span>
+          {storyMessage.status !== "recalled" ? (
+            <span className="phone-story-status" role="status">
+              <MessageStatusIndicator status={storyMessage.status} />
+            </span>
+          ) : null}
           <div className="phone-story-bubble" style={bubbleStyle}>
             <p style={bodyStyle}>{storyMessage.message}</p>
           </div>

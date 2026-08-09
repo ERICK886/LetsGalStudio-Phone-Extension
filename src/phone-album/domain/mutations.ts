@@ -155,7 +155,7 @@ export function applyRemoveAlbum(
  *
  * @param state - 当前存档。
  * @param settings - 作者设置快照。
- * @param payload - `{ mediaId, type, asset, albumIds, durationSec? }`。
+ * @param payload - `{ mediaId, type, asset, albumIds, durationSec?, posterAsset? }`。
  * @returns 新存档；空 mediaId 返回原 state。
  */
 export function applyAddMedia(
@@ -167,6 +167,7 @@ export function applyAddMedia(
     asset: string;
     albumIds: string[];
     durationSec?: number;
+    posterAsset?: string;
   },
 ): AlbumSaveState {
   const mediaId = payload.mediaId?.trim() ?? "";
@@ -185,6 +186,8 @@ export function applyAddMedia(
     createdAt: Date.now(),
   };
   if (payload.durationSec !== undefined) media.durationSec = payload.durationSec;
+  const poster = payload.posterAsset?.trim() ?? "";
+  if (poster !== "") media.posterAsset = poster;
   next.media = upsertMedia(next.media, media);
 
   const filteredIds = filterVisibleAlbumIds(settings, state, payload.albumIds);

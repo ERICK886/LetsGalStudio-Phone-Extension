@@ -70,6 +70,7 @@ export function executeRemoveAlbum(albumId: string): void {
  * @param input.asset - 资源标识
  * @param input.albumIds - 归属相册 id 列表
  * @param input.durationSec - 可选时长（视频）
+ * @param input.posterAsset - 可选视频封面图
  */
 export function executeAddMedia(input: {
   mediaId: string;
@@ -77,6 +78,7 @@ export function executeAddMedia(input: {
   asset: string;
   albumIds: string[];
   durationSec?: number;
+  posterAsset?: string;
 }): void {
   const mediaId = input.mediaId?.trim() ?? "";
   if (mediaId === "") {

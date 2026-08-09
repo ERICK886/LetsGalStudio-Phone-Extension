@@ -3,7 +3,7 @@
  * @description `@ink-zenly/phone-sdk/plugin`：内页应用客户端 API 入口（内部目录为 client/）。
  * @author 池水三两升
  * @date 2026-08-01
- * @version 0.5.0
+ * @version 0.5.1
  *
  * @remarks
  * 对外路径仍为 `@ink-zenly/phone-sdk/plugin`。
@@ -47,6 +47,7 @@ export {
 } from "./runtime/register";
 export { getPhoneSdkHost, installPhoneSdkHost } from "./runtime/host";
 export { openPhoneApp } from "./runtime/open-phone-app";
+export { closePhoneApp } from "./runtime/close-phone-app";
 export {
   clearPhoneNavigatePending,
   emitPhoneClosed,
