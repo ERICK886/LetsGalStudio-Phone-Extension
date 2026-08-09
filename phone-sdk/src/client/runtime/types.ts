@@ -158,4 +158,26 @@ export interface PhoneSdkGlobalSlot {
   safeAreaInsets?: PhoneSafeAreaInsets;
   /** 可选：宿主安装的导航控制器（`openPhoneApp` 等） */
   navigation?: PhoneNavigationController;
+  /**
+   * 导航总线：当前 pending 的 navigate 请求（仅保留最新一条）。
+   * 由 `publishPhoneNavigate` 写入，`subscribePhoneNavigate` 订阅时回放。
+   */
+  phoneNavigatePending?: NavigateRequest;
+  /** 导航总线：当前订阅者集合；publish 时遍历通知。 */
+  phoneNavigateListeners?: Set<(req: NavigateRequest) => void>;
+  /** 导航总线：等待手机关闭的一次性 waiter 集合；`emitPhoneClosed` 时全部唤醒并清空。 */
+  phoneClosedWaiters?: Set<() => void>;
+}
+
+/**
+ * 导航总线上的 navigate 请求载荷。
+ *
+ * @property appId 目标内页应用 id（Studio 程序 ID）
+ * @property seq 调用方维护的单调递增序号，便于宿主去重 / 排序
+ * @property payload 可选启动参数，透传给宿主
+ */
+export interface NavigateRequest {
+  appId: string;
+  seq: number;
+  payload?: Record<string, unknown>;
 }

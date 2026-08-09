@@ -16,6 +16,7 @@
  */
 
 export type {
+  NavigateRequest,
   OpenPhoneAppOptions,
   OpenPhoneAppWaitUntil,
   PhoneAppRegistration,
@@ -46,6 +47,13 @@ export {
 } from "./runtime/register";
 export { getPhoneSdkHost, installPhoneSdkHost } from "./runtime/host";
 export { openPhoneApp } from "./runtime/open-phone-app";
+export {
+  emitPhoneClosed,
+  getLatestPhoneNavigate,
+  publishPhoneNavigate,
+  subscribePhoneNavigate,
+  waitForPhoneClosed,
+} from "./runtime/phone-nav-bus";
 export {
   EMPTY_PHONE_SAFE_AREA,
   getPhoneSafeAreaInsets,
