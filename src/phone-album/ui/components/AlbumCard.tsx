@@ -9,9 +9,11 @@
  * 封面失败时回落到首字占位；点击触发 onOpen。
  */
 
-import React, { useState } from "react";
+import { useExtensionContext } from "@avg-studio/sdk";
+import React, { useMemo, useState } from "react";
 
 import type { AlbumView } from "../../types";
+import { resolveMediaUrl } from "./MediaThumb";
 
 export interface AlbumCardProps {
   /** 相册视图（来自 catalog.albums） */
@@ -26,8 +28,13 @@ export interface AlbumCardProps {
  */
 export function AlbumCard(props: AlbumCardProps) {
   const { album, onOpen } = props;
+  const ctx = useExtensionContext();
   const [failed, setFailed] = useState(false);
-  const showImg = Boolean(album.coverAsset) && !failed;
+  const url = useMemo(
+    () => resolveMediaUrl(ctx, album.coverAsset ?? ""),
+    [ctx, album.coverAsset],
+  );
+  const showImg = Boolean(url) && !failed;
   const glyph = Array.from(album.name.trim())[0]?.toUpperCase() ?? "?";
 
   return (
@@ -38,11 +45,7 @@ export function AlbumCard(props: AlbumCardProps) {
     >
       <div className="pa-album-thumb">
         {showImg ? (
-          <img
-            src={album.coverAsset}
-            alt=""
-            onError={() => setFailed(true)}
-          />
+          <img src={url} alt="" onError={() => setFailed(true)} />
         ) : (
           <span className="pa-album-glyph">{glyph}</span>
         )}

@@ -93,8 +93,10 @@ export function ViewerScreen(props: ViewerScreenProps) {
     else goNext();
   };
 
-  const albumName =
-    albumId === ALL_ALBUM_ID ? settings.allAlbumsLabel : albumId;
+  const albumName = useMemo(() => {
+    if (albumId === ALL_ALBUM_ID) return settings.allAlbumsLabel;
+    return catalog.albums.find((a) => a.id === albumId)?.name ?? albumId;
+  }, [albumId, catalog, settings.allAlbumsLabel]);
 
   return (
     <>

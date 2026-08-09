@@ -77,8 +77,7 @@ export function useAlbumSession(onExitHome: () => void): AlbumSession {
     const save = getAlbumSaveState();
     const catalog = buildAlbumCatalog(settings, save);
     return { settings, catalog };
-    // tick 触发重算；nav 变化时也重算（grid 列表可能依赖 albumId）
-    // 实际 catalog 与 nav 无关，但保持简洁依赖即可
+    // tick 触发重算；catalog 与 nav 无关，故不依赖 nav
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tick]);
 
