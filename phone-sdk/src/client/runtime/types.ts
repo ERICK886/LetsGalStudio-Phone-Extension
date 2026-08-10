@@ -55,7 +55,7 @@ export interface PhoneAppRenderProps {
  *
  * @property id 稳定 id，必须与 Studio 程序 ID（`@extension({ id })`）一致；
  *   同一扩展可注册多个 app（每个程序模块各注册一次）。作者设置的 `phoneAppId`
- *   **必须**填 `扩展ID/程序ID`（如 `ink.zenly.app-015abe/phone-chat`）；宿主会规约为程序 ID 查找注册表。
+ *   宿主内置填程序 ID（如 `phone-chat`）；跨扩展可填 `扩展ID/程序ID`。宿主会规约为程序 ID 查找注册表。
  * @property title 可选展示名（宿主可不显示顶栏，供调试/无障碍）
  * @property description 可选说明
  * @property render 返回要嵌在手机屏幕内的 React 节点

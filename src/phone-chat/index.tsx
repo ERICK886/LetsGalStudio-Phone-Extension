@@ -13,7 +13,7 @@
  *   `StudioPhoneExtension` 上以静态属性赋值挂载。
  * - 扩展包 id：`ink.zenly.ext-7a9373`（见宿主 `extension.json`）
  * - 程序 ID：`phone-chat`（`@extension` / `registerPhoneApp`）
- * - 宿主填写：`ink.zenly.ext-7a9373/phone-chat`（扩展ID/程序ID）
+ * - 宿主填写 Phone SDK 应用 ID：`phone-chat`（仅程序 ID）
  */
 
 // 内页注册（向 Phone SDK 注入聊天内页）。

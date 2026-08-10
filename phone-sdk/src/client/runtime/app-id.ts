@@ -47,13 +47,13 @@ export function isPhoneAppId(id: unknown): id is string {
  * @returns 是否为完整引用路径
  *
  * @remarks
- * 宿主「动作 · 手机内部应用」**必须**使用此格式，禁止只填程序 ID，
- * 以免多扩展同程序 ID 时作者绑错目标。
+ * 宿主「动作 · 手机内部应用」对**宿主内置**内页填程序 ID 即可；
+ * 跨扩展第三方内页仍可用此完整路径格式。
  *
  * @example
  * ```ts
  * isStudioProgramRefPath("ink.zenly.app-015abe/phone-chat"); // true
- * isStudioProgramRefPath("phone-chat"); // false
+ * isStudioProgramRefPath("phone-chat"); // false（那是裸程序 ID，另用 isPhoneAppId）
  * ```
  */
 export function isStudioProgramRefPath(value: unknown): value is string {

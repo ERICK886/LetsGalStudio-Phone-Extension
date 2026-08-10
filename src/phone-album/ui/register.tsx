@@ -8,7 +8,7 @@
  * @remarks
  * 注册程序 ID = `phone-album` 的内页；render 委托给 `AlbumApp`。
  * title 取注册时缓存的 `getCachedAuthorSettings().appTitle`；设置变更不强制 re-register。
- * 宿主「动作 · 手机内部应用」须填 `ink.zenly.ext-7a9373/phone-album`。
+ * 宿主「动作 · 手机内部应用」须填 `phone-album`（程序 ID）。
  */
 
 import { registerPhoneApp } from "@ink-zenly/phone-sdk/plugin";
@@ -18,7 +18,7 @@ import { getCachedAuthorSettings } from "../runtime/index";
 import { AlbumApp } from "./AlbumApp";
 
 /**
- * 注册程序 ID = `phone-album` 的内页（宿主绑定须写完整 `扩展ID/phone-album`）。
+ * 注册程序 ID = `phone-album` 的内页（宿主绑定填 `phone-album` 即可）。
  *
  * @returns void
  *

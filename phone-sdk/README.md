@@ -35,7 +35,9 @@ phone-sdk/src/
 Studio 以 **`扩展ID/程序ID`** 标识程序。  
 `registerPhoneApp({ id })` 必须等于**程序 ID**（与 `@extension({ id })` 一致）。
 
-作者在「动作 · 手机内部应用」填写的 `phoneAppId` **必须**为完整 `扩展ID/程序ID`（如 `ink.zenly.app-015abe/phone-chat`），**禁止**只填程序 ID，以免多扩展同 APPID 绑错。宿主解析后按程序 ID 查找注册表。
+作者在「动作 · 手机内部应用」填写的 `phoneAppId`：
+- **宿主内置内页**：只填**程序 ID**（如 `phone-chat`）
+- **跨扩展第三方内页**：可填完整 `扩展ID/程序ID`（宿主会规约为程序 ID 查找注册表）
 
 ## 安装
 

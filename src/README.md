@@ -123,7 +123,7 @@ API 细节见 [`../phone-sdk/README.md`](../phone-sdk/README.md)；CLI 细节见
 |------|------|--------|------|
 | **宿主扩展包 id** | `^[a-z][a-z0-9.-]*$`（可含点号）→ 宿主 `extension.json.id` | `create --extension-id` | `com.acme.my-phone` |
 | **程序 ID / app-id** | `^[a-z][a-z0-9-]*$` → `registerPhoneApp({ id })`、`src/<app-id>/` | `create --app-id` / `add` | `demo-shop`、`my-mail` |
-| **phoneAppId（作者设置）** | **必须**填 `扩展包ID/程序ID` | Studio 手动配置 | `ink.zenly.ext-7a9373/phone-chat` |
+| **phoneAppId（作者设置）** | 宿主内置填**程序 ID**；跨扩展可填 `扩展包ID/程序ID` | Studio 手动配置 | `phone-chat` |
 | **动作 ID** | 作者自定；APP 目录「默认动作 ID」引用它 | Studio 手动配置 | `open-my-mail` |
 | **内页包扩展包 id**（仅 pack） | 默认同 app-id；可用 `--extension-id` 覆盖 | `pack` 可选 | 默认 `my-mail` |
 
@@ -631,7 +631,7 @@ clearPhoneAppBadge("chat");
 
 仅 `registerPhoneApp` **不会**自动出现图标。还必须在**宿主**的作者设置中：
 
-1. **动作 · 手机内部应用**：`phoneAppId` **必须**填 `扩展包ID/程序ID`（如 `ink.zenly.app-foo/my-mail`），禁止只填程序 ID  
+1. **动作 · 手机内部应用**：宿主内置填程序 ID（如 `phone-chat`）；跨扩展可填 `扩展包ID/程序ID`  
 2. **手机应用目录**：`默认动作 ID` 指向上述动作；建议开启「游戏开始默认预装」
 
 然后 `pnpm build` / `watch` → Studio 重载扩展 → 剧本 Preview 中 `mount-phone` → 快捷键打开 → 点击 APP。
@@ -658,7 +658,7 @@ clearPhoneAppBadge("chat");
 
 | 版本 | 要点 |
 |------|------|
-| **1.3.0**（当前） | 内置 `phone-chat` / `phone-album`；`PhoneExtension` = `StudioPhoneExtension`；Phone SDK 应用 ID 为 `ink.zenly.ext-7a9373/phone-chat`、`ink.zenly.ext-7a9373/phone-album`。 |
+| **1.3.0**（当前） | 内置 `phone-chat` / `phone-album`；`PhoneExtension` = `StudioPhoneExtension`；Phone SDK 应用 ID 填 `phone-chat` / `phone-album`。 |
 | **1.2.7** | phone-sdk `0.5.5`：Phone SDK 应用 ID 必须填「扩展ID/程序ID」；CLI `0.3.7`。 |
 | **1.2.6** | 相册迁出为独立扩展 `ink.zenly.app-cd6ad3`；phone-sdk `0.5.4` 桌面 APP 角标。 |
 | **1.2.5** | 相册页面过渡；视频缩略修复；作者文档补齐相册章节。 |
@@ -679,7 +679,8 @@ clearPhoneAppBadge("chat");
 
 | 版本 | npm | 要点 |
 |------|-----|------|
-| **0.5.5** | ✅ npm | 「动作 · 手机内部应用」Phone SDK 应用 ID **必须**填 `扩展ID/程序ID`；并入未单独发 npm 的 0.5.4 桌面角标 API。 |
+| **0.5.6** | 本地 | 宿主内置内页 Phone SDK 应用 ID 恢复为可只填程序 ID；跨扩展仍支持 `扩展ID/程序ID`。 |
+| **0.5.5** | ✅ npm | 曾强制「扩展ID/程序ID」；桌面角标 API 并入。 |
 | **0.5.4** | （未单独发 npm，并入 0.5.5） | 桌面 APP 角标 API：`setPhoneAppBadge` / `clearPhoneAppBadge`（`dot` \| `count`）。 |
 | **0.5.3** | ✅ | 撤回计时器在关手机/清理会话时完整释放。 |
 | **0.5.2** | ✅ | `show-message` 支持 `recalled`：延迟后气泡消失并显示「角色名+后缀」系统行；推进时立刻撤回。 |
@@ -744,14 +745,14 @@ npm view @ink-zenly/create-phone-app version --registry https://registry.npmjs.o
 
 | 内页 | 程序 ID | Phone SDK 应用 ID（作者设置） |
 |------|---------|------------------------------|
-| 聊天 | `phone-chat` | `ink.zenly.ext-7a9373/phone-chat` |
-| 相册 | `phone-album` | `ink.zenly.ext-7a9373/phone-album` |
+| 聊天 | `phone-chat` | `phone-chat` |
+| 相册 | `phone-album` | `phone-album` |
 
 ### 从旧独立包迁移
 
 | 旧独立包扩展 ID | 旧 Phone SDK 应用 ID | 新绑定 |
 |-----------------|----------------------|--------|
-| `ink.zenly.app-015abe` | `ink.zenly.app-015abe/phone-chat` | `ink.zenly.ext-7a9373/phone-chat` |
-| `ink.zenly.app-cd6ad3` | `ink.zenly.app-cd6ad3/phone-album` | `ink.zenly.ext-7a9373/phone-album` |
+| `ink.zenly.app-015abe` | `ink.zenly.app-015abe/phone-chat` | `phone-chat` |
+| `ink.zenly.app-cd6ad3` | `ink.zenly.app-cd6ad3/phone-album` | `phone-album` |
 
 迁移后停用旧独立包，仅启用本扩展即可。Fragment 方法 `target` 前缀由旧包 id 改为 `ink.zenly.ext-7a9373/phone-chat/…` 或 `…/phone-album/…`。

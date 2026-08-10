@@ -12,7 +12,7 @@ import { PROGRAM_ID } from "../constants";
 import { ChatApp } from "./ChatApp";
 
 /**
- * 注册程序 ID = `phone-chat` 的内页（宿主绑定须写完整 `扩展ID/phone-chat`）。
+ * 注册程序 ID = `phone-chat` 的内页（宿主绑定填 `phone-chat` 即可）。
  *
  * @returns void
  * @throws 不抛出；非法参数由 phone-sdk 警告并忽略

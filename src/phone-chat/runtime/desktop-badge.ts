@@ -27,7 +27,7 @@ import { readChatState } from "./store";
  * @remarks
  * - `total > 0` → `{ mode: "count", count: total }`
  * - `total === 0` → `clearPhoneAppBadge`
- * - 依赖 phone-sdk ≥ 0.5.4；宿主桌面须绑定 `ink.zenly.ext-7a9373/phone-chat`
+ * - 依赖 phone-sdk ≥ 0.5.4；宿主桌面须绑定 `phoneAppId = phone-chat`
  */
 export function syncChatDesktopBadge(): number {
   const threads = readChatState().threads ?? [];

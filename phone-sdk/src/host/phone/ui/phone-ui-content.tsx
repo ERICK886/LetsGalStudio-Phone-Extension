@@ -94,7 +94,7 @@ import {
 function resolveDesktopBadgeAppId(app: ResolvedPhoneApp): string | undefined {
   const target = app.action?.target as PhoneTarget | undefined;
   if (target && target.kind === "in-phone-app" && target.phoneAppId) {
-    // 目录里存的是「扩展ID/程序ID」；角标表按程序 ID 索引。
+    // 目录里可能是程序 ID，或「扩展ID/程序ID」；角标表按程序 ID 索引。
     return toPhoneAppId(target.phoneAppId) ?? undefined;
   }
   return undefined;
@@ -1070,8 +1070,8 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
       });
       showMessage(
         `应用不可用：未找到「${phoneAppId}」。`
-          + "请确认 Phone SDK 应用 ID 已填「扩展ID/程序ID」，"
-          + "且已通过 @ink-zenly/phone-sdk/plugin 完成 registerPhoneApp。",
+          + "请确认 Phone SDK 应用 ID 与 registerPhoneApp({ id }) 的程序 ID 一致"
+          + "（宿主内置可只填程序 ID；跨扩展可填扩展ID/程序ID）。",
       );
       return;
     }
@@ -1899,9 +1899,9 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
 
                       {selectedAction.target.kind === "in-phone-app" && (
                         <label className="phone-field">
-                          Phone SDK 应用 ID（扩展ID/程序ID）
+                          Phone SDK 应用 ID
                           <input
-                            placeholder="例如 ink.zenly.app-015abe/phone-chat"
+                            placeholder="例如 phone-chat（宿主内置）或 扩展ID/程序ID"
                             value={selectedAction.target.phoneAppId}
                             onChange={(event) => updateSelectedTarget({
                               kind: "in-phone-app",
@@ -1909,7 +1909,7 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
                             })}
                           />
                           <span>
-                            必须填写「扩展包 ID/程序 ID」，禁止只填程序 ID。
+                            宿主内置填程序 ID；跨扩展可填「扩展包 ID/程序 ID」。
                             点击后在手机屏幕内打开，不关闭手机。
                           </span>
                         </label>

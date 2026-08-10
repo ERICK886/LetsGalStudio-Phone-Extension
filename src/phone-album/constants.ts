@@ -1,38 +1,32 @@
 /**
  * @file constants.ts
- * @description 手机相册内页模块常量（宿主包 id、程序 ID、应用完整引用）。
+ * @description 手机相册内页模块常量（宿主包 id、程序 ID）。
  * @author 池水三两升
  * @date 2026-08-10
- * @version 0.3.0
+ * @version 0.3.1
  *
  * @remarks
- * - 本模块从独立扩展 `ink.zenly.app-cd6ad3` 迁入宿主包 `ink.zenly.ext-7a9373`，
- *   作为 `src/phone-album/` 模块存在；不再以独立 Extension 形式注册。
- * - `EXTENSION_ID` 与宿主 `extension.json` 的 `id` 一致；Studio 方法块 `target`
- *   以该 id 开头，例如 `ink.zenly.ext-7a9373/phone-album/add-media`。
- * - `PROGRAM_ID` 与 `@extension({ id })` / `registerPhoneApp({ id })` 一致，
- *   SDK 要求 kebab-case（仅 a-z、0-9、-），**不能**使用带点号的包 id。
- * - 宿主「动作 · 手机内部应用」须填完整路径：
- *   `{EXTENSION_ID}/{PROGRAM_ID}` → `ink.zenly.ext-7a9373/phone-album`（phone-sdk ≥ 0.5.5）。
+ * - 本模块从独立扩展 `ink.zenly.app-cd6ad3` 迁入宿主包 `ink.zenly.ext-7a9373`。
+ * - Studio 方法块 `target` 仍以扩展包 id 开头，例如
+ *   `ink.zenly.ext-7a9373/phone-album/add-media`。
+ * - 宿主「动作 · 手机内部应用」的 Phone SDK 应用 ID：**只填程序 ID** `phone-album`
+ *  （与 `registerPhoneApp({ id })` 一致），无需再写扩展包 ID。
  */
 
 /**
- * 扩展包 id（与宿主 `extension.json` 的 `id` 一致，可含点号）。
+ * 扩展包 id（与宿主 `extension.json` 的 `id` 一致）。
  */
 export const EXTENSION_ID = "ink.zenly.ext-7a9373";
 
 /**
- * Studio 程序 ID / `@extension({ id })` / `registerPhoneApp({ id })`。
+ * Studio 程序 ID / `registerPhoneApp({ id })` / 宿主 Phone SDK 应用 ID。
  */
 export const PROGRAM_ID = "phone-album";
 
 /**
- * 宿主设置里「Phone SDK 应用 ID」完整路径。
- *
- * @remarks
- * 由 `扩展ID/程序ID` 拼接，供宿主「动作 · 手机内部应用」字段使用。
+ * 宿主「动作 · 手机内部应用」应填写的 Phone SDK 应用 ID（= 程序 ID）。
  */
-export const PHONE_APP_REF = `${EXTENSION_ID}/${PROGRAM_ID}`;
+export const PHONE_APP_REF = PROGRAM_ID;
 
 /** 虚拟「全部」相册 id（永不写入存档 albums）。 */
 export const ALL_ALBUM_ID = "__all__";
