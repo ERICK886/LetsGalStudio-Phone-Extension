@@ -91,6 +91,17 @@ export class StudioPhoneExtension extends PhoneExtension {
     ...albumSaveSchemaFields,
   });
 
+  /**
+   * SDK `listExtensionMethods` 只扫描**本类 own static**（不上原型链）。
+   * 继承无法自动登记父类 `method()`，必须在此显式再挂一遍，否则会出现
+   * 「自定义 block 未注册: …/mount-phone」。
+   */
+  static mountPhone = PhoneExtension.mountPhone;
+  static unmountPhone = PhoneExtension.unmountPhone;
+  static manageInstalledApps = PhoneExtension.manageInstalledApps;
+  static manageAppEnabledState = PhoneExtension.manageAppEnabledState;
+  static showMessage = PhoneExtension.showMessage;
+
   // 聊天内页方法
   static sendFriendMessages = chatSendFriendMessagesMethod;
   static awaitPlayerReply = chatAwaitPlayerReplyMethod;
