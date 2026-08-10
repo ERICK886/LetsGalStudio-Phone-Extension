@@ -14,6 +14,7 @@ import {
   getPhoneSdkAppsRegistry,
   getPhoneSdkSlot,
   installPhoneSdkHost,
+  notifyPhoneAppRegistryChanged,
   phoneSdkDiag,
   toPhoneAppId,
   type PhoneAppRegistration,
@@ -94,6 +95,7 @@ export function installPhoneExtensionSdkHost(): () => void {
         title: app.title,
         overwritten,
       });
+      notifyPhoneAppRegistryChanged();
     },
     unregisterApp(id) {
       const key = toPhoneAppId(id) ?? id;
@@ -104,6 +106,7 @@ export function installPhoneExtensionSdkHost(): () => void {
         id: key,
         existed,
       });
+      notifyPhoneAppRegistryChanged();
     },
     getApp(id) {
       const key = toPhoneAppId(id) ?? id;

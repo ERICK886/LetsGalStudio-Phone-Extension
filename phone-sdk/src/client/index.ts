@@ -22,6 +22,7 @@ export type {
   PhoneAppBadge,
   PhoneAppRegistration,
   PhoneAppRenderProps,
+  PhoneAppStyleEditorMeta,
   PhoneNavigationController,
   PhoneSafeAreaInsets,
   PhoneSdkGlobalSlot,
@@ -45,7 +46,9 @@ export {
 export {
   getRegisteredPhoneApp,
   listRegisteredPhoneApps,
+  notifyPhoneAppRegistryChanged,
   registerPhoneApp,
+  subscribePhoneAppRegistry,
   unregisterPhoneApp,
 } from "./runtime/register";
 export { getPhoneSdkHost, installPhoneSdkHost } from "./runtime/host";

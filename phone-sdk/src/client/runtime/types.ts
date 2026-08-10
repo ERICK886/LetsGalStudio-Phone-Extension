@@ -59,12 +59,32 @@ export interface PhoneAppRenderProps {
  * @property title 可选展示名（宿主可不显示顶栏，供调试/无障碍）
  * @property description 可选说明
  * @property render 返回要嵌在手机屏幕内的 React 节点
+ * @property styleEditor 可选：声明该内页在「手机编辑器」顶栏中的分区（opt-in）
  */
 export interface PhoneAppRegistration {
   id: string;
   title?: string;
   description?: string;
   render: (props: PhoneAppRenderProps) => ReactNode;
+  /**
+   * 样式编辑器贡献。未提供或 `enabled: false` 时不出现在编辑器顶栏。
+   */
+  styleEditor?: PhoneAppStyleEditorMeta;
+}
+
+/**
+ * 内页向「手机编辑器」贡献的顶栏分区元数据（opt-in）。
+ *
+ * @property enabled - 是否显示为独立 Tab；默认 `true`（只要写了 `styleEditor` 对象）
+ * @property label - Tab 文案；缺省回落 `title` 或 `id`
+ * @property icon - Font Awesome 图标名（不含 `fa-`）
+ * @property order - 排序权重，越小越靠前；缺省 100
+ */
+export interface PhoneAppStyleEditorMeta {
+  enabled?: boolean;
+  label?: string;
+  icon?: string;
+  order?: number;
 }
 
 /** `openPhoneApp` 的等待策略：关闭应用后返回，或不等待。 */
@@ -186,6 +206,11 @@ export interface PhoneSdkGlobalSlot {
   phoneAppBadges?: Map<string, PhoneAppBadge>;
   /** 桌面角标变更订阅者；set/clear 后通知宿主 UI 重绘。 */
   phoneAppBadgeListeners?: Set<() => void>;
+  /**
+   * 内页注册表变更订阅者（register / unregister 后通知）。
+   * 供手机编辑器等按已注册 APP 动态生成顶栏。
+   */
+  phoneAppRegistryListeners?: Set<() => void>;
 }
 
 /**

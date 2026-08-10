@@ -47,12 +47,47 @@ function normalizeRegistration(app: PhoneAppRegistration): PhoneAppRegistration 
   const description = typeof app.description === "string" && app.description.trim()
     ? app.description.trim().slice(0, 160)
     : undefined;
+  const styleEditor = normalizeStyleEditor(app.styleEditor);
 
   return {
     id: normalizedId,
     ...(title ? { title } : {}),
     ...(description ? { description } : {}),
+    ...(styleEditor ? { styleEditor } : {}),
     render: app.render,
+  };
+}
+
+/**
+ * 规范化 `styleEditor` 字段；非法对象忽略。
+ *
+ * @param raw - 原始 styleEditor
+ * @returns 净化后的元数据或 undefined
+ */
+function normalizeStyleEditor(
+  raw: PhoneAppRegistration["styleEditor"],
+): PhoneAppRegistration["styleEditor"] | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+
+  const enabled = raw.enabled === false ? false : true;
+  const label =
+    typeof raw.label === "string" && raw.label.trim()
+      ? raw.label.trim().slice(0, 40)
+      : undefined;
+  const icon =
+    typeof raw.icon === "string" && raw.icon.trim()
+      ? raw.icon.trim().slice(0, 64)
+      : undefined;
+  const order =
+    typeof raw.order === "number" && Number.isFinite(raw.order)
+      ? raw.order
+      : undefined;
+
+  return {
+    enabled,
+    ...(label ? { label } : {}),
+    ...(icon ? { icon } : {}),
+    ...(order !== undefined ? { order } : {}),
   };
 }
 
@@ -91,6 +126,7 @@ export function registerPhoneApp(app: PhoneAppRegistration): void {
       hostReady: true,
       queued: false,
     });
+    notifyPhoneAppRegistryChanged();
     return;
   }
 
@@ -107,6 +143,7 @@ export function registerPhoneApp(app: PhoneAppRegistration): void {
     hostReady: false,
     queueLength: slot.queue.length,
   });
+  notifyPhoneAppRegistryChanged();
 }
 
 /**
@@ -126,6 +163,7 @@ export function unregisterPhoneApp(id: string): void {
   if (slot.host) {
     slot.host.unregisterApp(normalizedId);
     phoneSdkDebug("unregisterPhoneApp → 已从宿主移除", { id: normalizedId, hostReady: true });
+    notifyPhoneAppRegistryChanged();
     return;
   }
 
@@ -138,6 +176,7 @@ export function unregisterPhoneApp(id: string): void {
     hostReady: false,
     unregisterQueueLength: slot.unregisterQueue.length,
   });
+  notifyPhoneAppRegistryChanged();
 }
 
 /**
@@ -153,10 +192,53 @@ export function getRegisteredPhoneApp(id: string): PhoneAppRegistration | undefi
 }
 
 /**
- * 列出宿主中全部已注册应用；宿主未安装时返回空数组。
+ * 列出已注册（或宿主未就绪时队列中）的全部内页应用。
  *
  * @returns 只读应用列表
  */
 export function listRegisteredPhoneApps(): readonly PhoneAppRegistration[] {
-  return getPhoneSdkSlot().host?.listApps() ?? [];
+  const slot = getPhoneSdkSlot();
+  if (slot.host) {
+    return slot.host.listApps();
+  }
+  return [...slot.queue];
+}
+
+/**
+ * 订阅内页注册表变更（register / unregister）。
+ *
+ * @param listener - 无参回调
+ * @returns 取消订阅函数
+ *
+ * @example
+ * ```ts
+ * const off = subscribePhoneAppRegistry(() => forceUpdate());
+ * ```
+ */
+export function subscribePhoneAppRegistry(listener: () => void): () => void {
+  const slot = getPhoneSdkSlot();
+  if (!slot.phoneAppRegistryListeners) {
+    slot.phoneAppRegistryListeners = new Set();
+  }
+  slot.phoneAppRegistryListeners.add(listener);
+  return () => {
+    slot.phoneAppRegistryListeners?.delete(listener);
+  };
+}
+
+/**
+ * 通知注册表订阅者（宿主 register/unregister 后调用）。
+ *
+ * @returns void
+ */
+export function notifyPhoneAppRegistryChanged(): void {
+  const listeners = getPhoneSdkSlot().phoneAppRegistryListeners;
+  if (!listeners || listeners.size === 0) return;
+  for (const listener of [...listeners]) {
+    try {
+      listener();
+    } catch (error) {
+      console.warn("[phone-sdk] phoneAppRegistry listener 失败", error);
+    }
+  }
 }

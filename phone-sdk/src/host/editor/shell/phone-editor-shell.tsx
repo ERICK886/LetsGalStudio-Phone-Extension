@@ -1,48 +1,40 @@
 /**
  * @file phone-editor-shell.tsx
- * @description 手机编辑器外壳：顶栏（品牌 + 分区 Tab + 主题切换 + 运行预览）与三栏占位 body 的整体骨架。
+ * @description 手机编辑器外壳：顶栏（品牌 + 动态分区 Tab + 主题 / 预览）与三栏占位 body。
  * @author 池水三两升
  * @date 2026-08-10
- * @version 0.1.0
+ * @version 0.2.0
  *
  * @remarks
- * - 顶栏左侧：accent 色块 + `BRAND_LABEL`（「手机」）。
- * - 顶栏中部：`role="tablist"`，4 个分区 Tab；选中态以 accent 描边 + `#DB277722` 底色表达。
- * - 顶栏右侧：主题切换按钮（调用 `onToggleTheme`）与「运行预览」按钮（`disabled`）。
- * - body：左 / 中 / 右三栏，左右栏宽度由 `leftWidth` / `rightWidth` 控制，中间栏 flex:1。
- * - 列间分隔线为 `1px solid tokens.border`；根容器 `height:100%` 纵向 flex。
- * - 实际分区内容在后续任务中替换 `PlaceholderPane`，本组件仅负责骨架与状态联动。
+ * 顶栏 Tab 由调用方传入的 `sections` 决定（宿主固定区 + 已注册且 opt-in 的 APP）。
  */
 
 import React from "react";
-import { BRAND_LABEL, EDITOR_SECTIONS, type EditorSection } from "../constants";
+
+import { BRAND_LABEL } from "../constants";
+import type { PhoneEditorSection } from "../editor-sections";
 import { IconLabel } from "../shared/fa-icon";
-import {
-  useTheme,
-  FONT_SIZE_TITLE,
-} from "../theme/theme-provider";
+import { useTheme, FONT_SIZE_TITLE } from "../theme/theme-provider";
 import { PlaceholderPane } from "./placeholder-pane";
 
 /**
  * PhoneEditorShell 组件属性。
  */
 export interface PhoneEditorShellProps {
-  /** 当前选中的分区 id。 */
-  section: EditorSection;
-  /** 切换分区回调。 */
-  onSectionChange: (section: EditorSection) => void;
-  /** 左栏宽度（CSS 长度，如 240 或 "240px"）。 */
+  /** 当前顶栏分区列表（已按 order 排好）。 */
+  sections: readonly PhoneEditorSection[];
+  /** 当前选中分区 id。 */
+  sectionId: string;
+  /** 切换分区。 */
+  onSectionChange: (sectionId: string) => void;
+  /** 左栏宽度。 */
   leftWidth: number | string;
   /** 右栏宽度。 */
   rightWidth: number | string;
-  /** 切换主题模式回调（light / dark 之间切换）。 */
+  /** 切换主题。 */
   onToggleTheme: () => void;
 }
 
-/**
- * 顶栏按钮的共用底样式：透明背景、圆角、次级文本色；hover/focus 由浏览器默认行为接管。
- * 主按钮（运行预览）在此基础上覆盖为白字 + accent 背景。
- */
 const topBarButtonStyle: React.CSSProperties = {
   height: 26,
   paddingInline: 10,
@@ -58,17 +50,14 @@ const topBarButtonStyle: React.CSSProperties = {
 };
 
 /**
- * 手机编辑器外壳组件。
+ * 手机编辑器外壳。
  *
- * @param props.section - 当前分区
- * @param props.onSectionChange - 切换分区
- * @param props.leftWidth - 左栏宽度
- * @param props.rightWidth - 右栏宽度
- * @param props.onToggleTheme - 切换主题
- * @returns 占满父容器、纵向布局的编辑器骨架
+ * @param props - PhoneEditorShellProps
+ * @returns 占满父容器的编辑器骨架
  */
 export function PhoneEditorShell({
-  section,
+  sections,
+  sectionId,
   onSectionChange,
   leftWidth,
   rightWidth,
@@ -76,11 +65,10 @@ export function PhoneEditorShell({
 }: PhoneEditorShellProps): React.ReactElement {
   const { tokens, mode } = useTheme();
 
-  // 当前分区元数据：label 用于左右栏占位标题，centerHint 用于中间栏占位标题。
   const current =
-    EDITOR_SECTIONS.find((item) => item.id === section) ?? EDITOR_SECTIONS[0];
-  const sectionLabel = current.label;
-  const centerHint = current.centerHint;
+    sections.find((item) => item.id === sectionId) ?? sections[0] ?? null;
+  const sectionLabel = current?.label ?? "分区";
+  const centerHint = current?.centerHint ?? "样式预览（即将推出）";
 
   return (
     <div
@@ -94,7 +82,6 @@ export function PhoneEditorShell({
         overflow: "hidden",
       }}
     >
-      {/* ===== 顶栏 ===== */}
       <div
         role="toolbar"
         aria-label="手机编辑器顶栏"
@@ -109,7 +96,6 @@ export function PhoneEditorShell({
           borderBottom: `1px solid ${tokens.border}`,
         }}
       >
-        {/* 品牌：accent 色块 + 文案 */}
         <div
           style={{
             display: "flex",
@@ -140,7 +126,6 @@ export function PhoneEditorShell({
           </span>
         </div>
 
-        {/* 分区 Tab 列表 */}
         <div
           role="tablist"
           aria-label="手机编辑器分区"
@@ -149,10 +134,11 @@ export function PhoneEditorShell({
             alignItems: "center",
             gap: 4,
             flex: "1 1 auto",
+            overflowX: "auto",
           }}
         >
-          {EDITOR_SECTIONS.map((item) => {
-            const selected = item.id === section;
+          {sections.map((item) => {
+            const selected = item.id === sectionId;
             return (
               <button
                 key={item.id}
@@ -160,6 +146,7 @@ export function PhoneEditorShell({
                 type="button"
                 aria-selected={selected}
                 data-testid={`phone-editor-section-${item.id}`}
+                data-section-source={item.source}
                 onClick={() => onSectionChange(item.id)}
                 style={{
                   height: 26,
@@ -177,15 +164,19 @@ export function PhoneEditorShell({
                   display: "inline-flex",
                   alignItems: "center",
                   gap: 6,
+                  flex: "0 0 auto",
                 }}
               >
-                <IconLabel icon={item.icon}>{item.label}</IconLabel>
+                {item.icon ? (
+                  <IconLabel icon={item.icon}>{item.label}</IconLabel>
+                ) : (
+                  item.label
+                )}
               </button>
             );
           })}
         </div>
 
-        {/* 右侧操作：主题切换 + 运行预览 */}
         <div
           style={{
             display: "flex",
@@ -226,7 +217,6 @@ export function PhoneEditorShell({
         </div>
       </div>
 
-      {/* ===== body 三栏 ===== */}
       <div
         style={{
           flex: "1 1 auto",
@@ -235,7 +225,6 @@ export function PhoneEditorShell({
           minHeight: 0,
         }}
       >
-        {/* 左栏：导航 / 列表 */}
         <div
           style={{
             flex: `0 0 ${typeof leftWidth === "number" ? `${leftWidth}px` : leftWidth}`,
@@ -248,7 +237,6 @@ export function PhoneEditorShell({
           <PlaceholderPane title={`${sectionLabel} · 导航 / 列表`} />
         </div>
 
-        {/* 中栏：主预览 */}
         <div
           style={{
             flex: "1 1 0",
@@ -260,11 +248,11 @@ export function PhoneEditorShell({
           <PlaceholderPane title={centerHint} />
         </div>
 
-        {/* 右栏：属性 */}
         <div
           style={{
             flex: `0 0 ${typeof rightWidth === "number" ? `${rightWidth}px` : rightWidth}`,
-            width: typeof rightWidth === "number" ? `${rightWidth}px` : rightWidth,
+            width:
+              typeof rightWidth === "number" ? `${rightWidth}px` : rightWidth,
             padding: 8,
             boxSizing: "border-box",
             borderLeft: `1px solid ${tokens.border}`,

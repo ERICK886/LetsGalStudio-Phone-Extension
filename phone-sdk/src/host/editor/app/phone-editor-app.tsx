@@ -1,35 +1,26 @@
 /**
  * @file phone-editor-app.tsx
- * @description 手机编辑器根组件：读取本模块 settings，包裹 ThemeProvider 并渲染外壳。
+ * @description 手机编辑器根组件：订阅已注册 APP，动态生成顶栏分区并渲染外壳。
  * @author 池水三两升
  * @date 2026-08-10
- * @version 0.1.0
- *
- * @remarks
- * - 归属 `@ink-zenly/phone-sdk` 宿主侧（`host/editor`），与 PhoneExtension / Toast 并列。
- * - `ThemeProvider` 用 `key={mode}`，确保项目设置改主题后整树按新 mode 重建。
+ * @version 0.2.0
  */
 
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useExtensionContext } from "@avg-studio/sdk";
 
+import { subscribePhoneAppRegistry } from "../../../client/runtime/register";
 import {
-  EDITOR_SECTIONS,
-  type EditorSection,
-} from "../constants";
+  buildPhoneEditorSections,
+  defaultPhoneEditorSectionId,
+} from "../editor-sections";
 import { ThemeProvider } from "../theme/theme-provider";
 import { PhoneEditorShell } from "../shell/phone-editor-shell";
 
 /**
- * 手机编辑器 App：settings 驱动主题与栏宽，本地 state 驱动分区 Tab。
+ * 手机编辑器 App。
  *
  * @returns 主题包裹后的编辑器外壳
- *
- * @example
- * ```tsx
- * // Extension.render()
- * return { component: PhoneEditorApp, props: {} };
- * ```
  */
 export function PhoneEditorApp(): React.ReactElement {
   const ctx = useExtensionContext();
@@ -38,9 +29,31 @@ export function PhoneEditorApp(): React.ReactElement {
   const [leftWidthSetting] = ctx.settings.useValue<number>("editorLeftWidth");
   const [rightWidthSetting] = ctx.settings.useValue<number>("editorRightWidth");
 
-  const [section, setSection] = useState<EditorSection>(
-    EDITOR_SECTIONS[0]?.id ?? "shell",
+  /** 注册表版本戳：subscribe 时递增，触发 sections 重算。 */
+  const [registryTick, setRegistryTick] = useState(0);
+
+  useEffect(() => {
+    return subscribePhoneAppRegistry(() => {
+      setRegistryTick((n) => n + 1);
+    });
+  }, []);
+
+  const sections = useMemo(
+    () => buildPhoneEditorSections(),
+    // registryTick 变化时重读 listRegisteredPhoneApps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional tick
+    [registryTick],
   );
+
+  const [sectionId, setSectionId] = useState(() =>
+    defaultPhoneEditorSectionId(buildPhoneEditorSections()),
+  );
+
+  useEffect(() => {
+    if (!sections.some((s) => s.id === sectionId)) {
+      setSectionId(defaultPhoneEditorSectionId(sections));
+    }
+  }, [sections, sectionId]);
 
   const mode = themeSetting === "light" ? "light" : "dark";
   const leftWidth =
@@ -55,8 +68,9 @@ export function PhoneEditorApp(): React.ReactElement {
   return (
     <ThemeProvider key={mode} initialMode={mode}>
       <PhoneEditorShell
-        section={section}
-        onSectionChange={setSection}
+        sections={sections}
+        sectionId={sectionId}
+        onSectionChange={setSectionId}
         leftWidth={leftWidth}
         rightWidth={rightWidth}
         onToggleTheme={() => {

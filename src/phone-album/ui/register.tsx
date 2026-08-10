@@ -34,6 +34,12 @@ export function registerPhoneAlbumPhoneApp(): void {
     id: PROGRAM_ID,
     title: getCachedAuthorSettings().appTitle,
     description: "手机相册内页",
+    styleEditor: {
+      enabled: true,
+      label: "相册",
+      icon: "images",
+      order: 110,
+    },
     render: (props) => <AlbumApp {...props} />,
   });
 }

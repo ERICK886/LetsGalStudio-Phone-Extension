@@ -29,6 +29,12 @@ export function registerChatPhoneApp(): void {
     id: PROGRAM_ID,
     title: "聊天",
     description: "手机聊天内页，浏览聊天记录与好友",
+    styleEditor: {
+      enabled: true,
+      label: "聊天气泡",
+      icon: "comments",
+      order: 100,
+    },
     render: (props) => <ChatApp {...props} />,
   });
 }
