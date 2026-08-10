@@ -2,11 +2,11 @@
 
 > 面向开发者：在本仓或脚手架工程中开发手机内页、使用 CLI / phone-sdk。  
 > 作者侧「如何使用手机」（挂载、设置、消息、Toast）见根目录 [README.md](../README.md)。  
-> 当前推荐：`@ink-zenly/phone-sdk@^0.5.4` ｜ `@ink-zenly/create-phone-app@0.3.6` ｜ Studio SDK `>=1.9.0`
+> 当前推荐：`@ink-zenly/phone-sdk@^0.5.5` ｜ `@ink-zenly/create-phone-app@0.3.7` ｜ Studio SDK `>=1.9.0`
 
-本目录 `src/` 是本仓宿主扩展的入口与内页应用（如 `demo-shop/`）。宿主实现在 `@ink-zenly/phone-sdk`，脚手架在 `cli/`。  
-相册内页已迁至独立扩展 [`../ext-cd6ad3`](../ext-cd6ad3)（`ink.zenly.app-cd6ad3`，宿主填写 `phoneAppId=ink.zenly.app-cd6ad3/phone-album`）。  
-独立 release 形态的聊天内页示例见旁路工程 [`../app-015abe`](../../app-015abe)（扩展包 id `app-015abe`，`phoneAppId=chat`）。
+本目录 `src/` 是本仓宿主扩展的入口与内页应用（`demo-shop/`、`phone-chat/`、`phone-album/`）。宿主实现在 `@ink-zenly/phone-sdk`，脚手架在 `cli/`。  
+**聊天与相册已内置**于本扩展（`src/phone-chat/`、`src/phone-album/`），工坊只需启用本包；导出 `PhoneExtension` = `StudioPhoneExtension`（合并壳 + 聊天 + 相册业务）。  
+独立 release 形态的聊天内页示例仍见旁路工程 [`../app-015abe`](../../app-015abe)（已迁入本仓，见 [§7 迁移表](#7-内置内页-phone-chat--phone-album)）。
 
 ## 目录
 
@@ -123,7 +123,7 @@ API 细节见 [`../phone-sdk/README.md`](../phone-sdk/README.md)；CLI 细节见
 |------|------|--------|------|
 | **宿主扩展包 id** | `^[a-z][a-z0-9.-]*$`（可含点号）→ 宿主 `extension.json.id` | `create --extension-id` | `com.acme.my-phone` |
 | **程序 ID / app-id** | `^[a-z][a-z0-9-]*$` → `registerPhoneApp({ id })`、`src/<app-id>/` | `create --app-id` / `add` | `demo-shop`、`my-mail` |
-| **phoneAppId（作者设置）** | **必须**填 `扩展包ID/程序ID` | Studio 手动配置 | `ink.zenly.app-015abe/phone-chat` |
+| **phoneAppId（作者设置）** | **必须**填 `扩展包ID/程序ID` | Studio 手动配置 | `ink.zenly.ext-7a9373/phone-chat` |
 | **动作 ID** | 作者自定；APP 目录「默认动作 ID」引用它 | Studio 手动配置 | `open-my-mail` |
 | **内页包扩展包 id**（仅 pack） | 默认同 app-id；可用 `--extension-id` 覆盖 | `pack` 可选 | 默认 `my-mail` |
 
@@ -192,23 +192,18 @@ export function registerMyMailPhoneApp(): void {
 入口侧保持清单注册（本仓现状）：
 
 ```tsx
-// src/index.tsx
-import {
-  bootstrapPhonePluginApps,
-  definePhonePluginRegistry,
-} from "@ink-zenly/phone-sdk/plugin";
-import { registerDemoShopPhoneApp } from "./demo-shop";
-import { registerMyMailPhoneApp } from "./my-mail";
-
+// src/index.tsx — 导出 StudioPhoneExtension 作为 PhoneExtension
 bootstrapPhonePluginApps(
   definePhonePluginRegistry(
     registerDemoShopPhoneApp,
-    registerMyMailPhoneApp,
+    registerChatPhoneApp,
+    registerPhoneAlbumPhoneApp,
   ),
 );
 
-export { PhoneExtension, ToastExtension } from "@ink-zenly/phone-sdk";
-export { default } from "@ink-zenly/phone-sdk";
+export { StudioPhoneExtension as PhoneExtension } from "./studio-phone-extension";
+export { default } from "./studio-phone-extension";
+export { ToastExtension } from "@ink-zenly/phone-sdk";
 ```
 
 `add` 命令会自动完成上述注入；手写时勿漏掉 `bootstrapPhonePluginApps`。
@@ -572,8 +567,9 @@ bootstrapPhonePluginApps(
   definePhonePluginRegistry(registerDemoShopPhoneApp),
 );
 
-export { PhoneExtension, ToastExtension } from "@ink-zenly/phone-sdk";
-export { default } from "@ink-zenly/phone-sdk";
+export { StudioPhoneExtension as PhoneExtension } from "./studio-phone-extension";
+export { default } from "./studio-phone-extension";
+export { ToastExtension } from "@ink-zenly/phone-sdk";
 ```
 
 宿主负责：桌面、动作、消息、Toast、shared 存档、打开手机快捷键。  
@@ -662,7 +658,8 @@ clearPhoneAppBadge("chat");
 
 | 版本 | 要点 |
 |------|------|
-| **1.2.7**（当前） | phone-sdk `0.5.5`：Phone SDK 应用 ID 必须填「扩展ID/程序ID」；CLI `0.3.7`。 |
+| **1.3.0**（当前） | 内置 `phone-chat` / `phone-album`；`PhoneExtension` = `StudioPhoneExtension`；Phone SDK 应用 ID 为 `ink.zenly.ext-7a9373/phone-chat`、`ink.zenly.ext-7a9373/phone-album`。 |
+| **1.2.7** | phone-sdk `0.5.5`：Phone SDK 应用 ID 必须填「扩展ID/程序ID」；CLI `0.3.7`。 |
 | **1.2.6** | 相册迁出为独立扩展 `ink.zenly.app-cd6ad3`；phone-sdk `0.5.4` 桌面 APP 角标。 |
 | **1.2.5** | 相册页面过渡；视频缩略修复；作者文档补齐相册章节。 |
 | **1.2.4** | 相册视频：封面/抽帧 + 手机风播放器。 |
@@ -741,12 +738,20 @@ npm view @ink-zenly/phone-sdk version --registry https://registry.npmjs.org/
 npm view @ink-zenly/create-phone-app version --registry https://registry.npmjs.org/
 ```
 
-## 7. 内页应用：phone-album（相册，独立扩展）
+## 7. 内置内页：phone-chat 与 phone-album
 
-相册已迁至旁路工程 [`../ext-cd6ad3`](../ext-cd6ad3)：
+聊天与相册自 **1.3.0** 起内置在本仓宿主包，源码位于 `src/phone-chat/`、`src/phone-album/`，由 `StudioPhoneExtension` 合并设置 / 存档 / Fragment 方法。
 
-- 扩展包 ID：`ink.zenly.app-cd6ad3`
-- 程序 ID / 模块 id：`phone-album`（`registerPhoneApp({ id: "phone-album" })`）
-- 宿主填写：`ink.zenly.app-cd6ad3/phone-album`
+| 内页 | 程序 ID | Phone SDK 应用 ID（作者设置） |
+|------|---------|------------------------------|
+| 聊天 | `phone-chat` | `ink.zenly.ext-7a9373/phone-chat` |
+| 相册 | `phone-album` | `ink.zenly.ext-7a9373/phone-album` |
 
-宿主侧在「动作 · 手机内部应用」填 `phoneAppId = ink.zenly.app-cd6ad3/phone-album`（扩展ID/程序ID），并同时启用相册扩展。作者设置与 Fragment 方法见该仓库 `README.md`。
+### 从旧独立包迁移
+
+| 旧独立包扩展 ID | 旧 Phone SDK 应用 ID | 新绑定 |
+|-----------------|----------------------|--------|
+| `ink.zenly.app-015abe` | `ink.zenly.app-015abe/phone-chat` | `ink.zenly.ext-7a9373/phone-chat` |
+| `ink.zenly.app-cd6ad3` | `ink.zenly.app-cd6ad3/phone-album` | `ink.zenly.ext-7a9373/phone-album` |
+
+迁移后停用旧独立包，仅启用本扩展即可。Fragment 方法 `target` 前缀由旧包 id 改为 `ink.zenly.ext-7a9373/phone-chat/…` 或 `…/phone-album/…`。
