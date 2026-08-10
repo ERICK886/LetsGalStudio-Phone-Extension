@@ -1,6 +1,6 @@
 /**
  * @file constants.ts
- * @description 手机编辑器模块常量：程序 ID、品牌与分区元数据。
+ * @description 手机编辑器模块常量：程序 ID、品牌与分区元数据（phone-sdk host/editor）。
  * @author 池水三两升
  * @date 2026-08-10
  * @version 0.1.0

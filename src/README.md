@@ -5,7 +5,7 @@
 > 当前推荐：`@ink-zenly/phone-sdk@^0.5.5` ｜ `@ink-zenly/create-phone-app@0.3.7` ｜ Studio SDK `>=1.9.0`
 
 本目录 `src/` 是本仓宿主扩展的入口与内页应用（`demo-shop/`、`phone-chat/`、`phone-album/`）。宿主实现在 `@ink-zenly/phone-sdk`，脚手架在 `cli/`。  
-**聊天与相册已内置**于本扩展（`src/phone-chat/`、`src/phone-album/`），工坊只需启用本包。同包**多模块**：`PhoneExtension`（壳）+ `ChatController`（`phone-chat`）+ `PhoneAlbumExtension`（`phone-album`），各模块自有设置 / 存档。  
+**聊天与相册已内置**于本扩展（`src/phone-chat/`、`src/phone-album/`），工坊只需启用本包。同包**多模块**：`PhoneExtension`（壳）+ `PhoneEditorExtension`（作者编辑器，源码在 phone-sdk）+ `ChatController`（`phone-chat`）+ `PhoneAlbumExtension`（`phone-album`）。  
 独立 release 形态的聊天内页示例仍见旁路工程 [`../app-015abe`](../../app-015abe)（已迁入本仓，见 [§7 迁移表](#7-内置内页-phone-chat--phone-album)）。
 
 ## 目录
@@ -660,7 +660,7 @@ clearPhoneAppBadge("chat");
 
 | 版本 | 要点 |
 |------|------|
-| **1.3.1**（当前） | 聊天 / 相册改为同包**多模块**（`ChatController` / `PhoneAlbumExtension`），设置与存档跟随模块；Phone SDK 应用 ID 仍填 `phone-chat` / `phone-album`。 |
+| **1.3.1**（当前） | 聊天 / 相册同包多模块；新增 `PhoneEditorExtension`（phone-sdk `host/editor`，强调色 `#DB2777`，第一版仅外壳）。 |
 | **1.3.0** | 内置 `phone-chat` / `phone-album`（曾合并进 `StudioPhoneExtension`）；Phone SDK 应用 ID 填程序 ID。 |
 | **1.2.7** | phone-sdk `0.5.5`：Phone SDK 应用 ID 必须填「扩展ID/程序ID」；CLI `0.3.7`。 |
 | **1.2.6** | 相册迁出为独立扩展 `ink.zenly.app-cd6ad3`；phone-sdk `0.5.4` 桌面 APP 角标。 |
@@ -749,6 +749,7 @@ npm view @ink-zenly/create-phone-app version --registry https://registry.npmjs.o
 | 模块 | 类 | 程序 ID | Phone SDK 应用 ID | 方法 target 前缀 |
 |------|----|---------|-------------------|------------------|
 | 手机壳 | `PhoneExtension` | `phone` | — | `ink.zenly.ext-7a9373/phone/…` |
+| 手机编辑器 | `PhoneEditorExtension` | `phone-editor` | —（作者工具，非内页） | — |
 | 聊天 | `ChatController` | `phone-chat` | `phone-chat` | `…/phone-chat/…` |
 | 相册 | `PhoneAlbumExtension` | `phone-album` | `phone-album` | `…/phone-album/…` |
 

@@ -22,6 +22,7 @@
 | D3 | 实现路径：镜像场景交互壳（推荐）——自研轻量壳，不整包拷贝 `ext-27b96b` 业务 |
 | D4 | 第一版范围：**仅外壳**；样式编辑、自由布局、与 `phone` settings 写回均不做 |
 | D5 | 强调色固定 `#DB2777` |
+| D6 | 代码归属：`@ink-zenly/phone-sdk` 的 `host/editor/`（与 Phone / Toast 并列）；宿主仅 re-export |
 
 ### 1.2 非目标（外壳期）
 
@@ -36,11 +37,11 @@
 
 | 项 | 定案 |
 | --- | --- |
-| 目录 | `src/phone-editor/` |
+| 目录 | `phone-sdk/src/host/editor/`（跟随 phone-sdk，与 phone / toast 并列） |
 | 程序 id | `phone-editor` |
 | `@extension` | `{ id: "phone-editor", label: "手机编辑器" }` |
-| 包 id | `ink.zenly.ext-7a9373` |
-| 入口 | `src/index.tsx` → `export { PhoneEditorExtension }` |
+| 包 id | 宿主仍为 `ink.zenly.ext-7a9373`；实现包 `@ink-zenly/phone-sdk` |
+| 入口 | phone-sdk `index.ts` 导出；宿主 `src/index.tsx` re-export |
 | `exposeUI` | 默认 true（可被「显示界面」选中） |
 | `autonomous` | 否（作者主动打开） |
 
@@ -97,9 +98,9 @@ PhoneEditorExtension
 ## 4. 文件树与接线
 
 ```text
-src/phone-editor/
+phone-sdk/src/host/editor/
   constants.ts
-  index.tsx                 # PhoneEditorExtension
+  phone-editor-extension.tsx
   theme/
     tokens.ts
     theme-provider.tsx
@@ -112,7 +113,8 @@ src/phone-editor/
 
 接线：
 
-- `src/index.tsx` 增加 `export { PhoneEditorExtension } from "./phone-editor"`
+- `phone-sdk/src/index.ts`：`export { PhoneEditorExtension }`
+- 宿主 `src/index.tsx`：从 `@ink-zenly/phone-sdk` re-export
 - **不**加入 `bootstrapPhonePluginApps` 注册表
 
 ## 5. 验收标准
