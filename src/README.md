@@ -4,7 +4,8 @@
 > 作者侧「如何使用手机」（挂载、设置、消息、Toast）见根目录 [README.md](../README.md)。  
 > 当前推荐：`@ink-zenly/phone-sdk@^0.5.3` ｜ `@ink-zenly/create-phone-app@0.3.6` ｜ Studio SDK `>=1.9.0`
 
-本目录 `src/` 是本仓宿主扩展的入口与内页应用（如 `demo-shop/`、`phone-album/`）。宿主实现在 `@ink-zenly/phone-sdk`，脚手架在 `cli/`。  
+本目录 `src/` 是本仓宿主扩展的入口与内页应用（如 `demo-shop/`）。宿主实现在 `@ink-zenly/phone-sdk`，脚手架在 `cli/`。  
+相册内页已迁至独立扩展 [`../ext-cd6ad3`](../ext-cd6ad3)（`ink.zenly.app-cd6ad3`，`phoneAppId=phone-album`）。  
 独立 release 形态的聊天内页示例见旁路工程 [`../app-015abe`](../../app-015abe)（扩展包 id `app-015abe`，`phoneAppId=chat`）。
 
 ## 目录
@@ -66,7 +67,7 @@ vite.config.ts                 # 构建；注入 __PHONE_HOST_EXTENSION_ID__
 src/
 ├─ index.tsx                   # 扩展入口：导出 Phone/Toast，bootstrap 内页清单
 ├─ vite-env.d.ts
-└─ <app-id>/                   # 内页应用（如 demo-shop/、phone-album/）：registerPhoneApp + UI
+└─ <app-id>/                   # 内页应用（如 demo-shop/）：registerPhoneApp + UI
 phone-sdk/                     # 发布包 @ink-zenly/phone-sdk（0.4.0+）
 ├─ src/index.ts                # main：宿主 PhoneExtension / ToastExtension
 ├─ src/client/                 # → @ink-zenly/phone-sdk/plugin（内页 API）
@@ -647,7 +648,8 @@ await openPhoneApp({ appId: "chat", waitUntil: "close" });
 
 | 版本 | 要点 |
 |------|------|
-| **1.2.5**（当前） | 相册页面过渡；视频缩略修复；作者文档补齐相册章节。 |
+| **1.2.6**（当前） | 相册迁出为独立扩展 `ink.zenly.app-cd6ad3`（`phoneAppId` 仍为 `phone-album`）。 |
+| **1.2.5** | 相册页面过渡；视频缩略修复；作者文档补齐相册章节。 |
 | **1.2.4** | 相册视频：封面/抽帧 + 手机风播放器。 |
 | **1.2.3** | 对齐 phone-sdk `0.5.3`（`show-message` 撤回状态）。 |
 | **1.2.2** | 对齐 phone-sdk `0.5.2`（撤回首发）。 |
@@ -722,18 +724,11 @@ npm view @ink-zenly/phone-sdk version --registry https://registry.npmjs.org/
 npm view @ink-zenly/create-phone-app version --registry https://registry.npmjs.org/
 ```
 
-## 7. 内页应用：phone-album（相册）
+## 7. 内页应用：phone-album（相册，独立扩展）
 
-本仓内置相册内页；程序 ID 与作者设置 **`phoneAppId`** 均为 **`phone-album`**。Studio 扩展模块 id 同为 `phone-album`，显示名「**手机相册**」。
+相册已迁至旁路工程 [`../ext-cd6ad3`](../ext-cd6ad3)：
 
-### 作者怎么用
+- 扩展包 ID：`ink.zenly.app-cd6ad3`
+- 程序 / `phoneAppId` / 模块 id：`phone-album`
 
-1. **桌面 APP**：按 [§2.3 步骤 4](#步骤-4作者设置动作--桌面-app必做) 配置「动作 · 手机内部应用」与「手机应用目录」，`phoneAppId` 填 `phone-album`。
-2. **默认相册 / 媒体**：在扩展设置「手机相册」中配置「默认相册」「默认媒体」及文案（应用标题、「全部」显示名、空相册提示）。媒体的「所属相册 ID」为逗号分隔，可属多个相册。
-3. **剧情 Fragment 方法**：在模块「手机相册」上调用（快进 / skip 与正常执行一致，均写入存档）：
-   - `add-album` — 新增或覆盖相册
-   - `remove-album` — 隐藏相册
-   - `add-media` — 新增或覆盖媒体
-   - `remove-media` — 隐藏媒体
-   - `set-media-albums` — 替换媒体所属相册
-4. **玩家侧只读**：打开内页仅浏览相册与媒体，不能上传、删除或编辑。
+宿主侧只需在「动作 · 手机内部应用」填 `phoneAppId = phone-album`，并同时启用相册扩展。作者设置与 Fragment 方法见该仓库 `README.md`。
