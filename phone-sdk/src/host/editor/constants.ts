@@ -20,14 +20,37 @@ export type EditorSection = "shell" | "desktop" | "chat" | "misc";
 
 /**
  * 分区元数据（顺序即 Tab 顺序）。
+ *
+ * @property icon - Font Awesome 图标名（不含 `fa-`），供顶栏 Tab 使用
  */
 export const EDITOR_SECTIONS: ReadonlyArray<{
   id: EditorSection;
   label: string;
   centerHint: string;
+  icon: string;
 }> = [
-  { id: "shell", label: "外壳", centerHint: "手机外壳预览（即将推出）" },
-  { id: "desktop", label: "桌面", centerHint: "桌面图标样式（即将推出）" },
-  { id: "chat", label: "聊天气泡", centerHint: "气泡主题预览（即将推出）" },
-  { id: "misc", label: "其他", centerHint: "其它手机样式（即将推出）" },
+  {
+    id: "shell",
+    label: "外壳",
+    centerHint: "手机外壳预览（即将推出）",
+    icon: "mobile-screen",
+  },
+  {
+    id: "desktop",
+    label: "桌面",
+    centerHint: "桌面图标样式（即将推出）",
+    icon: "grid-2",
+  },
+  {
+    id: "chat",
+    label: "聊天气泡",
+    centerHint: "气泡主题预览（即将推出）",
+    icon: "comments",
+  },
+  {
+    id: "misc",
+    label: "其他",
+    centerHint: "其它手机样式（即将推出）",
+    icon: "sliders",
+  },
 ];

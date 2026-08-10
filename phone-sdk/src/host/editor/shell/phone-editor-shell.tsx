@@ -16,6 +16,7 @@
 
 import React from "react";
 import { BRAND_LABEL, EDITOR_SECTIONS, type EditorSection } from "../constants";
+import { IconLabel } from "../shared/fa-icon";
 import {
   useTheme,
   FONT_SIZE_TITLE,
@@ -51,6 +52,9 @@ const topBarButtonStyle: React.CSSProperties = {
   cursor: "pointer",
   fontSize: 12,
   lineHeight: 1,
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 6,
 };
 
 /**
@@ -170,9 +174,12 @@ export function PhoneEditorShell({
                     ? `1px solid ${tokens.accent}`
                     : `1px solid transparent`,
                   fontWeight: selected ? 600 : 400,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
                 }}
               >
-                {item.label}
+                <IconLabel icon={item.icon}>{item.label}</IconLabel>
               </button>
             );
           })}
@@ -198,7 +205,9 @@ export function PhoneEditorShell({
               border: `1px solid ${tokens.border}`,
             }}
           >
-            {mode === "dark" ? "浅色" : "深色"}
+            <IconLabel icon={mode === "dark" ? "sun" : "moon"}>
+              {mode === "dark" ? "浅色" : "深色"}
+            </IconLabel>
           </button>
           <button
             type="button"
@@ -212,7 +221,7 @@ export function PhoneEditorShell({
               opacity: 0.7,
             }}
           >
-            运行预览
+            <IconLabel icon="play">运行预览</IconLabel>
           </button>
         </div>
       </div>

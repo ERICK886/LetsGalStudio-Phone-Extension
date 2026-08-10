@@ -17,6 +17,7 @@ import React, {
   useMemo,
   useState,
 } from "react";
+import { ensureFontAwesomeCss } from "../shared/font-awesome";
 import { getThemeTokens, type ThemeMode, type ThemeTokens } from "./tokens";
 
 /**
@@ -99,6 +100,11 @@ export function ThemeProvider({
   initialMode = "dark",
   children,
 }: ThemeProviderProps): React.ReactElement {
+  // 编辑器打开即注入 FA，保证顶栏 Tab / 按钮图标可用。
+  useEffect(() => {
+    ensureFontAwesomeCss();
+  }, []);
+
   const [mode, setMode] = useState<ThemeMode>(initialMode);
 
   /**
