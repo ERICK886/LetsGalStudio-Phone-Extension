@@ -1,8 +1,8 @@
 # LetsGal Studio 自定义手机扩展
 
 > 扩展包 ID：`ink.zenly.ext-7a9373`｜ 程序界面：`phone`、`phone-toast`  
-> 扩展版本：`1.2.6` ｜ 需要 LetsGal Studio SDK：`>=1.9.0`  
-> 对齐：`@ink-zenly/phone-sdk@^0.5.4` ｜ `@ink-zenly/create-phone-app@0.3.6`
+> 扩展版本：`1.2.7` ｜ 需要 LetsGal Studio SDK：`>=1.9.0`
+> 对齐：`@ink-zenly/phone-sdk@^0.5.5` ｜ `@ink-zenly/create-phone-app@0.3.7`
 
 这是一个**游戏里的手机**：剧情里挂上之后，玩家可以打开桌面、点 APP、看聊天消息，还能收到简单的提示（Toast）。
 
@@ -36,7 +36,7 @@
 - 装删 APP 时可选弹出 Toast 提示（快进时一般不弹）
 - 做聊天对话：对方 / 我方气泡、已读未读、撤回、多段消息接上聊
 - 可调气泡颜色、字号、要不要显示头像和名字等
-- 可挂独立相册内页扩展（`phoneAppId=phone-album`）
+- 可挂独立相册内页扩展（`phoneAppId=ink.zenly.app-cd6ad3/phone-album`）
 - 剧本可用 `openPhoneApp` / `closePhoneApp`（phone-sdk）自动打开或关闭手机并深开内页
 
 **暂时做不到 / 要注意：**
@@ -164,7 +164,7 @@ ink.zenly.ext-7a9373.open-phone
 | 可视化 UI | 项目 UI 填名字；扩展 UI 填 `@扩展ID/界面名` |
 | 内置系统界面 | 标题、工具栏、存档、读档、设置、历史、鉴赏 |
 | 手机内部方法 | 快速存档 / 快速读档 / 切换全屏 |
-| 手机内部应用 | 打开手机屏幕里的小应用（不关手机外壳） |
+| 手机内部应用 | 打开手机屏幕里的小应用（不关手机外壳）。**Phone SDK 应用 ID 必须填「扩展ID/程序ID」**，例如 `ink.zenly.app-015abe/phone-chat` |
 
 动作 ID 发布后尽量别改：桌面和玩家自己改过的绑定都认这个 ID。  
 扩展**不会**随便跑脚本；要调别的扩展方法，请用剧本 Fragment +「调用扩展方法」。
@@ -188,8 +188,12 @@ ink.zenly.ext-7a9373.open-phone
 **c. 手机内页（小应用）**
 
 一般要问内页作者，或看他们的说明。  
-- 别人做的内页扩展：通常是 `扩展ID/内页ID`  
-- 本手机扩展自带的内页：往往只要填内页 ID（不用带扩展 ID）
+**统一填写「扩展包 ID/程序 ID」**，禁止只填程序 ID（避免多扩展同 APPID 冲突）：
+
+- 聊天：`ink.zenly.app-015abe/phone-chat`  
+- 相册：`ink.zenly.app-cd6ad3/phone-album`  
+- 扩展包 ID = 该内页扩展的 `extension.json` → `id`  
+- 程序 ID = `@extension({ id })` / `registerPhoneApp({ id })`（聊天为 `phone-chat`，相册为 `phone-album`）
 
 ![内页 ID 示例](assets/1785821132813.png)
 
@@ -378,7 +382,7 @@ ink.zenly.ext-7a9373.open-phone
 - [ ] 装、删、禁用、解禁表现正确；Toast 在快进时不会乱弹  
 - [ ] 个性化开关和「锁定编辑」符合预期  
 - [ ] 消息能一条条推进，接续和背景符合预期  
-- [ ] 相册能打开（已启用 `ink.zenly.app-cd6ad3`，且 `phoneAppId=phone-album`）  
+- [ ] 相册能打开（已启用 `ink.zenly.app-cd6ad3`，且 `phoneAppId=ink.zenly.app-cd6ad3/phone-album`）  
 - [ ] 用剧本 Preview 能完整跑通  
 
 | 遇到的情况 | 先查什么 |
@@ -392,7 +396,7 @@ ink.zenly.ext-7a9373.open-phone
 | 接续不上 | 上一组有没有关掉？本组开了接续吗？中间卸过手机吗？ |
 | 最后一条后卡住 | 正常：还要再确认一次才会关手机 |
 | 头像只剩一个字 | 角色/素材/图片地址；控制台搜 `[phone-avatar]` |
-| 相册打不开 | 是否启用相册扩展 `ink.zenly.app-cd6ad3`；内部应用 ID 是否为 `phone-album`；是否已挂载手机 |
+| 相册打不开 | 是否启用相册扩展；Phone SDK 应用 ID 是否为 `扩展ID/phone-album`（禁止只填 `phone-album`） |
 
 调试时可看控制台里的 `[phone-debug]`、`[phone-avatar]`、`[phone-album]`。
 
@@ -406,7 +410,8 @@ ink.zenly.ext-7a9373.open-phone
 
 | 版本 | 主要变化 |
 |------|------|
-| **1.2.6**（当前） | 相册迁出为独立扩展 `ink.zenly.app-cd6ad3`；phone-sdk `0.5.4` 桌面 APP 角标（红点/数字） |
+| **1.2.7**（当前） | phone-sdk `0.5.5`：Phone SDK 应用 ID 必须填「扩展ID/程序ID」；CLI `0.3.7` |
+| **1.2.6** | 相册迁出为独立扩展 `ink.zenly.app-cd6ad3`；phone-sdk `0.5.4` 桌面 APP 角标（红点/数字） |
 | **1.2.5** | 文档补齐相册；相册内页页面过渡；视频缩略不再错误 seek |
 | **1.2.4** | 相册视频：封面/抽帧缩略 + 手机风播放器 |
 | **1.2.3** | phone-sdk `0.5.3`：`show-message`「撤回」状态（延迟消失 + 系统行） |

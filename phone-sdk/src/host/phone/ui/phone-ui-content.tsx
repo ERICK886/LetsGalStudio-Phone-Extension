@@ -64,6 +64,7 @@ import {
   publishPhoneSafeAreaInsets,
   subscribePhoneAppBadges,
   subscribePhoneNavigate,
+  toPhoneAppId,
   type PhoneAppBadge,
   type PhoneSafeAreaInsets,
 } from "@ink-zenly/phone-sdk/plugin";
@@ -88,12 +89,13 @@ import {
  * 从桌面解析结果取出角标用的 phoneAppId（仅 in-phone-app 目标）。
  *
  * @param app - 已解析桌面应用
- * @returns phoneAppId；非内页动作则 `undefined`
+ * @returns 程序 ID（与 setPhoneAppBadge 键一致）；非内页动作则 `undefined`
  */
 function resolveDesktopBadgeAppId(app: ResolvedPhoneApp): string | undefined {
   const target = app.action?.target as PhoneTarget | undefined;
   if (target && target.kind === "in-phone-app" && target.phoneAppId) {
-    return target.phoneAppId;
+    // 目录里存的是「扩展ID/程序ID」；角标表按程序 ID 索引。
+    return toPhoneAppId(target.phoneAppId) ?? undefined;
   }
   return undefined;
 }
@@ -1050,33 +1052,37 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
    * 抽自 `launchApp` 的 `in-phone-app` 分支，供桌面图标点击与导航总线订阅共用。
    * 仅依赖 `registerPhoneApp` 注册表，不要求桌面目录存在对应图标；未注册时 warn 并退出，不抛错。
    *
-   * @param phoneAppId Phone SDK 应用 id（Studio 程序 ID）
-   * @param originAppId 可选的桌面图标 id，用于苹果预设下从图标中心放大的 transform-origin；
-   *   未提供（如导航总线驱动）时回退屏幕中部偏上。
-   */
+ * @param phoneAppId Phone SDK 应用 ID（作者填写的「扩展ID/程序ID」，或程序 ID）
+ * @param originAppId 可选的桌面图标 id，用于苹果预设下从图标中心放大的 transform-origin；
+ *   未提供（如导航总线驱动）时回退屏幕中部偏上。
+ */
   const openInPhoneAppById = (phoneAppId: string, originAppId?: string) => {
     const lookupDiag = diagnosePhoneAppLookup(phoneAppId);
     const registered = lookupPhoneSdkApp(phoneAppId);
+    // 注册表按程序 ID 索引；作者填写的是「扩展ID/程序ID」时规约为程序 ID。
+    const resolvedAppId = lookupDiag.normalizedId ?? phoneAppId;
     if (!registered) {
       phoneSdkDiagWarn("打开内页失败：注册表未命中", {
         phase: "open-in-phone-app-miss",
         phoneAppId,
+        resolvedAppId,
         ...lookupDiag,
       });
       showMessage(
         `应用不可用：未找到「${phoneAppId}」。`
-          + "请确认已通过 @ink-zenly/phone-sdk/plugin 完成 registerPhoneApp，"
-          + "且 Phone SDK 应用 ID 与程序 ID 一致。",
+          + "请确认 Phone SDK 应用 ID 已填「扩展ID/程序ID」，"
+          + "且已通过 @ink-zenly/phone-sdk/plugin 完成 registerPhoneApp。",
       );
       return;
     }
     phoneSdkDiag("打开内页：注册表命中", {
       phase: "open-in-phone-app-hit",
       phoneAppId,
+      resolvedAppId,
       title: registered.title,
     });
     // 策略 D：成功打开内页时清除桌面角标；内页仍可按未读再 set。
-    clearPhoneAppBadge(phoneAppId);
+    clearPhoneAppBadge(resolvedAppId);
     setEditorOpen(false);
     // 进入内页前先写入状态栏高度，避免首帧 safeAreaInsets 为 0 导致标题顶到状态栏。
     const provisional: PhoneSafeAreaInsets = {
@@ -1103,7 +1109,8 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
       origin,
     });
     setInAppPhase("entering");
-    setActiveInPhoneAppId(phoneAppId);
+    // 活动态用程序 ID，与 registerPhoneApp / 角标 / InPhoneApp 查找键一致。
+    setActiveInPhoneAppId(resolvedAppId);
   };
   openInPhoneAppByIdRef.current = openInPhoneAppById;
   messageModeRef.current = messageMode;
@@ -1892,16 +1899,19 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
 
                       {selectedAction.target.kind === "in-phone-app" && (
                         <label className="phone-field">
-                          Phone SDK 应用 ID
+                          Phone SDK 应用 ID（扩展ID/程序ID）
                           <input
-                            placeholder="例如 phone-snake 或 ink.zenly.ext-phone-snake/phone-snake"
+                            placeholder="例如 ink.zenly.app-015abe/phone-chat"
                             value={selectedAction.target.phoneAppId}
                             onChange={(event) => updateSelectedTarget({
                               kind: "in-phone-app",
                               phoneAppId: event.target.value,
                             })}
                           />
-                          <span>点击后在手机屏幕内打开，不关闭手机。应用内返回由第三方自行实现；底部 Home 回桌面。</span>
+                          <span>
+                            必须填写「扩展包 ID/程序 ID」，禁止只填程序 ID。
+                            点击后在手机屏幕内打开，不关闭手机。
+                          </span>
                         </label>
                       )}
 

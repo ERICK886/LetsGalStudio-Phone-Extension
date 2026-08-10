@@ -3,7 +3,7 @@
  * @description Phone SDK 应用 id 约定：与 Studio「程序 ID」对齐，并支持扩展ID/程序ID 引用解析。
  * @author 池水三两升
  * @date 2026-08-01
- * @version 0.2.0
+ * @version 0.5.5
  */
 
 /**
@@ -41,6 +41,28 @@ export function isPhoneAppId(id: unknown): id is string {
 }
 
 /**
+ * 判断是否为规范的「扩展ID/程序ID」路径（两端均非空且合法）。
+ *
+ * @param value - 作者填写的 Phone SDK 应用 ID
+ * @returns 是否为完整引用路径
+ *
+ * @remarks
+ * 宿主「动作 · 手机内部应用」**必须**使用此格式，禁止只填程序 ID，
+ * 以免多扩展同程序 ID 时作者绑错目标。
+ *
+ * @example
+ * ```ts
+ * isStudioProgramRefPath("ink.zenly.app-015abe/phone-chat"); // true
+ * isStudioProgramRefPath("phone-chat"); // false
+ * ```
+ */
+export function isStudioProgramRefPath(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  const parsed = parseStudioProgramRef(value);
+  return Boolean(parsed && parsed.extensionId);
+}
+
+/**
  * 拼接 Studio 程序引用路径。
  *
  * @param extensionId 扩展清单 id（`extension.json`）
@@ -63,6 +85,25 @@ export function formatStudioProgramRef(extensionId: string, programId: string): 
     throw new Error(`[phone-sdk] programId 非法: ${JSON.stringify(programId)}`);
   }
   return `${extensionId}/${programId}`;
+}
+
+/**
+ * 将作者填写值规范为「扩展ID/程序ID」路径。
+ *
+ * @param idOrRef - 已含斜杠的完整引用
+ * @returns 规范化路径；缺扩展段或非法时 `null`
+ *
+ * @example
+ * ```ts
+ * toStudioProgramRefPath(" ink.zenly.app-015abe / phone-chat ");
+ * // → "ink.zenly.app-015abe/phone-chat"
+ * toStudioProgramRefPath("phone-chat"); // null
+ * ```
+ */
+export function toStudioProgramRefPath(idOrRef: string): string | null {
+  const parsed = parseStudioProgramRef(idOrRef);
+  if (!parsed?.extensionId) return null;
+  return formatStudioProgramRef(parsed.extensionId, parsed.programId);
 }
 
 /**

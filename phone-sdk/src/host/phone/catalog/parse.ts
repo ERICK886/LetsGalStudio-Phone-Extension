@@ -11,7 +11,7 @@ import {
   isInternalSystemSlot,
   resolveUIRef,
 } from "@avg-studio/sdk";
-import { isPhoneAppId, toPhoneAppId } from "@ink-zenly/phone-sdk/plugin";
+import { toStudioProgramRefPath } from "@ink-zenly/phone-sdk/plugin";
 import { getPhoneHostExtensionId } from "../../host-extension-id";
 import type {
   ActionSettingsRow,
@@ -143,13 +143,11 @@ function parseTarget(value: unknown): PhoneTarget | null {
           }
         : null;
     case "in-phone-app": {
-      const phoneAppId =
-        typeof value.phoneAppId === "string"
-          ? toPhoneAppId(value.phoneAppId)
-          : null;
-      return phoneAppId && isPhoneAppId(phoneAppId)
-        ? { kind: "in-phone-app", phoneAppId }
-        : null;
+      // 必须填写「扩展ID/程序ID」；禁止只填程序 ID，避免多扩展同 APPID 绑错。
+      // 目标里保留完整引用；打开时由 lookupPhoneSdkApp / toPhoneAppId 取程序 ID。
+      if (typeof value.phoneAppId !== "string") return null;
+      const refPath = toStudioProgramRefPath(value.phoneAppId);
+      return refPath ? { kind: "in-phone-app", phoneAppId: refPath } : null;
     }
     default:
       return null;
@@ -181,6 +179,12 @@ export function getPhoneActionValidationError(
   if (!isSafeId(action.id)) return "动作 ID 只能使用小写字母、数字和连字符";
   if (!nonEmptyString(action.name, 32))
     return "动作名称不能为空且不能超过 32 个字符";
+  if (action.target.kind === "in-phone-app") {
+    const ref = String(action.target.phoneAppId ?? "").trim();
+    if (!toStudioProgramRefPath(ref)) {
+      return "Phone SDK 应用 ID 须填写「扩展ID/程序ID」，例如 ink.zenly.app-015abe/phone-chat（禁止只填程序 ID）";
+    }
+  }
   if (!parseTarget(action.target)) return "动作目标未填写完整或格式无效";
   return undefined;
 }

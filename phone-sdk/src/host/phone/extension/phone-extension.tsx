@@ -2134,9 +2134,9 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
         id: item.string("ID").default("new-in-phone-app"),
         name: item.string("名称").default("新手机内部应用"),
         phoneAppId: item
-          .string("Phone SDK 应用 ID")
+          .string("Phone SDK 应用 ID（扩展ID/程序ID）")
           .describe(
-            "填写已通过 @ink-zenly/phone-sdk/plugin 注册的程序 ID（与 @extension({ id }) / registerPhoneApp({ id }) 一致），例如 phone-snake。也可填「扩展ID/程序ID」。宿主本身不提供内页应用。",
+            "必须填写「扩展包 ID/程序 ID」，例如 ink.zenly.app-015abe/phone-chat 或 ink.zenly.app-cd6ad3/phone-album。禁止只填程序 ID（如 phone-chat），以免多扩展同 APPID 冲突绑错。扩展包 ID 见该扩展 extension.json 的 id；程序 ID 与 @extension({ id }) / registerPhoneApp({ id }) 一致。",
           ),
         description: item.string("说明"),
       }))
@@ -2150,7 +2150,7 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
       .addLabel("添加手机内部应用动作")
       .emptyHint("没有手机内部应用动作。请先由外部通过 @ink-zenly/phone-sdk/plugin 注册应用。")
       .describe(
-        "操作：①外部用 @ink-zenly/phone-sdk/plugin 的 registerPhoneApp({ id: 程序ID }) 注册；②添加本动作并填写相同程序 ID（或 扩展ID/程序ID）；③在「手机应用目录」绑定该动作 ID。宿主不编写内页应用。",
+        "操作：①外部用 registerPhoneApp({ id: 程序ID }) 注册；②添加本动作，Phone SDK 应用 ID 必填「扩展ID/程序ID」（如 ink.zenly.app-015abe/phone-chat）；③在「手机应用目录」绑定该动作 ID。禁止只填程序 ID。",
       ),
     catalogApps: s
       .array("手机应用目录", (item) => ({

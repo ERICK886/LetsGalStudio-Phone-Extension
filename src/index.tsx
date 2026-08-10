@@ -9,7 +9,7 @@
  * - 宿主：`@ink-zenly/phone-sdk`（main），不编写内页。
  * - 内页 API / 引导：`@ink-zenly/phone-sdk/plugin`。
  * - 内页应用目录：`src/<app-id>/`（仅保留应用本身）。
- * - 相册已迁至独立扩展 `ink.zenly.app-cd6ad3`（phoneAppId=`phone-album`）。
+ * - 相册已迁至独立扩展 `ink.zenly.app-cd6ad3`（宿主 phoneAppId=`ink.zenly.app-cd6ad3/phone-album`）。
  */
 
 import {

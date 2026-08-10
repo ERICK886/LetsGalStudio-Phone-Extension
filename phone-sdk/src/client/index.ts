@@ -37,8 +37,10 @@ export { PHONE_SDK_GLOBAL_KEY, getPhoneSdkAppsRegistry, getPhoneSdkSlot } from "
 export {
   formatStudioProgramRef,
   isPhoneAppId,
+  isStudioProgramRefPath,
   parseStudioProgramRef,
   toPhoneAppId,
+  toStudioProgramRefPath,
 } from "./runtime/app-id";
 export {
   getRegisteredPhoneApp,

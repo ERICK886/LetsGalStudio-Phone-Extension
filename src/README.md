@@ -5,7 +5,7 @@
 > 当前推荐：`@ink-zenly/phone-sdk@^0.5.4` ｜ `@ink-zenly/create-phone-app@0.3.6` ｜ Studio SDK `>=1.9.0`
 
 本目录 `src/` 是本仓宿主扩展的入口与内页应用（如 `demo-shop/`）。宿主实现在 `@ink-zenly/phone-sdk`，脚手架在 `cli/`。  
-相册内页已迁至独立扩展 [`../ext-cd6ad3`](../ext-cd6ad3)（`ink.zenly.app-cd6ad3`，`phoneAppId=phone-album`）。  
+相册内页已迁至独立扩展 [`../ext-cd6ad3`](../ext-cd6ad3)（`ink.zenly.app-cd6ad3`，宿主填写 `phoneAppId=ink.zenly.app-cd6ad3/phone-album`）。  
 独立 release 形态的聊天内页示例见旁路工程 [`../app-015abe`](../../app-015abe)（扩展包 id `app-015abe`，`phoneAppId=chat`）。
 
 ## 目录
@@ -123,7 +123,7 @@ API 细节见 [`../phone-sdk/README.md`](../phone-sdk/README.md)；CLI 细节见
 |------|------|--------|------|
 | **宿主扩展包 id** | `^[a-z][a-z0-9.-]*$`（可含点号）→ 宿主 `extension.json.id` | `create --extension-id` | `com.acme.my-phone` |
 | **程序 ID / app-id** | `^[a-z][a-z0-9-]*$` → `registerPhoneApp({ id })`、`src/<app-id>/` | `create --app-id` / `add` | `demo-shop`、`my-mail` |
-| **phoneAppId（作者设置）** | 填**程序 ID**，或 `宿主扩展包ID/程序ID` | Studio 手动配置 | `my-mail` |
+| **phoneAppId（作者设置）** | **必须**填 `扩展包ID/程序ID` | Studio 手动配置 | `ink.zenly.app-015abe/phone-chat` |
 | **动作 ID** | 作者自定；APP 目录「默认动作 ID」引用它 | Studio 手动配置 | `open-my-mail` |
 | **内页包扩展包 id**（仅 pack） | 默认同 app-id；可用 `--extension-id` 覆盖 | `pack` 可选 | 默认 `my-mail` |
 
@@ -333,7 +333,7 @@ export class ShopController extends Extension {
 
 - `@extension({ id })` **必须**等于 `registerPhoneApp({ id })`
 - 构建时将 phone-sdk **打进**内页 bundle；`react` / `@avg-studio/sdk` 保持 external
-- 游戏中须**同时启用**手机宿主扩展，并在宿主设置里把 `phoneAppId` 指到该程序 ID
+- 游戏中须**同时启用**手机宿主扩展，并在宿主设置里把 `phoneAppId` 填为 `扩展包ID/程序ID`
 
 `pack` 产物即按此形态生成，一般无需手写脚手架。
 
@@ -367,7 +367,7 @@ export class ShopController extends Extension {
 | 点击无反应 / 打不开内页 | `phoneAppId` 是否与 `PROGRAM_ID` 一致；扩展是否已 build 并重载；是否已 `mount-phone` |
 | 打开了却立刻回桌面或白屏 | 看控制台内页错误边界；检查 `render` 是否抛错 |
 | 只有程序 Preview 能看见手机壳 | 改用剧本 Preview 验证内页 |
-| pack 后对方打不开 | 对方是否启用了**宿主**；`phoneAppId` 是否仍指向同一程序 ID |
+| pack 后对方打不开 | 对方是否启用了**宿主**；`phoneAppId` 是否仍为同一 `扩展ID/程序ID` |
 | 快捷键打开手机异常 | 宿主扩展包 id 是否已 Vite 注入（§4）；勿与内页 app-id 混淆 |
 
 ## 3. 脚手架 create-phone-app 详解
@@ -635,7 +635,7 @@ clearPhoneAppBadge("chat");
 
 仅 `registerPhoneApp` **不会**自动出现图标。还必须在**宿主**的作者设置中：
 
-1. **动作 · 手机内部应用**：`phoneAppId` = 程序 ID（如 `my-mail`）
+1. **动作 · 手机内部应用**：`phoneAppId` **必须**填 `扩展包ID/程序ID`（如 `ink.zenly.app-foo/my-mail`），禁止只填程序 ID  
 2. **手机应用目录**：`默认动作 ID` 指向上述动作；建议开启「游戏开始默认预装」
 
 然后 `pnpm build` / `watch` → Studio 重载扩展 → 剧本 Preview 中 `mount-phone` → 快捷键打开 → 点击 APP。
@@ -662,7 +662,8 @@ clearPhoneAppBadge("chat");
 
 | 版本 | 要点 |
 |------|------|
-| **1.2.6**（当前） | 相册迁出为独立扩展 `ink.zenly.app-cd6ad3`；phone-sdk `0.5.4` 桌面 APP 角标。 |
+| **1.2.7**（当前） | phone-sdk `0.5.5`：Phone SDK 应用 ID 必须填「扩展ID/程序ID」；CLI `0.3.7`。 |
+| **1.2.6** | 相册迁出为独立扩展 `ink.zenly.app-cd6ad3`；phone-sdk `0.5.4` 桌面 APP 角标。 |
 | **1.2.5** | 相册页面过渡；视频缩略修复；作者文档补齐相册章节。 |
 | **1.2.4** | 相册视频：封面/抽帧 + 手机风播放器。 |
 | **1.2.3** | 对齐 phone-sdk `0.5.3`（`show-message` 撤回状态）。 |
@@ -681,7 +682,8 @@ clearPhoneAppBadge("chat");
 
 | 版本 | npm | 要点 |
 |------|-----|------|
-| **0.5.4** | ⏳ | 桌面 APP 角标 API：`setPhoneAppBadge` / `clearPhoneAppBadge`（`dot` \| `count`）；宿主桌面渲染；打开内页自动 clear。 |
+| **0.5.5** | ✅ npm | 「动作 · 手机内部应用」Phone SDK 应用 ID **必须**填 `扩展ID/程序ID`；并入未单独发 npm 的 0.5.4 桌面角标 API。 |
+| **0.5.4** | （未单独发 npm，并入 0.5.5） | 桌面 APP 角标 API：`setPhoneAppBadge` / `clearPhoneAppBadge`（`dot` \| `count`）。 |
 | **0.5.3** | ✅ | 撤回计时器在关手机/清理会话时完整释放。 |
 | **0.5.2** | ✅ | `show-message` 支持 `recalled`：延迟后气泡消失并显示「角色名+后缀」系统行；推进时立刻撤回。 |
 | **0.5.1** | ✅ | 导出 `closePhoneApp`：剧本/动作可带动画关闭手机；导航控制器补齐关闭路径。 |
@@ -744,6 +746,7 @@ npm view @ink-zenly/create-phone-app version --registry https://registry.npmjs.o
 相册已迁至旁路工程 [`../ext-cd6ad3`](../ext-cd6ad3)：
 
 - 扩展包 ID：`ink.zenly.app-cd6ad3`
-- 程序 / `phoneAppId` / 模块 id：`phone-album`
+- 程序 ID / 模块 id：`phone-album`（`registerPhoneApp({ id: "phone-album" })`）
+- 宿主填写：`ink.zenly.app-cd6ad3/phone-album`
 
-宿主侧只需在「动作 · 手机内部应用」填 `phoneAppId = phone-album`，并同时启用相册扩展。作者设置与 Fragment 方法见该仓库 `README.md`。
+宿主侧在「动作 · 手机内部应用」填 `phoneAppId = ink.zenly.app-cd6ad3/phone-album`（扩展ID/程序ID），并同时启用相册扩展。作者设置与 Fragment 方法见该仓库 `README.md`。
