@@ -22,7 +22,6 @@ import {
   DEFAULT_CHAT_ROLE_NAME_COLOR,
   DEFAULT_CHAT_ROLE_TEXT_COLOR,
 } from "./chat-role-bubble-style";
-import { STORY_VISIBILITY_OVERRIDES } from "./story-message-visibility";
 
 const DEFAULT_OPEN_PHONE_SHORTCUT = "ArrowUp";
 

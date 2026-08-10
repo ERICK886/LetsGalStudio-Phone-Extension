@@ -142,8 +142,8 @@ export class StudioPhoneExtension extends PhoneExtension {
    * 卸载时释放所有等待玩家回复的门闩，避免剧情卡在 await-player-reply。
    *
    * @remarks
-   * 当前 SDK 基类未声明 `onUnload` 钩子，本方法作为防御性 API 保留；
-   * 若未来 SDK 增加该钩子，宿主可直接调用。同时供外部测试或手动卸载场景调用。
+   * SDK 不会自动调用本静态方法；仅当宿主显式调用（或未来 SDK 提供卸载钩子）时，
+   * 才会释放 reply-wait。否则 await-player-reply 可能一直挂起。
    */
   static onUnload(): void {
     try {
