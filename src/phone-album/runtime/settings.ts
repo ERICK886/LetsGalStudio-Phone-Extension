@@ -1,0 +1,210 @@
+/**
+ * @file settings.ts
+ * @description 从扩展设置读取默认相册 / 默认媒体 / 文案，并缓存供内页 UI 读取。
+ * @author 池水三两升
+ * @date 2026-08-10
+ * @version 0.2.0
+ *
+ * @remarks
+ * - 字段名一律以 `album` 前缀读取（与 `settings-fields.ts` 的 `buildAlbumSettingsFields` 对齐）。
+ * - `ALBUM_SETTINGS_KEYS` 供宿主包装类 `onRegister` 集中订阅。
+ * - 内页 React 树在宿主 Phone 中渲染时，`useExtensionContext()` 是宿主上下文，
+ *   不能直接 `settings.get` 本扩展字段；请用 `cacheAuthorSettings` + `getCachedAuthorSettings`。
+ */
+
+import type { ExtensionContext } from "@avg-studio/sdk";
+
+import type {
+  AlbumAuthorSettings,
+  DefaultAlbumSeed,
+  DefaultMediaSeed,
+  MediaType,
+} from "../types";
+import { parseCommaIds, parseMediaType } from "../domain/index";
+
+/** 文案默认值。 */
+const DEFAULT_LABELS = {
+  appTitle: "相册",
+  allAlbumsLabel: "全部",
+  emptyAlbumHint: "这里还没有照片",
+} as const;
+
+/**
+ * 相册内页作者设置键（带 `album` 前缀）。
+ *
+ * @remarks
+ * 供宿主 `StudioPhoneExtension.onRegister` 集中 `ctx.settings.subscribe`，
+ * 任一字段变更即刷新缓存。与 `settings-fields.ts` 的字段名一一对应。
+ */
+export const ALBUM_SETTINGS_KEYS = [
+  "albumAppTitle",
+  "albumAllAlbumsLabel",
+  "albumEmptyAlbumHint",
+  "albumDefaultAlbums",
+  "albumDefaultMedia",
+] as const;
+
+/** 字符串字段规范化：非字符串 / 空白回落到 fallback，并截断到 max。 */
+function nonEmpty(value: unknown, fallback: string, max = 40): string {
+  if (typeof value !== "string") return fallback;
+  const trimmed = value.trim();
+  return trimmed ? trimmed.slice(0, max) : fallback;
+}
+
+/** 解析默认相册设置行：`id` / `name` 必填；`coverAsset` 空则省略。 */
+function parseDefaultAlbum(row: unknown): DefaultAlbumSeed | null {
+  if (!row || typeof row !== "object") return null;
+  const raw = row as {
+    id?: unknown;
+    name?: unknown;
+    coverAsset?: unknown;
+    asset?: unknown;
+  };
+  const id = nonEmpty(raw.id, "");
+  if (id === "") return null;
+  const name = nonEmpty(raw.name, id);
+  // 兼容旧字段名 asset
+  const coverRaw =
+    typeof raw.coverAsset === "string"
+      ? raw.coverAsset
+      : typeof raw.asset === "string"
+        ? raw.asset
+        : "";
+  const coverAsset = coverRaw.trim();
+  const seed: DefaultAlbumSeed = { id, name };
+  if (coverAsset !== "") seed.coverAsset = coverAsset;
+  return seed;
+}
+
+/** 解析默认媒体设置行：`type` 经 parseMediaType（失败跳过）；`asset` 必填；`albumIds` 用 parseCommaIds。 */
+function parseDefaultMedia(row: unknown): DefaultMediaSeed | null {
+  if (!row || typeof row !== "object") return null;
+  const raw = row as {
+    id?: unknown;
+    type?: unknown;
+    asset?: unknown;
+    albumIds?: unknown;
+    durationSec?: unknown;
+    posterAsset?: unknown;
+  };
+  const id = nonEmpty(raw.id, "");
+  if (id === "") return null;
+  const type = parseMediaType(raw.type) as MediaType | null;
+  if (type === null) return null;
+  const asset = coerceSettingsAsset(raw.asset);
+  if (asset === "") return null;
+  const albumIds = parseCommaIds(raw.albumIds);
+  const seed: DefaultMediaSeed = { id, type, asset, albumIds };
+  if (
+    typeof raw.durationSec === "number" &&
+    Number.isFinite(raw.durationSec) &&
+    raw.durationSec > 0
+  ) {
+    seed.durationSec = raw.durationSec;
+  }
+  const poster = coerceSettingsAsset(raw.posterAsset);
+  if (poster !== "") seed.posterAsset = poster;
+  return seed;
+}
+
+/**
+ * 设置里的 asset 字段可能是字符串，也可能是 `{ url }` / `{ uri }`。
+ *
+ * @param value - 原始设置值
+ * @returns trim 后的 URI 字符串
+ */
+function coerceSettingsAsset(value: unknown): string {
+  if (typeof value === "string") return value.trim();
+  if (value && typeof value === "object") {
+    const raw = value as { url?: unknown; uri?: unknown };
+    if (typeof raw.url === "string" && raw.url.trim()) return raw.url.trim();
+    if (typeof raw.uri === "string" && raw.uri.trim()) return raw.uri.trim();
+  }
+  return "";
+}
+
+/**
+ * 读取并规范化作者设置。
+ *
+ * @param ctx - 扩展上下文（方法内为本扩展 scope；内页为宿主 scope 时勿用本函数读设置）
+ * @returns AlbumAuthorSettings
+ *
+ * @example
+ * ```ts
+ * const settings = readAuthorSettings(ctx);
+ * cacheAuthorSettings(settings);
+ * ```
+ */
+export function readAuthorSettings(ctx: ExtensionContext): AlbumAuthorSettings {
+  const albumRows = ctx.settings.get<unknown[]>("albumDefaultAlbums") ?? [];
+  const defaultAlbums: DefaultAlbumSeed[] = [];
+  const seenAlbum = new Set<string>();
+  for (const row of albumRows) {
+    const seed = parseDefaultAlbum(row);
+    if (!seed || seenAlbum.has(seed.id)) continue;
+    seenAlbum.add(seed.id);
+    defaultAlbums.push(seed);
+  }
+
+  const mediaRows = ctx.settings.get<unknown[]>("albumDefaultMedia") ?? [];
+  const defaultMedia: DefaultMediaSeed[] = [];
+  const seenMedia = new Set<string>();
+  for (const row of mediaRows) {
+    const seed = parseDefaultMedia(row);
+    if (!seed || seenMedia.has(seed.id)) continue;
+    seenMedia.add(seed.id);
+    defaultMedia.push(seed);
+  }
+
+  return {
+    appTitle: nonEmpty(
+      ctx.settings.get("albumAppTitle"),
+      DEFAULT_LABELS.appTitle,
+    ),
+    allAlbumsLabel: nonEmpty(
+      ctx.settings.get("albumAllAlbumsLabel"),
+      DEFAULT_LABELS.allAlbumsLabel,
+    ),
+    emptyAlbumHint: nonEmpty(
+      ctx.settings.get("albumEmptyAlbumHint"),
+      DEFAULT_LABELS.emptyAlbumHint,
+      120,
+    ),
+    defaultAlbums,
+    defaultMedia,
+  };
+}
+
+let cachedSettings: AlbumAuthorSettings = {
+  appTitle: DEFAULT_LABELS.appTitle,
+  allAlbumsLabel: DEFAULT_LABELS.allAlbumsLabel,
+  emptyAlbumHint: DEFAULT_LABELS.emptyAlbumHint,
+  defaultAlbums: [],
+  defaultMedia: [],
+};
+
+/**
+ * 在方法 / onRegister 中缓存设置，供内页 UI 读取。
+ *
+ * @param settings - 规范化后的作者设置
+ */
+export function cacheAuthorSettings(settings: AlbumAuthorSettings): void {
+  cachedSettings = {
+    ...settings,
+    defaultAlbums: settings.defaultAlbums.map((d) => ({ ...d })),
+    defaultMedia: settings.defaultMedia.map((d) => ({ ...d })),
+  };
+}
+
+/**
+ * 读取缓存的作者设置（内页用）。
+ *
+ * @returns AlbumAuthorSettings 拷贝
+ */
+export function getCachedAuthorSettings(): AlbumAuthorSettings {
+  return {
+    ...cachedSettings,
+    defaultAlbums: cachedSettings.defaultAlbums.map((d) => ({ ...d })),
+    defaultMedia: cachedSettings.defaultMedia.map((d) => ({ ...d })),
+  };
+}
