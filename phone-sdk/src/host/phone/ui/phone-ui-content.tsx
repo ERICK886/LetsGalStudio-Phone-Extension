@@ -52,14 +52,19 @@ import type {
 } from "../extension/phone-extension";
 import {
   EMPTY_PHONE_SAFE_AREA,
+  clearPhoneAppBadge,
   diagnosePhoneAppLookup,
   clearPhoneNavigatePending,
+  formatPhoneAppBadgeLabel,
+  getPhoneAppBadge,
   getPhoneSdkSlot,
   phoneSdkDebug,
   phoneSdkDiag,
   phoneSdkDiagWarn,
   publishPhoneSafeAreaInsets,
+  subscribePhoneAppBadges,
   subscribePhoneNavigate,
+  type PhoneAppBadge,
   type PhoneSafeAreaInsets,
 } from "@ink-zenly/phone-sdk/plugin";
 import {
@@ -78,6 +83,33 @@ import {
   isTextInput,
   normalizePhonePopupPosition,
 } from "./constants";
+
+/**
+ * 从桌面解析结果取出角标用的 phoneAppId（仅 in-phone-app 目标）。
+ *
+ * @param app - 已解析桌面应用
+ * @returns phoneAppId；非内页动作则 `undefined`
+ */
+function resolveDesktopBadgeAppId(app: ResolvedPhoneApp): string | undefined {
+  const target = app.action?.target as PhoneTarget | undefined;
+  if (target && target.kind === "in-phone-app" && target.phoneAppId) {
+    return target.phoneAppId;
+  }
+  return undefined;
+}
+
+/**
+ * 无障碍朗读用的角标附加文案。
+ *
+ * @param badge - 当前角标
+ * @returns 附加片段；无角标时为空串
+ */
+function describeBadgeForAria(badge: PhoneAppBadge | null): string {
+  if (!badge) return "";
+  if (badge.mode === "dot") return "，有提醒";
+  const label = formatPhoneAppBadgeLabel(badge);
+  return label ? `，${label} 条提醒` : "";
+}
 import {
   type AppDragStart,
   type AppDropPlacement,
@@ -206,6 +238,8 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
   const [appDropTarget, setAppDropTarget] = useState<AppDropTarget>();
   const [message, setMessage] = useState("");
   const [clock, setClock] = useState(() => new Date());
+  /** 桌面角标变更计数：仅用于触发订阅后的重绘。 */
+  const [, setBadgeRevision] = useState(0);
   const appRefs = useRef(new Map<string, HTMLButtonElement>());
   const storyListRef = useRef<HTMLElement | null>(null);
   const messageTimer = useRef<number | undefined>();
@@ -345,6 +379,13 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
       setDisplayStoryBackground(nextStoryBackground);
     });
   }, [subscribeStoryMessages]);
+
+  // 订阅桌面 APP 角标（仅内存）；任意 set/clear 后重绘图标层。
+  useEffect(() => {
+    return subscribePhoneAppBadges(() => {
+      setBadgeRevision((n) => n + 1);
+    });
+  }, []);
 
   // 订阅导航总线：收到 openPhoneApp 请求时打开对应内页。
   // subscribePhoneNavigate 在订阅时会立即回放最新 pending，因此挂载即消费 getLatestPhoneNavigate()，
@@ -1034,6 +1075,8 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
       phoneAppId,
       title: registered.title,
     });
+    // 策略 D：成功打开内页时清除桌面角标；内页仍可按未读再 set。
+    clearPhoneAppBadge(phoneAppId);
     setEditorOpen(false);
     // 进入内页前先写入状态栏高度，避免首帧 safeAreaInsets 为 0 导致标题顶到状态栏。
     const provisional: PhoneSafeAreaInsets = {
@@ -1493,6 +1536,8 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
               >
                 {apps.map((app) => {
                   const iconUrl = resolveAssetUrl(ctx, app.iconSource);
+                  const badgeAppId = resolveDesktopBadgeAppId(app);
+                  const badge = badgeAppId ? getPhoneAppBadge(badgeAppId) : null;
                   return (
                     <button
                       key={app.id}
@@ -1507,7 +1552,7 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
                       tabIndex={activeInPhoneAppId ? -1 : focusedAppId === app.id ? 0 : -1}
                       aria-disabled={!app.enabled}
                       aria-label={app.enabled
-                        ? `${app.displayName}，动作：${app.action.name}`
+                        ? `${app.displayName}，动作：${app.action.name}${describeBadgeForAria(badge)}`
                         : `${app.displayName}，当前已禁用`}
                       title={app.enabled
                         ? app.action.description ?? `执行：${app.action.name}`
@@ -1517,8 +1562,18 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
                       onClick={() => void launchApp(app)}
                       disabled={busy || closing || Boolean(activeInPhoneAppId)}
                     >
-                      <span className="phone-app-icon" aria-hidden="true">
-                        {iconUrl ? <img src={iconUrl} alt="" /> : firstGlyph(app.displayName)}
+                      <span className="phone-app-icon-wrap">
+                        <span className="phone-app-icon" aria-hidden="true">
+                          {iconUrl ? <img src={iconUrl} alt="" /> : firstGlyph(app.displayName)}
+                        </span>
+                        {badge?.mode === "dot" ? (
+                          <span className="phone-app-badge phone-app-badge--dot" aria-hidden="true" />
+                        ) : null}
+                        {badge?.mode === "count" ? (
+                          <span className="phone-app-badge phone-app-badge--count" aria-hidden="true">
+                            {formatPhoneAppBadgeLabel(badge)}
+                          </span>
+                        ) : null}
                       </span>
                       <span className="phone-app-name">{app.displayName}</span>
                     </button>

@@ -2,7 +2,7 @@
 
 > 扩展包 ID：`ink.zenly.ext-7a9373`｜ 程序界面：`phone`、`phone-toast`  
 > 扩展版本：`1.2.6` ｜ 需要 LetsGal Studio SDK：`>=1.9.0`  
-> 对齐：`@ink-zenly/phone-sdk@^0.5.3` ｜ `@ink-zenly/create-phone-app@0.3.6`
+> 对齐：`@ink-zenly/phone-sdk@^0.5.4` ｜ `@ink-zenly/create-phone-app@0.3.6`
 
 这是一个**游戏里的手机**：剧情里挂上之后，玩家可以打开桌面、点 APP、看聊天消息，还能收到简单的提示（Toast）。
 
@@ -406,7 +406,7 @@ ink.zenly.ext-7a9373.open-phone
 
 | 版本 | 主要变化 |
 |------|------|
-| **1.2.6**（当前） | 相册迁出为独立扩展 `ink.zenly.app-cd6ad3`（`phoneAppId` 仍为 `phone-album`） |
+| **1.2.6**（当前） | 相册迁出为独立扩展 `ink.zenly.app-cd6ad3`；phone-sdk `0.5.4` 桌面 APP 角标（红点/数字） |
 | **1.2.5** | 文档补齐相册；相册内页页面过渡；视频缩略不再错误 seek |
 | **1.2.4** | 相册视频：封面/抽帧缩略 + 手机风播放器 |
 | **1.2.3** | phone-sdk `0.5.3`：`show-message`「撤回」状态（延迟消失 + 系统行） |

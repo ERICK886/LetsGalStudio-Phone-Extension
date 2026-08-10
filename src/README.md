@@ -2,7 +2,7 @@
 
 > 面向开发者：在本仓或脚手架工程中开发手机内页、使用 CLI / phone-sdk。  
 > 作者侧「如何使用手机」（挂载、设置、消息、Toast）见根目录 [README.md](../README.md)。  
-> 当前推荐：`@ink-zenly/phone-sdk@^0.5.3` ｜ `@ink-zenly/create-phone-app@0.3.6` ｜ Studio SDK `>=1.9.0`
+> 当前推荐：`@ink-zenly/phone-sdk@^0.5.4` ｜ `@ink-zenly/create-phone-app@0.3.6` ｜ Studio SDK `>=1.9.0`
 
 本目录 `src/` 是本仓宿主扩展的入口与内页应用（如 `demo-shop/`）。宿主实现在 `@ink-zenly/phone-sdk`，脚手架在 `cli/`。  
 相册内页已迁至独立扩展 [`../ext-cd6ad3`](../ext-cd6ad3)（`ink.zenly.app-cd6ad3`，`phoneAppId=phone-album`）。  
@@ -617,6 +617,20 @@ await openPhoneApp({ appId: "chat", waitUntil: "close" });
 
 `waitUntil: "close"` 会在玩家关手机后 resolve；`"none"` 则显示后立即返回。
 
+桌面 APP 角标（≥ 0.5.4，仅内存）：
+
+```ts
+import {
+  setPhoneAppBadge,
+  clearPhoneAppBadge,
+} from "@ink-zenly/phone-sdk/plugin";
+
+setPhoneAppBadge("chat", { mode: "count", count: 3 }); // 或 { mode: "dot" }
+clearPhoneAppBadge("chat");
+```
+
+打开对应内页时宿主会自动 clear；内页仍可按未读再 `set`。数字 `>99` 显示 `99+`。
+
 ### 5.5 从「写好代码」到「桌面能点开」
 
 仅 `registerPhoneApp` **不会**自动出现图标。还必须在**宿主**的作者设置中：
@@ -648,7 +662,7 @@ await openPhoneApp({ appId: "chat", waitUntil: "close" });
 
 | 版本 | 要点 |
 |------|------|
-| **1.2.6**（当前） | 相册迁出为独立扩展 `ink.zenly.app-cd6ad3`（`phoneAppId` 仍为 `phone-album`）。 |
+| **1.2.6**（当前） | 相册迁出为独立扩展 `ink.zenly.app-cd6ad3`；phone-sdk `0.5.4` 桌面 APP 角标。 |
 | **1.2.5** | 相册页面过渡；视频缩略修复；作者文档补齐相册章节。 |
 | **1.2.4** | 相册视频：封面/抽帧 + 手机风播放器。 |
 | **1.2.3** | 对齐 phone-sdk `0.5.3`（`show-message` 撤回状态）。 |
@@ -667,6 +681,7 @@ await openPhoneApp({ appId: "chat", waitUntil: "close" });
 
 | 版本 | npm | 要点 |
 |------|-----|------|
+| **0.5.4** | ⏳ | 桌面 APP 角标 API：`setPhoneAppBadge` / `clearPhoneAppBadge`（`dot` \| `count`）；宿主桌面渲染；打开内页自动 clear。 |
 | **0.5.3** | ✅ | 撤回计时器在关手机/清理会话时完整释放。 |
 | **0.5.2** | ✅ | `show-message` 支持 `recalled`：延迟后气泡消失并显示「角色名+后缀」系统行；推进时立刻撤回。 |
 | **0.5.1** | ✅ | 导出 `closePhoneApp`：剧本/动作可带动画关闭手机；导航控制器补齐关闭路径。 |

@@ -179,7 +179,24 @@ export interface PhoneSdkGlobalSlot {
   phoneNavigateListeners?: Set<(req: NavigateRequest) => void>;
   /** 导航总线：等待手机关闭的一次性 waiter 集合；`emitPhoneClosed` 时全部唤醒并清空。 */
   phoneClosedWaiters?: Set<() => void>;
+  /**
+   * 桌面 APP 角标表（key = phoneAppId）；仅内存，不写存档。
+   * 由 `setPhoneAppBadge` / `clearPhoneAppBadge` 维护。
+   */
+  phoneAppBadges?: Map<string, PhoneAppBadge>;
+  /** 桌面角标变更订阅者；set/clear 后通知宿主 UI 重绘。 */
+  phoneAppBadgeListeners?: Set<() => void>;
 }
+
+/**
+ * 桌面 APP 角标（仅内存）。
+ *
+ * - `dot`：仅红点，无数字
+ * - `count`：数字角标；UI 层对 `>99` 显示 `99+`
+ */
+export type PhoneAppBadge =
+  | { mode: "dot" }
+  | { mode: "count"; count: number };
 
 /**
  * 导航总线上的 navigate 请求载荷。

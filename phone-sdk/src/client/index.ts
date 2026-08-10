@@ -19,6 +19,7 @@ export type {
   NavigateRequest,
   OpenPhoneAppOptions,
   OpenPhoneAppWaitUntil,
+  PhoneAppBadge,
   PhoneAppRegistration,
   PhoneAppRenderProps,
   PhoneNavigationController,
@@ -48,6 +49,14 @@ export {
 export { getPhoneSdkHost, installPhoneSdkHost } from "./runtime/host";
 export { openPhoneApp } from "./runtime/open-phone-app";
 export { closePhoneApp } from "./runtime/close-phone-app";
+export {
+  clearPhoneAppBadge,
+  formatPhoneAppBadgeLabel,
+  getPhoneAppBadge,
+  getPhoneAppBadges,
+  setPhoneAppBadge,
+  subscribePhoneAppBadges,
+} from "./runtime/phone-app-badge";
 export {
   clearPhoneNavigatePending,
   emitPhoneClosed,

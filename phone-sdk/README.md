@@ -75,6 +75,20 @@ export class ShopController extends Extension {
 }
 ```
 
+## 桌面角标（≥ 0.5.4）
+
+内页可设置桌面图标红点或数字（**仅内存**，不写存档）：
+
+```ts
+import { setPhoneAppBadge, clearPhoneAppBadge } from "@ink-zenly/phone-sdk/plugin";
+
+setPhoneAppBadge("chat", { mode: "dot" });
+setPhoneAppBadge("chat", { mode: "count", count: 3 }); // >99 → 99+
+clearPhoneAppBadge("chat");
+```
+
+打开该内页时宿主自动 clear；内页仍可再 `set`。
+
 ## 扩展入口引导（本仓库）
 
 ```ts
