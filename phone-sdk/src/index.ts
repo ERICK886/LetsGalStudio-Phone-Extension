@@ -22,4 +22,8 @@ import { PhoneExtension } from "./host/phone/extension/phone-extension";
 import { ToastExtension } from "./host/toast/extension/toast-extension";
 
 export { PhoneExtension, ToastExtension };
+export {
+  buildPhoneHostSettingsFields,
+  phoneHostSaveSchema,
+} from "./host/phone/extension/phone-host-schema";
 export default PhoneExtension;
