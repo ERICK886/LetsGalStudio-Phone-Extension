@@ -3,10 +3,10 @@
  * @description 根据宿主固定分区 + 已注册内页的 styleEditor 元数据，计算手机编辑器顶栏 Tab。
  * @author 池水三两升
  * @date 2026-08-10
- * @version 0.1.0
+ * @version 0.2.0
  *
  * @remarks
- * - 宿主固定：外壳 / 桌面 / 其他（非内页）。
+ * - 宿主固定仅一项：「手机」（外壳 / 桌面等宿主字段统一归此分区）。
  * - 内页：仅 `registerPhoneApp({ styleEditor })` 且 `enabled !== false` 的 APP 出现。
  */
 
@@ -20,7 +20,7 @@ export type PhoneEditorSectionSource = "host" | "app";
  * 编辑器顶栏一条分区。
  */
 export interface PhoneEditorSection {
-  /** 稳定 id：宿主为 shell/desktop/misc；内页为程序 id */
+  /** 稳定 id：宿主为 `phone`；内页为程序 id */
   id: string;
   /** Tab 文案 */
   label: string;
@@ -34,31 +34,20 @@ export interface PhoneEditorSection {
   order: number;
 }
 
-/** 宿主固定分区（始终显示）。 */
+/**
+ * 宿主固定分区（始终显示，仅一项）。
+ *
+ * @remarks
+ * 手机壳、桌面图标等宿主侧可编辑字段都归入本分区，不再拆成多个顶栏 Tab。
+ */
 export const HOST_EDITOR_SECTIONS: ReadonlyArray<PhoneEditorSection> = [
   {
-    id: "shell",
-    label: "外壳",
-    centerHint: "手机外壳预览（即将推出）",
+    id: "phone",
+    label: "手机",
+    centerHint: "手机宿主样式（外壳、桌面等，即将推出）",
     icon: "mobile-screen",
     source: "host",
     order: 10,
-  },
-  {
-    id: "desktop",
-    label: "桌面",
-    centerHint: "桌面图标样式（即将推出）",
-    icon: "border-all",
-    source: "host",
-    order: 20,
-  },
-  {
-    id: "misc",
-    label: "其他",
-    centerHint: "其它手机样式（即将推出）",
-    icon: "sliders",
-    source: "host",
-    order: 1000,
   },
 ];
 
@@ -92,7 +81,7 @@ export function phoneAppToEditorSection(
 }
 
 /**
- * 计算当前应显示的顶栏分区列表（宿主固定 + 已注册且 opt-in 的 APP）。
+ * 计算当前应显示的顶栏分区列表（宿主「手机」+ 已注册且 opt-in 的 APP）。
  *
  * @param apps - 可选显式传入；缺省读 `listRegisteredPhoneApps()`
  * @returns 按 order、再按 id 排序的分区数组
@@ -118,7 +107,7 @@ export function buildPhoneEditorSections(
 }
 
 /**
- * 默认选中分区 id（优先外壳）。
+ * 默认选中分区 id（优先宿主「手机」）。
  *
  * @param sections - 当前分区列表
  * @returns 分区 id
@@ -126,5 +115,5 @@ export function buildPhoneEditorSections(
 export function defaultPhoneEditorSectionId(
   sections: readonly PhoneEditorSection[],
 ): string {
-  return sections.find((s) => s.id === "shell")?.id ?? sections[0]?.id ?? "shell";
+  return sections.find((s) => s.id === "phone")?.id ?? sections[0]?.id ?? "phone";
 }
