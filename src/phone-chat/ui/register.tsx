@@ -2,8 +2,11 @@
  * @file register.tsx
  * @description 向 Phone SDK 注册聊天内页应用。
  * @author 池水三两升
- * @date 2026-08-05
- * @version 0.1.0
+ * @date 2026-08-10
+ * @version 0.2.0
+ *
+ * @remarks
+ * 注册程序 ID = `phone-chat`；展示名 / 编辑器 Tab 为「聊天APP」。
  */
 
 import { registerPhoneApp } from "@ink-zenly/phone-sdk/plugin";
@@ -27,11 +30,11 @@ import { ChatApp } from "./ChatApp";
 export function registerChatPhoneApp(): void {
   registerPhoneApp({
     id: PROGRAM_ID,
-    title: "聊天",
+    title: "聊天APP",
     description: "手机聊天内页，浏览聊天记录与好友",
     styleEditor: {
       enabled: true,
-      label: "聊天气泡",
+      label: "聊天APP",
       icon: "comments",
       order: 100,
     },
