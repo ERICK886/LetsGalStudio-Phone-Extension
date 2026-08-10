@@ -1,13 +1,13 @@
 /**
  * @file settings.ts
- * @description 从扩展设置读取默认好友、属性槽位与文案，并缓存供内页使用。
+ * @description 从本模块设置读取默认好友、属性槽位与文案，并缓存供内页使用。
  * @author 池水三两升
  * @date 2026-08-10
- * @version 0.2.0
+ * @version 0.3.0
  *
  * @remarks
- * - 字段名一律以 `chat` 前缀读取（与 `settings-fields.ts` 的 `buildChatSettingsFields` 对齐）。
- * - `CHAT_SETTINGS_KEYS` 供宿主包装类 `onRegister` 集中订阅。
+ * 多模块模式下本模块有独立 settings 命名空间，字段无前缀。
+ * 内页在宿主 Phone 中渲染时勿直接 settings.get；用 cache + getCached。
  */
 
 import type { ExtensionContext } from "@avg-studio/sdk";
@@ -15,10 +15,6 @@ import type { ChatAttributeField } from "../types/index";
 
 /**
  * 作者设置快照（运行时规范化后）。
- *
- * @remarks
- * 字段名沿用逻辑名（不带 `chat` 前缀），供 UI / domain 层无感使用；
- * 前缀仅体现在 `ctx.settings.get` 的 key 上。
  */
 export interface ChatAuthorSettings {
   defaultFriends: string[];
@@ -40,21 +36,15 @@ const DEFAULTS: ChatAuthorSettings = {
   appTitle: "聊天",
 };
 
-/**
- * 聊天内页作者设置键（带 `chat` 前缀）。
- *
- * @remarks
- * 供宿主 `StudioPhoneExtension.onRegister` 集中 `ctx.settings.subscribe`，
- * 任一字段变更即刷新缓存。与 `settings-fields.ts` 的字段名一一对应。
- */
+/** 供 `ChatController.onRegister` 订阅。 */
 export const CHAT_SETTINGS_KEYS = [
-  "chatDefaultFriends",
-  "chatAttributeFields",
-  "chatAppTitle",
-  "chatChatsTabLabel",
-  "chatFriendsTabLabel",
-  "chatEmptyChatsHint",
-  "chatEmptyFriendsHint",
+  "defaultFriends",
+  "attributeFields",
+  "appTitle",
+  "chatsTabLabel",
+  "friendsTabLabel",
+  "emptyChatsHint",
+  "emptyFriendsHint",
 ] as const;
 
 function nonEmpty(value: unknown, fallback: string, max = 40): string {
@@ -66,20 +56,11 @@ function nonEmpty(value: unknown, fallback: string, max = 40): string {
 /**
  * 读取并规范化作者设置。
  *
- * @param ctx - 扩展上下文（方法内为聊天扩展 scope；内页为宿主 scope 时勿用本函数读设置）
+ * @param ctx - 本模块扩展上下文
  * @returns ChatAuthorSettings
- *
- * @example
- * ```ts
- * const settings = readAuthorSettings(ctx);
- * ```
- *
- * @remarks
- * 内页 React 树在宿主 Phone 中渲染时，`useExtensionContext()` 是宿主上下文，
- * 不能直接 `settings.get` 本扩展字段；请用 `cacheAuthorSettings` + `getCachedAuthorSettings`。
  */
 export function readAuthorSettings(ctx: ExtensionContext): ChatAuthorSettings {
-  const friendRows = ctx.settings.get<unknown[]>("chatDefaultFriends") ?? [];
+  const friendRows = ctx.settings.get<unknown[]>("defaultFriends") ?? [];
   const defaultFriends: string[] = [];
   for (const row of friendRows) {
     if (!row || typeof row !== "object") continue;
@@ -89,7 +70,7 @@ export function readAuthorSettings(ctx: ExtensionContext): ChatAuthorSettings {
     if (id && !defaultFriends.includes(id)) defaultFriends.push(id);
   }
 
-  const attrRows = ctx.settings.get<unknown[]>("chatAttributeFields") ?? [];
+  const attrRows = ctx.settings.get<unknown[]>("attributeFields") ?? [];
   const attributeFields: ChatAttributeField[] = [];
   for (const row of attrRows) {
     if (!row || typeof row !== "object") continue;
@@ -109,24 +90,24 @@ export function readAuthorSettings(ctx: ExtensionContext): ChatAuthorSettings {
     defaultFriends,
     attributeFields,
     chatsTabLabel: nonEmpty(
-      ctx.settings.get("chatChatsTabLabel"),
+      ctx.settings.get("chatsTabLabel"),
       DEFAULTS.chatsTabLabel,
     ),
     friendsTabLabel: nonEmpty(
-      ctx.settings.get("chatFriendsTabLabel"),
+      ctx.settings.get("friendsTabLabel"),
       DEFAULTS.friendsTabLabel,
     ),
     emptyChatsHint: nonEmpty(
-      ctx.settings.get("chatEmptyChatsHint"),
+      ctx.settings.get("emptyChatsHint"),
       DEFAULTS.emptyChatsHint,
       120,
     ),
     emptyFriendsHint: nonEmpty(
-      ctx.settings.get("chatEmptyFriendsHint"),
+      ctx.settings.get("emptyFriendsHint"),
       DEFAULTS.emptyFriendsHint,
       120,
     ),
-    appTitle: nonEmpty(ctx.settings.get("chatAppTitle"), DEFAULTS.appTitle),
+    appTitle: nonEmpty(ctx.settings.get("appTitle"), DEFAULTS.appTitle),
   };
 }
 

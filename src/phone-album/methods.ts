@@ -1,17 +1,16 @@
 /**
  * @file methods.ts
- * @description 相册内页五个 Studio 方法的 `method()` 描述，供 Task 4 在
- *              `StudioPhoneExtension` 类体上以静态属性赋值挂载。
+ * @description 相册内页五个 Studio 方法的 `method()` 描述，供 `PhoneAlbumExtension`
+ *              类体上以静态属性赋值挂载。
  * @author 池水三两升
  * @date 2026-08-10
- * @version 0.1.0
+ * @version 0.2.0
  *
  * @remarks
- * - 本模块**不**定义 `Extension` 子类，也不在加载时 `attach`；
- *   只导出五个已构造好的 `method()` 结果（`BrandedExtensionMethod`）。
- * - `run` / `runImmediately` / `skip` 里的 `this` 是宿主包装类实例，
- *   `this.save` 是该实例的 save（键为 `album*` 前缀）。
- *   每个执行体先调用 `bindAlbumSave(this.save)`，由 store 适配器翻译键名。
+ * - 只导出五个已构造好的 `method()` 结果（`BrandedExtensionMethod`）。
+ * - `run` / `runImmediately` / `skip` 里的 `this` 是本模块 `PhoneAlbumExtension` 实例，
+ *   `this.save` 为本模块独立存档（无前缀键名）。
+ * - 每个执行体先调用 `bindAlbumSave(this.save)`。
  * - 相册场景为纯数据操作，方法不挂起等待 UI，`run` / `runImmediately` / `skip`
  *   行为一致。
  */
@@ -36,7 +35,7 @@ import {
 /**
  * 绑定 save 并刷新作者设置缓存。
  *
- * @param instanceSave - 包装类实例 this.save（键为 `album*` 前缀）
+ * @param instanceSave - 本模块实例 this.save
  * @param ctx - 扩展上下文
  */
 function prepareRuntime(instanceSave: unknown, ctx: ExtensionContext): void {
@@ -177,7 +176,7 @@ function executeSetMediaAlbumsMethod(
  * 「新增 / 覆盖相册」方法描述。
  *
  * @remarks
- * 方法 ID：`add-album`。供 Task 4 在 `StudioPhoneExtension` 上赋值：
+ * 方法 ID：`add-album`。供 `PhoneAlbumExtension` 挂载：
  * ```ts
  * static addAlbum = albumAddAlbumMethod;
  * ```

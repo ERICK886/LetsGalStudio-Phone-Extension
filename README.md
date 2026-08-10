@@ -38,7 +38,7 @@
 - **内置**聊天内页（`phone-chat`）与相册内页（`phone-album`），工坊只需启用本扩展，无需再单独安装旧版独立包
 - 剧本可用 `openPhoneApp` / `closePhoneApp`（phone-sdk）自动打开或关闭手机并深开内页
 
-本扩展导出的 `PhoneExtension` 即 `StudioPhoneExtension`（合并手机壳、聊天与相册的设置 / 存档 / 方法）。
+本扩展同包导出多模块：`PhoneExtension`（手机壳）+ `ChatController`（聊天）+ `PhoneAlbumExtension`（相册）；各模块设置 / 存档独立。
 
 **暂时做不到 / 要注意：**
 

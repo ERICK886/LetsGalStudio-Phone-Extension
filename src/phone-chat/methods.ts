@@ -1,19 +1,16 @@
 /**
  * @file methods.ts
- * @description 聊天内页四个 Studio 方法的 `method()` 描述，供 Task 4 在
- *              `StudioPhoneExtension` 类体上以静态属性赋值挂载。
+ * @description 聊天内页四个 Studio 方法的 `method()` 描述，供 `ChatController`
+ *              类体上以静态属性赋值挂载。
  * @author 池水三两升
  * @date 2026-08-10
- * @version 0.1.0
+ * @version 0.2.0
  *
  * @remarks
- * - 本模块**不**定义 `Extension` 子类，也不在加载时 `attach`；
- *   只导出四个已构造好的 `method()` 结果（`BrandedExtensionMethod`）。
- * - `run` / `runImmediately` / `skip` 里的 `this` 是宿主包装类实例，
- *   `this.save` 是该实例的 save（键为 `chat*` 前缀）。
- *   每个执行体先调用 `bindChatSave(this.save)`，由 store 适配器翻译键名。
- * - `addFriend` / `removeFriend` 的 `runImmediately` / `skip` 直接复用 `run` 逻辑
- *   （等价于原 `ChatController.addFriend.run.call(this, ...)`）。
+ * - 只导出四个已构造好的 `method()` 结果（`BrandedExtensionMethod`）。
+ * - `run` / `runImmediately` / `skip` 里的 `this` 是本模块 `ChatController` 实例，
+ *   `this.save` 为本模块独立存档（无前缀键名）。
+ * - 每个执行体先调用 `bindChatSave(this.save)`。
  */
 
 import {
@@ -44,7 +41,7 @@ import {
 /**
  * 绑定 save 并刷新作者设置缓存。
  *
- * @param instanceSave - 包装类实例 this.save（键为 `chat*` 前缀）
+ * @param instanceSave - 本模块实例 this.save
  * @param ctx - 扩展上下文
  */
 function prepareRuntime(instanceSave: unknown, ctx: ExtensionContext): void {
@@ -146,7 +143,7 @@ async function executeAwaitPlayerReply(
  * 「对方发送消息」方法描述。
  *
  * @remarks
- * 方法 ID：`send-friend-messages`。供 Task 4 在 `StudioPhoneExtension` 上赋值：
+ * 方法 ID：`send-friend-messages`。供 `ChatController` 挂载：
  * ```ts
  * static sendFriendMessages = chatSendFriendMessagesMethod;
  * ```

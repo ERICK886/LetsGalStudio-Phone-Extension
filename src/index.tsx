@@ -1,17 +1,16 @@
 /**
  * @file index.tsx
  * @description 工坊用手机扩展入口：引导注册 demo-shop / 聊天 / 相册内页应用，
- *              并导出 `StudioPhoneExtension`（作为 `PhoneExtension` 与默认导出）+ `ToastExtension`。
+ *              并导出多模块：`PhoneExtension` + `ToastExtension` + `ChatController` + `PhoneAlbumExtension`。
  * @author 池水三两升
  * @date 2026-08-10
- * @version 1.3.0
+ * @version 1.3.1
  *
  * @remarks
  * - 宿主：`@ink-zenly/phone-sdk`（main），不编写内页。
  * - 内页 API / 引导：`@ink-zenly/phone-sdk/plugin`。
- * - 内页应用目录：`src/<app-id>/`（demo-shop / phone-chat / phone-album）。
- * - `StudioPhoneExtension` 合并手机壳 + 聊天 + 相册的设置 / 存档 / 方法，
- *   由本入口导出为 `PhoneExtension` 与默认导出，供工坊作为单一扩展加载。
+ * - 同包多模块：每个内页 APP 为独立 `@extension` 程序，设置 / 存档跟随模块命名空间。
+ * - Phone SDK 应用 ID：宿主内置填程序 ID（`phone-chat` / `phone-album`）。
  */
 
 import {
@@ -30,6 +29,7 @@ bootstrapPhonePluginApps(
   ),
 );
 
-export { StudioPhoneExtension as PhoneExtension } from "./studio-phone-extension";
-export { default } from "./studio-phone-extension";
-export { ToastExtension } from "@ink-zenly/phone-sdk";
+export { PhoneExtension, ToastExtension } from "@ink-zenly/phone-sdk";
+export { default } from "@ink-zenly/phone-sdk";
+export { ChatController } from "./phone-chat";
+export { PhoneAlbumExtension } from "./phone-album";

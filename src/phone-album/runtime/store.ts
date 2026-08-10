@@ -1,22 +1,19 @@
 /**
  * @file store.ts
- * @description 绑定扩展 save，供方法与内页 UI 读写相册会话状态。
+ * @description 绑定本模块 save，供方法与内页 UI 读写相册会话状态。
  * @author 池水三两升
  * @date 2026-08-10
- * @version 0.3.0
+ * @version 0.4.0
  *
  * @remarks
  * - 剧情相册字段：`persistence: "slot"`（跟游戏存档槽）
  * - 相机胶卷：`persistence: "shared"`（跨存档、关游戏也保留；需 flushShared）
  * - 内页若在 save 绑定前写入，只会进内存；`autonomous` + onInit 应尽早 bind。
- * - 自 v0.3.0 起，存档键带 `album` 前缀（`albumAlbumsExtra` 等），由 `ALBUM_SAVE_KEY_MAP`
- *   通过键映射适配器把逻辑名（`albumsExtra` 等）翻译为实际存档键。领域层
- *   （`actions.ts` / UI）继续使用逻辑名，无感知。
+ * - 多模块下存档键与逻辑名一致（无 album 前缀）。
  */
 
 import type { SaveAPI } from "@avg-studio/sdk";
 
-import { ALBUM_SAVE_KEY_MAP } from "../save-fields";
 import { CAMERA_ALBUM_ID, CAMERA_ALBUM_NAME } from "../constants";
 import type {
   AlbumMedia,
@@ -51,43 +48,6 @@ export interface CameraSharedState {
   cameraAlbumsMeta: AlbumMeta[];
 }
 
-/**
- * 键映射适配器：把对逻辑名的 `get/set` 翻译为对 `album*` 前缀键的访问。
- *
- * @remarks
- * - 仅翻译 `AlbumSaveMap` 已知的九个逻辑键；其他键直接透传到底层 api（防御性）。
- * - `useValue` 同样按规则映射，保持接口完整。
- */
-function createKeyMappedApi(
-  api: SaveAPI<Record<string, unknown>>,
-): SaveAPI<AlbumSaveMap> {
-  const toSaveKey = (logical: string): string =>
-    (ALBUM_SAVE_KEY_MAP as Record<string, string>)[logical] ?? logical;
-
-  return {
-    get: <K extends keyof AlbumSaveMap>(key: K): AlbumSaveMap[K] =>
-      api.get(toSaveKey(key as string)) as AlbumSaveMap[K],
-    set: <K extends keyof AlbumSaveMap>(
-      key: K,
-      value: AlbumSaveMap[K],
-    ): void => {
-      api.set(toSaveKey(key as string), value as unknown);
-    },
-    useValue: <K extends keyof AlbumSaveMap>(
-      key: K,
-    ): [AlbumSaveMap[K], (v: AlbumSaveMap[K]) => void] => {
-      const [value, setter] = api.useValue(toSaveKey(key as string)) as [
-        unknown,
-        (v: unknown) => void,
-      ];
-      return [
-        value as AlbumSaveMap[K],
-        (v: AlbumSaveMap[K]) => setter(v as unknown),
-      ];
-    },
-  };
-}
-
 type AlbumSaveApi = SaveAPI<AlbumSaveMap>;
 
 let saveApi: AlbumSaveApi | null = null;
@@ -110,42 +70,35 @@ let memoryCamera: CameraSharedState = {
 };
 
 /**
- * 绑定 save（兼容 method `this.save` 的条件类型推导）。
+ * 绑定本模块 `this.save`。
  *
- * @param api - this.save 或兼容适配器；键名可为 `album*` 前缀（由适配器翻译）
+ * @param api - this.save 或兼容适配器
  * @returns void
  *
  * @example
  * ```ts
  * bindAlbumSave(this.save);
  * ```
- *
- * @remarks
- * 入参 `api` 通常是宿主包装类实例的 `this.save`，其键为 `album*` 前缀；
- * 本函数包一层键映射适配器，使本模块其余代码继续使用逻辑名。
  */
 export function bindAlbumSave(
   api: AlbumSaveApi | SaveAPI<Record<string, unknown>>,
 ): void {
-  const mapped = createKeyMappedApi(
-    api as SaveAPI<Record<string, unknown>>,
-  ) as AlbumSaveApi;
-  saveApi = mapped;
-  const fromSlot = readSlotFromApi(mapped);
-  const fromCamera = readCameraFromApi(mapped);
+  saveApi = api as AlbumSaveApi;
+  const fromSlot = readSlotFromApi(saveApi);
+  const fromCamera = readCameraFromApi(saveApi);
   const slotEmpty = isSlotEmpty(fromSlot);
   const cameraEmpty = isCameraEmpty(fromCamera);
   const memorySlotDirty = !isSlotEmpty(memorySlot);
   const memoryCameraDirty = !isCameraEmpty(memoryCamera);
 
   if (slotEmpty && memorySlotDirty) {
-    writeSlotToApi(mapped, memorySlot);
+    writeSlotToApi(saveApi, memorySlot);
   } else {
     memorySlot = fromSlot;
   }
 
   if (cameraEmpty && memoryCameraDirty) {
-    writeCameraToApi(mapped, memoryCamera);
+    writeCameraToApi(saveApi, memoryCamera);
   } else {
     memoryCamera = fromCamera;
   }

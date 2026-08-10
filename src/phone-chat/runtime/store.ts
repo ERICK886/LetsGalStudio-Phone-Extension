@@ -1,19 +1,16 @@
 /**
  * @file store.ts
- * @description 绑定扩展 save，供方法与内页 UI 读写会话状态。
+ * @description 绑定本模块 save，供方法与内页 UI 读写会话状态。
  * @author 池水三两升
  * @date 2026-08-10
- * @version 0.2.0
+ * @version 0.3.0
  *
  * @remarks
- * - `pendingReplies` 在 saveSchema 中以 list（0～1 项）存储，读写时在本模块折叠为对象或 null。
- * - 自 v0.2.0 起，存档键带 `chat` 前缀（`chatFriendsExtra` 等），由 `CHAT_SAVE_KEY_MAP`
- *   通过键映射适配器把逻辑名（`friendsExtra` 等）翻译为实际存档键。领域层
- *   （`actions.ts` / UI）继续使用逻辑名，无感知。
+ * `pendingReplies` 在 saveSchema 中以 list（0～1 项）存储，读写时折叠为对象或 null。
+ * 多模块下存档键与逻辑名一致（无 chat 前缀）。
  */
 
 import type { SaveAPI } from "@avg-studio/sdk";
-import { CHAT_SAVE_KEY_MAP } from "../save-fields";
 import type {
   ChatPendingReplies,
   ChatSaveState,
@@ -22,15 +19,7 @@ import type {
 import { emitChatBus } from "./bus";
 
 /**
- * 与领域层逻辑名对齐的存档字段映射。
- *
- * @property friendsExtra - 剧情追加好友
- * @property friendsRemoved - 剧情隐藏的好友
- * @property threads - 会话列表
- * @property pendingReplies - 当前可选回复（最多 1 条记录）
- *
- * @remarks
- * 键名是逻辑名；实际存档键由 `CHAT_SAVE_KEY_MAP` 映射为 `chat*` 前缀。
+ * 与 `defineSave` 对齐的存档字段映射。
  */
 export type ChatSaveMap = {
   friendsExtra: string[];
@@ -39,40 +28,11 @@ export type ChatSaveMap = {
   pendingReplies: ChatPendingReplies[];
 };
 
-/**
- * 键映射适配器：把对逻辑名的 `get/set` 翻译为对 `chat*` 前缀键的访问。
- *
- * @remarks
- * - 仅翻译 `ChatSaveMap` 已知的四个逻辑键；其他键直接透传到底层 api（防御性）。
- * - `useValue` 不在 chat 模块使用，但仍按相同规则映射，保持接口完整。
- */
-function createKeyMappedApi(
-  api: SaveAPI<Record<string, unknown>>,
-): SaveAPI<ChatSaveMap> {
-  const toSaveKey = (logical: string): string =>
-    (CHAT_SAVE_KEY_MAP as Record<string, string>)[logical] ?? logical;
-
-  return {
-    get: <K extends keyof ChatSaveMap>(key: K): ChatSaveMap[K] =>
-      api.get(toSaveKey(key as string)) as ChatSaveMap[K],
-    set: <K extends keyof ChatSaveMap>(key: K, value: ChatSaveMap[K]): void => {
-      api.set(toSaveKey(key as string), value as unknown);
-    },
-    useValue: <K extends keyof ChatSaveMap>(key: K): [ChatSaveMap[K], (v: ChatSaveMap[K]) => void] => {
-      const [value, setter] = api.useValue(toSaveKey(key as string)) as [
-        unknown,
-        (v: unknown) => void,
-      ];
-      return [value as ChatSaveMap[K], (v: ChatSaveMap[K]) => setter(v as unknown)];
-    },
-  };
-}
-
 type ChatSaveApi = SaveAPI<ChatSaveMap>;
 
 let saveApi: ChatSaveApi | null = null;
 
-/** save 未绑定时的内存兜底（方法执行后会升级为真实 save）。 */
+/** save 未绑定时的内存兜底。 */
 let memoryState: ChatSaveState = {
   friendsExtra: [],
   friendsRemoved: [],
@@ -81,27 +41,13 @@ let memoryState: ChatSaveState = {
 };
 
 /**
- * 绑定 save（兼容 method `this.save` 的条件类型推导）。
+ * 绑定本模块 `this.save`。
  *
- * @param api - this.save 或兼容适配器；键名可为 `chat*` 前缀（由适配器翻译）
- * @returns void
- *
- * @example
- * ```ts
- * bindChatSave(this.save);
- * ```
- *
- * @remarks
- * 入参 `api` 通常是宿主包装类实例的 `this.save`，其键为 `chat*` 前缀；
- * 本函数包一层键映射适配器，使本模块其余代码继续使用逻辑名。
+ * @param api - this.save 或兼容适配器
  */
 export function bindChatSave(api: ChatSaveApi | SaveAPI<any>): void {
-  const mapped = createKeyMappedApi(
-    api as SaveAPI<Record<string, unknown>>,
-  ) as ChatSaveApi;
-  saveApi = mapped;
-  // 优先采用存档中的数据；若存档为空而内存有写，则回写，避免 UI 先写后丢。
-  const fromSave = readFromApi(mapped);
+  saveApi = api as ChatSaveApi;
+  const fromSave = readFromApi(saveApi);
   const saveEmpty =
     fromSave.friendsExtra.length === 0 &&
     fromSave.friendsRemoved.length === 0 &&
@@ -114,7 +60,7 @@ export function bindChatSave(api: ChatSaveApi | SaveAPI<any>): void {
     memoryState.pendingReplies !== null;
 
   if (saveEmpty && memoryDirty) {
-    writeToApi(mapped, memoryState);
+    writeToApi(saveApi, memoryState);
   } else {
     memoryState = fromSave;
   }

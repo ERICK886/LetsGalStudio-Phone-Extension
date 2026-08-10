@@ -1,34 +1,131 @@
 /**
  * @file index.tsx
- * @description 手机聊天内页模块入口：仅导出注册函数、常量与方法描述，
- *              供宿主 `StudioPhoneExtension`（Task 4）合并挂载。
+ * @description 手机聊天扩展模块：独立 `@extension` 程序，自有设置 / 存档 / Fragment 方法。
  * @author 池水三两升
  * @date 2026-08-10
- * @version 0.3.0
+ * @version 0.4.0
  *
  * @remarks
- * - 本模块从独立扩展 `ink.zenly.app-015abe` 迁入宿主包 `ink.zenly.ext-7a9373`，
- *   作为 `src/phone-chat/` 模块存在；**不再**以独立 `Extension` 子类形式注册。
- * - 不导出 `ChatController` 类；方法以 `method()` 描述形式导出，由 Task 4 在
- *   `StudioPhoneExtension` 上以静态属性赋值挂载。
- * - 扩展包 id：`ink.zenly.ext-7a9373`（见宿主 `extension.json`）
+ * - 扩展包 id：`ink.zenly.ext-7a9373`（与宿主同包多模块）
  * - 程序 ID：`phone-chat`（`@extension` / `registerPhoneApp`）
- * - 宿主填写 Phone SDK 应用 ID：`phone-chat`（仅程序 ID）
+ * - Phone SDK 应用 ID：填 `phone-chat`
+ * - 内页 UI 由宿主入口 `bootstrapPhonePluginApps` 注册；本类 `onRegister` 只缓存设置，不重复 register。
+ * - Studio 方法 target：`ink.zenly.ext-7a9373/phone-chat/<method-id>`
  */
 
-// 内页注册（向 Phone SDK 注入聊天内页）。
+import {
+  defineSave,
+  Extension,
+  extension,
+  settings,
+  type ExtensionContext,
+} from "@avg-studio/sdk";
+
+import { PROGRAM_ID } from "./constants";
+import { buildChatSettingsFields } from "./settings-fields";
+import { chatSaveSchemaFields } from "./save-fields";
+import {
+  chatSendFriendMessagesMethod,
+  chatAwaitPlayerReplyMethod,
+  chatAddFriendMethod,
+  chatRemoveFriendMethod,
+} from "./methods";
+import {
+  CHAT_SETTINGS_KEYS,
+  cacheAuthorSettings,
+  readAuthorSettings,
+} from "./runtime/settings";
+import { bindChatSave } from "./runtime/store";
+import { syncChatDesktopBadge } from "./runtime/desktop-badge";
+import { resolveReplyWaitsForFriend } from "./runtime/reply-wait";
+
+/** Studio 聊天方法内联卡片（紫色主题）；副作用安装。 */
+import "./studio/chat-inline-cards";
+
+/**
+ * 手机聊天扩展控制器。
+ *
+ * @remarks
+ * 内页由 `registerPhoneApp`（bootstrap）注入宿主手机屏幕；本类负责本模块设置、存档与方法。
+ */
+@extension({
+  id: PROGRAM_ID,
+  label: "手机聊天",
+  exposeUI: false,
+})
+export class ChatController extends Extension {
+  /**
+   * 作者设置：默认好友、详情属性槽、文案（本模块独立命名空间）。
+   */
+  static settings = settings((s) => buildChatSettingsFields(s));
+
+  /**
+   * 存档字段（跟游戏进度，slot；本模块独立命名空间）。
+   */
+  static saveSchema = defineSave(chatSaveSchemaFields);
+
+  static sendFriendMessages = chatSendFriendMessagesMethod;
+  static awaitPlayerReply = chatAwaitPlayerReplyMethod;
+  static addFriend = chatAddFriendMethod;
+  static removeFriend = chatRemoveFriendMethod;
+
+  /**
+   * Studio 加载时缓存默认设置并订阅变更；不重复 `registerPhoneApp`。
+   *
+   * @param ctx - 本模块扩展上下文
+   */
+  static onRegister(ctx: ExtensionContext): void {
+    cacheAuthorSettings(readAuthorSettings(ctx));
+
+    for (const key of CHAT_SETTINGS_KEYS) {
+      ctx.settings.subscribe(key, () => {
+        cacheAuthorSettings(readAuthorSettings(ctx));
+      });
+    }
+
+    try {
+      syncChatDesktopBadge();
+    } catch (error) {
+      console.warn("[phone-chat] 初始同步桌面角标失败", error);
+    }
+  }
+
+  /**
+   * 实例初始化时绑定本模块 save。
+   */
+  onInit(): void {
+    bindChatSave(this.save as Parameters<typeof bindChatSave>[0]);
+    syncChatDesktopBadge();
+  }
+
+  /**
+   * 卸载时释放全部等待玩家回复的门闩，避免剧情卡死。
+   *
+   * @remarks
+   * 仅当宿主显式调用本静态方法（或未来 SDK 提供卸载钩子）时生效。
+   */
+  static onUnload(): void {
+    try {
+      resolveReplyWaitsForFriend();
+    } catch (error) {
+      console.warn("[phone-chat] 释放回复等待失败", error);
+    }
+  }
+}
+
+export default ChatController;
+
+/** 内页注册（向 Phone SDK 注入聊天内页）。 */
 export { registerChatPhoneApp } from "./ui/register";
 
-// 常量：扩展包 id、程序 ID、完整应用引用。
+/** 常量：扩展包 id、程序 ID、完整应用引用。 */
 export { EXTENSION_ID, PROGRAM_ID, PHONE_APP_REF } from "./constants";
 
-// 设置字段工厂（带 chat 前缀），供宿主合并到 `static settings`。
+/** 设置 / 存档字段工厂（供测试或外部组合；本类已直接使用）。 */
 export { buildChatSettingsFields } from "./settings-fields";
+export { chatSaveSchemaFields } from "./save-fields";
 
-// 存档字段定义（带 chat 前缀），供宿主合并到 `static saveSchema`。
-export { chatSaveSchemaFields, CHAT_SAVE_KEY_MAP } from "./save-fields";
-
-// 四个方法描述，供 Task 4 在 `StudioPhoneExtension` 上以静态属性赋值挂载。
+/** 方法描述（已挂到本类静态属性）。 */
 export {
   chatSendFriendMessagesMethod,
   chatAwaitPlayerReplyMethod,
@@ -36,7 +133,7 @@ export {
   chatRemoveFriendMethod,
 } from "./methods";
 
-// 运行时辅助：onRegister 订阅键、缓存读写、桌面角标同步、卸载时释放等待。
+/** 运行时辅助。 */
 export {
   CHAT_SETTINGS_KEYS,
   cacheAuthorSettings,
@@ -46,5 +143,11 @@ export {
 export { syncChatDesktopBadge } from "./runtime/desktop-badge";
 export { resolveReplyWaitsForFriend } from "./runtime/reply-wait";
 
-// Studio 编辑器内联卡片（紫色主题）；副作用安装。
-import "./studio/chat-inline-cards";
+/**
+ * 内页卸载时调用：解除全部等待，避免剧情卡死。
+ *
+ * @returns void
+ */
+export function releaseChatWaitsOnUnload(): void {
+  resolveReplyWaitsForFriend();
+}
