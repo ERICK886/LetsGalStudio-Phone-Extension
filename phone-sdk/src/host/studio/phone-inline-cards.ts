@@ -108,6 +108,41 @@ function truncate(value: unknown, limit = 72): string {
   return normalized.length > limit ? `${normalized.slice(0, limit - 1)}…` : normalized;
 }
 
+/**
+ * 与 `src/phone-chat/domain/message-content.ts` 的 `resolveMessageSlot` 对齐（避免循环依赖本地副本）。
+ */
+function resolveStoryMessageSlot(input: {
+  contentType: unknown;
+  text: unknown;
+  imageAsset: unknown;
+}):
+  | { contentType: "text"; text: string }
+  | { contentType: "image"; imageAsset: string }
+  | null {
+  const contentType = input.contentType === "image" ? "image" : "text";
+
+  if (contentType === "image") {
+    const imageAsset =
+      typeof input.imageAsset === "string" ? input.imageAsset.trim() : "";
+    if (!imageAsset) return null;
+    return { contentType: "image", imageAsset };
+  }
+
+  const text = typeof input.text === "string" ? input.text.trim() : "";
+  if (!text) return null;
+
+  return { contentType: "text", text };
+}
+
+function storySlotInlineSummary(
+  slot: ReturnType<typeof resolveStoryMessageSlot>,
+  limit = 72,
+): string {
+  if (!slot) return "";
+  if (slot.contentType === "image") return "[图片]";
+  return truncate(slot.text, limit);
+}
+
 function findBlock(content: HTMLElement): ExtensionBlock | undefined {
   const blockRoot = content.closest<HTMLElement>("[data-id]");
   const expectedBlockId = blockRoot?.dataset.id;
@@ -289,8 +324,14 @@ function renderDetails(
       const messages: string[] = [];
       for (let index = 1; index <= 8; index += 1) {
         const suffix = index === 1 ? "" : String(index);
-        const text = truncate(params[`message${suffix}`]);
-        if (text) messages.push(text);
+        const summary = storySlotInlineSummary(
+          resolveStoryMessageSlot({
+            contentType: params[`contentType${suffix}`],
+            text: params[`message${suffix}`],
+            imageAsset: params[`imageAsset${suffix}`],
+          }),
+        );
+        if (summary) messages.push(summary);
       }
       const direction = params.direction === "outgoing" ? "我方" : "对方";
       const preset = truncate(params.presetId, 48);

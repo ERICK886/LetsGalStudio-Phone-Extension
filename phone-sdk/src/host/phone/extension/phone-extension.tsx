@@ -582,6 +582,43 @@ function normalizeStoryPopupPosition(value: unknown): PhonePopupPosition {
     : "bottom-right";
 }
 
+type PhoneStoryMessageContentType = "text" | "image";
+
+/**
+ * 与 `src/phone-chat/domain/message-content.ts` 的 `normalizeContentType` 对齐（避免循环依赖本地副本）。
+ */
+function normalizeStoryContentType(
+  raw: unknown,
+): PhoneStoryMessageContentType {
+  return raw === "image" ? "image" : "text";
+}
+
+/**
+ * 与 `src/phone-chat/domain/message-content.ts` 的 `resolveMessageSlot` 对齐（避免循环依赖本地副本）。
+ */
+function resolveStoryMessageSlot(input: {
+  contentType: unknown;
+  text: unknown;
+  imageAsset: unknown;
+}):
+  | { contentType: "text"; text: string }
+  | { contentType: "image"; imageAsset: string }
+  | null {
+  const contentType = normalizeStoryContentType(input.contentType);
+
+  if (contentType === "image") {
+    const imageAsset =
+      typeof input.imageAsset === "string" ? input.imageAsset.trim() : "";
+    if (!imageAsset) return null;
+    return { contentType: "image", imageAsset };
+  }
+
+  const text = typeof input.text === "string" ? input.text.trim() : "";
+  if (!text) return null;
+
+  return { contentType: "text", text };
+}
+
 export interface PhoneStoryMessage {
   /** 预设在方法开始时展开的资产角色稳定 ID。 */
   characterId: string;
@@ -594,6 +631,10 @@ export interface PhoneStoryMessage {
   /** 兼容旧消息快照中的角色立绘引用。 */
   portraitId?: string;
   message: string;
+  /** 消息内容类型；缺省为文字。 */
+  contentType?: PhoneStoryMessageContentType;
+  /** `contentType === "image"` 时的素材 URI。 */
+  imageAsset?: string;
   direction: PhoneMessageDirection;
   status: PhoneMessageStatus;
   /** 仅在 `status === "blocked"` 时显示。 */
@@ -1449,7 +1490,8 @@ async function showStoryMessages(
 
 /**
  * 从 Studio method 参数的 1–8 号槽位构造可显示消息。
- * 文本会 trim，空文本直接跳过；第 2–8 条未选角色时继承第 1 条角色，未选方向默认为 incoming；
+ * 有效槽由 `resolveStoryMessageSlot` 判定（文本 trim 非空或图片 asset 有效）；无效槽跳过；
+ * 第 2–8 条未选角色时继承第 1 条角色，未选方向默认为 incoming；
  * `portraitId` 保持为 characterPortrait 选择器给出的稳定立绘 ID。该函数只做容错归一化，不启动 UI。
  */
 function collectStoryMessages(
@@ -1467,7 +1509,9 @@ function collectStoryMessages(
     return {
       index,
       presetId: params[`presetId${suffix}`],
+      contentType: params[`contentType${suffix}`],
       message: params[`message${suffix}`],
+      imageAsset: params[`imageAsset${suffix}`],
       direction: params[`direction${suffix}`],
       status: params[`status${suffix}`],
     };
@@ -1490,8 +1534,12 @@ function collectStoryMessages(
 
   for (let index = 1; index <= 8; index += 1) {
     const suffix = index === 1 ? "" : String(index);
-    const rawMessage = params[`message${suffix}`];
-    if (typeof rawMessage !== "string" || rawMessage.trim() === "") continue;
+    const slot = resolveStoryMessageSlot({
+      contentType: params[`contentType${suffix}`],
+      text: params[`message${suffix}`],
+      imageAsset: params[`imageAsset${suffix}`],
+    });
+    if (!slot) continue;
 
     const presetId =
       nonEmptyString(params[`presetId${suffix}`], 80) ?? defaultPresetId;
@@ -1549,7 +1597,9 @@ function collectStoryMessages(
       chatRoleId: preset.id,
       avatarSource: preset.avatarSource,
       ...(preset.avatarAsset ? { avatarAsset: preset.avatarAsset } : {}),
-      message: rawMessage.trim(),
+      message: slot.contentType === "text" ? slot.text : "",
+      contentType: slot.contentType,
+      ...(slot.contentType === "image" ? { imageAsset: slot.imageAsset } : {}),
       direction,
       status,
       ...(blockedHint ? { blockedHint } : {}),
@@ -1658,12 +1708,32 @@ function createStoryMessageSchema() {
             } as const,
           ],
           [
+            `contentType${suffix}`,
+            {
+              type: "enum",
+              label: `第 ${index} 条 · 类型`,
+              options: [
+                { label: "文字", value: "text" },
+                { label: "图片", value: "image" },
+              ],
+              default: "text",
+              required,
+            } as const,
+          ],
+          [
             `message${suffix}`,
             {
               type: "string",
-              label: `第 ${index} 条 · 内容`,
+              label: `第 ${index} 条 · 文字`,
               multiline: true,
-              required,
+            } as const,
+          ],
+          [
+            `imageAsset${suffix}`,
+            {
+              type: "asset",
+              label: `第 ${index} 条 · 图片`,
+              assetType: "image",
             } as const,
           ],
           [
@@ -2097,6 +2167,12 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
                 ? { portraitId: inputMessage.portraitId }
                 : {}),
               message: inputMessage.message,
+              contentType: normalizeStoryContentType(inputMessage.contentType),
+              ...(inputMessage.contentType === "image" &&
+              typeof inputMessage.imageAsset === "string" &&
+              inputMessage.imageAsset.trim()
+                ? { imageAsset: inputMessage.imageAsset.trim() }
+                : {}),
               direction,
               status,
               ...(blockedHint ? { blockedHint } : {}),

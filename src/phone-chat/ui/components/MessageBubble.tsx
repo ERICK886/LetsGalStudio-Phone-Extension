@@ -7,8 +7,9 @@
  */
 
 import { useExtensionContext } from "@avg-studio/sdk";
-import React from "react";
+import React, { useEffect, useState } from "react";
 
+import { resolveAssetUrl } from "../../domain/character";
 import type { ChatMessage } from "../../types/index";
 import { useCharacterView } from "../hooks/useCharacterView";
 import { Avatar } from "./Avatar";
@@ -30,7 +31,14 @@ export function MessageBubble(props: MessageBubbleProps) {
   const friendView = useCharacterView(ctx, props.friendCharacterId);
   const isOutgoing = props.message.direction === "outgoing";
   const glyph = isOutgoing ? "我" : friendView.glyph;
-  const url = isOutgoing ? undefined : friendView.avatarUrl;
+  const avatarUrl = isOutgoing ? undefined : friendView.avatarUrl;
+  const isImage = props.message.contentType === "image";
+  const imageUrl = isImage
+    ? resolveAssetUrl(ctx, props.message.imageAsset)
+    : undefined;
+  const [imageLoadFailed, setImageLoadFailed] = useState(false);
+
+  useEffect(() => setImageLoadFailed(false), [imageUrl]);
 
   return (
     <div
@@ -38,9 +46,24 @@ export function MessageBubble(props: MessageBubbleProps) {
       data-direction={props.message.direction}
       data-animate={props.animate ? "true" : "false"}
     >
-      <Avatar url={url} glyph={glyph} />
+      <Avatar url={avatarUrl} glyph={glyph} />
       <div className="chat-msg-col">
-        <div className="chat-bubble">{props.message.text}</div>
+        <div className="chat-bubble">
+          {isImage ? (
+            imageLoadFailed || !imageUrl ? (
+              "图片加载失败"
+            ) : (
+              <img
+                className="chat-bubble-img"
+                src={imageUrl}
+                alt=""
+                onError={() => setImageLoadFailed(true)}
+              />
+            )
+          ) : (
+            props.message.text
+          )}
+        </div>
         {isOutgoing ? <StatusLabel status={props.message.status} /> : null}
       </div>
     </div>

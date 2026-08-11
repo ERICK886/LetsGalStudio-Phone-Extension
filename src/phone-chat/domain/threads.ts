@@ -12,12 +12,15 @@ import type {
   ChatMessageDirection,
   ChatMessageStatus,
   ChatThread,
+  MessageContentType,
 } from "../types/index";
 
 export interface AppendMessageInput {
   text: string;
   direction: ChatMessageDirection;
   status: ChatMessageStatus;
+  contentType?: MessageContentType;
+  imageAsset?: string;
 }
 
 /**
@@ -41,13 +44,22 @@ export function appendMessagesToThreads(
   }
 
   const now = Date.now();
-  const appended: ChatMessage[] = incoming.map((item) => ({
-    id: nextId("msg"),
-    text: item.text,
-    direction: item.direction,
-    status: item.status,
-    createdAt: now,
-  }));
+  const appended: ChatMessage[] = incoming.map((item) => {
+    const message: ChatMessage = {
+      id: nextId("msg"),
+      text: item.text,
+      direction: item.direction,
+      status: item.status,
+      createdAt: now,
+    };
+    if (item.contentType !== undefined) {
+      message.contentType = item.contentType;
+    }
+    if (item.imageAsset !== undefined) {
+      message.imageAsset = item.imageAsset;
+    }
+    return message;
+  });
 
   const unreadDelta = options.bumpUnread
     ? appended.filter((m) => m.direction === "incoming").length
@@ -105,6 +117,9 @@ export function threadPreviewText(thread: ChatThread | undefined): string {
   if (!thread || thread.messages.length === 0) return "";
   const last = thread.messages[thread.messages.length - 1]!;
   const prefix = last.direction === "outgoing" ? "我: " : "";
+  if (last.contentType === "image") {
+    return `${prefix}[图片]`.slice(0, 48);
+  }
   const text = last.text.replace(/\s+/g, " ").trim();
   return `${prefix}${text}`.slice(0, 48);
 }

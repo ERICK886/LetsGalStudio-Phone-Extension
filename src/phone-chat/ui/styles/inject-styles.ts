@@ -197,6 +197,17 @@ const CSS_TEXT = `
   box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
 }
 .chat-msg[data-direction="outgoing"] .chat-bubble { background: #95ec69; }
+.chat-bubble-img {
+  display: block;
+  max-width: 180px;
+  max-height: 180px;
+  border-radius: 4px;
+  object-fit: cover;
+}
+.chat-bubble:has(.chat-bubble-img) {
+  padding: 4px;
+  line-height: 0;
+}
 .chat-status { font-size: 11px; color: #888; }
 .chat-status[data-error="true"] { color: #fa5151; }
 .chat-msg[data-animate="true"] {
@@ -226,6 +237,19 @@ const CSS_TEXT = `
   cursor: pointer;
 }
 .chat-reply-btn:active { background: #e9e9e9; }
+.chat-reply-btn[data-content-type="image"] {
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.chat-reply-thumb {
+  display: block;
+  width: 48px;
+  height: 48px;
+  border-radius: 4px;
+  object-fit: cover;
+}
 .chat-detail {
   background: #ededed;
   min-height: 100%;

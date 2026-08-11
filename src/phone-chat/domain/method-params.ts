@@ -2,8 +2,8 @@
  * @file method-params.ts
  * @description 从方法块 params 解析多条消息 / 回复。
  * @author 池水三两升
- * @date 2026-08-05
- * @version 0.2.0
+ * @date 2026-08-11
+ * @version 0.3.0
  */
 
 import type { BlockSchema } from "@avg-studio/sdk";
@@ -12,8 +12,9 @@ import {
   MAX_EFFECTS_PER_REPLY,
   MAX_MESSAGES_PER_METHOD,
   MAX_REPLIES_PER_METHOD,
-} from "../constants";
-import { nextId } from "./id";
+} from "../constants.ts";
+import { resolveMessageSlot } from "./message-content.ts";
+import { nextId } from "./id.ts";
 import type { AppendMessageInput } from "./threads";
 import type { ChatMessageStatus, ChatReplyOption } from "../types/index";
 
@@ -100,18 +101,31 @@ export function coerceMethodBoolean(
  * @example
  * ```ts
  * const fields = buildFriendMessageSchemaFields();
- * // fields.message.required === true
+ * // fields.contentType.default === "text"
  * ```
  */
 export function buildFriendMessageSchemaFields(): BlockSchema {
   const fields: BlockSchema = {};
   for (let i = 1; i <= MAX_MESSAGES_PER_METHOD; i += 1) {
     const suffix = i === 1 ? "" : String(i);
+    fields[`contentType${suffix}`] = {
+      type: "enum",
+      label: `对方第 ${i} 条 · 类型`,
+      options: [
+        { label: "文字", value: "text" },
+        { label: "图片", value: "image" },
+      ],
+      default: "text",
+    };
     fields[`message${suffix}`] = {
       type: "string",
-      label: `对方第 ${i} 条 · 内容`,
+      label: `对方第 ${i} 条 · 文字`,
       multiline: true,
-      ...(i === 1 ? { required: true } : {}),
+    };
+    fields[`imageAsset${suffix}`] = {
+      type: "asset",
+      label: `对方第 ${i} 条 · 图片`,
+      assetType: "image",
     };
   }
   return fields;
@@ -136,9 +150,20 @@ export function parseFriendMessagesFromParams(
   const result: AppendMessageInput[] = [];
   for (let i = 1; i <= MAX_MESSAGES_PER_METHOD; i += 1) {
     const suffix = i === 1 ? "" : String(i);
-    const text = nonEmpty(params[`message${suffix}`]);
-    if (!text) continue;
-    result.push({ text, direction: "incoming", status: "read" });
+    const slot = resolveMessageSlot({
+      contentType: params[`contentType${suffix}`],
+      text: params[`message${suffix}`],
+      imageAsset: params[`imageAsset${suffix}`],
+      textMax: 2000,
+    });
+    if (!slot) continue;
+    result.push({
+      text: slot.contentType === "text" ? slot.text : "",
+      contentType: slot.contentType,
+      ...(slot.contentType === "image" ? { imageAsset: slot.imageAsset } : {}),
+      direction: "incoming",
+      status: "read",
+    });
   }
   return result;
 }
@@ -154,8 +179,13 @@ export function parseRepliesFromParams(
 ): ChatReplyOption[] {
   const result: ChatReplyOption[] = [];
   for (let i = 1; i <= MAX_REPLIES_PER_METHOD; i += 1) {
-    const text = nonEmpty(params[`reply${i}`], 500);
-    if (!text) continue;
+    const slot = resolveMessageSlot({
+      contentType: params[`reply${i}ContentType`],
+      text: params[`reply${i}`],
+      imageAsset: params[`reply${i}Image`],
+      textMax: 500,
+    });
+    if (!slot) continue;
     const effects = [];
     for (let e = 1; e <= MAX_EFFECTS_PER_REPLY; e += 1) {
       const variable = nonEmpty(params[`reply${i}Var${e}`], 120);
@@ -168,7 +198,13 @@ export function parseRepliesFromParams(
             : String(params[`reply${i}Val${e}`]);
       effects.push({ variable, value });
     }
-    result.push({ id: nextId("reply"), text, effects });
+    result.push({
+      id: nextId("reply"),
+      text: slot.contentType === "text" ? slot.text : "",
+      contentType: slot.contentType,
+      ...(slot.contentType === "image" ? { imageAsset: slot.imageAsset } : {}),
+      effects,
+    });
   }
   return result;
 }
@@ -215,11 +251,24 @@ export function normalizeOutgoingStatus(status: unknown): ChatMessageStatus {
 export function buildReplySchemaFields(): BlockSchema {
   const fields: BlockSchema = {};
   for (let i = 1; i <= MAX_REPLIES_PER_METHOD; i += 1) {
+    fields[`reply${i}ContentType`] = {
+      type: "enum",
+      label: `玩家回复 ${i} · 类型`,
+      options: [
+        { label: "文字", value: "text" },
+        { label: "图片", value: "image" },
+      ],
+      default: "text",
+    };
     fields[`reply${i}`] = {
       type: "string",
-      label: `玩家回复 ${i} · 文案`,
+      label: `玩家回复 ${i} · 文字`,
       multiline: true,
-      ...(i === 1 ? { required: true } : {}),
+    };
+    fields[`reply${i}Image`] = {
+      type: "asset",
+      label: `玩家回复 ${i} · 图片`,
+      assetType: "image",
     };
     for (let e = 1; e <= MAX_EFFECTS_PER_REPLY; e += 1) {
       fields[`reply${i}Var${e}`] = {

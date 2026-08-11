@@ -16,12 +16,19 @@ export type ChatMessageStatus =
 
 export type ChatMessageDirection = "incoming" | "outgoing";
 
+/** 消息正文种类；缺省视为 `"text"`。 */
+export type MessageContentType = "text" | "image";
+
 export interface ChatMessage {
   id: string;
+  /** text 消息正文；image 消息可为空串。 */
   text: string;
   direction: ChatMessageDirection;
   status: ChatMessageStatus;
   createdAt: number;
+  contentType?: MessageContentType;
+  /** image 消息时有效，Studio image asset URI。 */
+  imageAsset?: string;
 }
 
 export interface ChatThread {
@@ -38,8 +45,11 @@ export interface ChatReplyEffect {
 
 export interface ChatReplyOption {
   id: string;
+  /** text 选项文案；image 选项可为空串。 */
   text: string;
   effects: ChatReplyEffect[];
+  contentType?: MessageContentType;
+  imageAsset?: string;
 }
 
 export interface ChatPendingReplies {

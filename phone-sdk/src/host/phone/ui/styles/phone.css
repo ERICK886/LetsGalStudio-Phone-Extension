@@ -1035,6 +1035,19 @@
   white-space: pre-wrap;
 }
 
+[data-phone-root] .phone-story-bubble img {
+  display: block;
+  max-width: min(180px, 100%);
+  max-height: 180px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+[data-phone-root] .phone-story-bubble:has(img) {
+  padding: 4px;
+  line-height: 0;
+}
+
 [data-phone-root] .phone-story-message-body {
   min-width: 0;
   max-width: calc(100% - 78px);

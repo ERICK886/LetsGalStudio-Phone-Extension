@@ -12,3 +12,4 @@ export * from "./threads";
 export * from "./effects";
 export * from "./character";
 export * from "./method-params";
+export * from "./message-content";

@@ -257,7 +257,15 @@ export function selectPlayerReply(
   const { threads, appended } = appendMessagesToThreads(
     state.threads,
     friendId,
-    [{ text: option.text, direction: "outgoing", status }],
+    [
+      {
+        text: option.contentType === "image" ? "" : option.text,
+        contentType: option.contentType ?? "text",
+        ...(option.imageAsset ? { imageAsset: option.imageAsset } : {}),
+        direction: "outgoing",
+        status,
+      },
+    ],
     { bumpUnread: false },
   );
 

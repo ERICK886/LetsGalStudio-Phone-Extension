@@ -18,6 +18,7 @@
  */
 
 import { EXTENSION_ID, PROGRAM_ID } from "../constants";
+import { resolveMessageSlot } from "../domain/message-content";
 
 /** 卡片根节点属性（与相册 / 宿主 phone 卡片隔离）。 */
 const CARD_ATTRIBUTE = "data-chat-inline-card";
@@ -551,7 +552,23 @@ function seedCharacterFromRawParam(
 }
 
 /**
- * 统计对方消息槽中非空条数。
+ * 将有效消息/回复槽转为内联卡片摘要片段。
+ *
+ * @param slot - `resolveMessageSlot` 结果
+ * @param limit - 文字截断长度
+ * @returns 摘要文本；无效槽为空串
+ */
+function slotInlineSummary(
+  slot: ReturnType<typeof resolveMessageSlot>,
+  limit = 48,
+): string {
+  if (!slot) return "";
+  if (slot.contentType === "image") return "[图片]";
+  return truncate(slot.text, limit);
+}
+
+/**
+ * 统计对方消息槽中非空条数（含图片槽）。
  *
  * @param params - 解包后的参数
  * @returns 非空消息数量
@@ -559,14 +576,35 @@ function seedCharacterFromRawParam(
 function countFriendMessages(params: Record<string, unknown>): number {
   let count = 0;
   for (let i = 1; i <= 8; i += 1) {
-    const key = i === 1 ? "message" : `message${i}`;
-    if (truncate(params[key], 8)) count += 1;
+    const suffix = i === 1 ? "" : String(i);
+    const slot = resolveMessageSlot({
+      contentType: params[`contentType${suffix}`],
+      text: params[`message${suffix}`],
+      imageAsset: params[`imageAsset${suffix}`],
+    });
+    if (slot) count += 1;
   }
   return count;
 }
 
 /**
- * 统计玩家回复选项中非空条数。
+ * 取首条对方消息的内联摘要。
+ *
+ * @param params - 解包后的参数
+ * @returns 首条有效槽摘要
+ */
+function firstFriendMessageSummary(params: Record<string, unknown>): string {
+  return slotInlineSummary(
+    resolveMessageSlot({
+      contentType: params.contentType,
+      text: params.message,
+      imageAsset: params.imageAsset,
+    }),
+  );
+}
+
+/**
+ * 统计玩家回复选项中非空条数（含图片槽）。
  *
  * @param params - 解包后的参数
  * @returns 非空回复数量
@@ -574,9 +612,30 @@ function countFriendMessages(params: Record<string, unknown>): number {
 function countReplyOptions(params: Record<string, unknown>): number {
   let count = 0;
   for (let i = 1; i <= 6; i += 1) {
-    if (truncate(params[`reply${i}`], 8)) count += 1;
+    const slot = resolveMessageSlot({
+      contentType: params[`reply${i}ContentType`],
+      text: params[`reply${i}`],
+      imageAsset: params[`reply${i}Image`],
+    });
+    if (slot) count += 1;
   }
   return count;
+}
+
+/**
+ * 取首条回复选项的内联摘要。
+ *
+ * @param params - 解包后的参数
+ * @returns 首条有效槽摘要
+ */
+function firstReplySummary(params: Record<string, unknown>): string {
+  return slotInlineSummary(
+    resolveMessageSlot({
+      contentType: params.reply1ContentType,
+      text: params.reply1,
+      imageAsset: params.reply1Image,
+    }),
+  );
 }
 
 /**
@@ -716,7 +775,7 @@ function renderDetails(
   switch (methodId) {
     case "send-friend-messages": {
       const messageCount = countFriendMessages(params);
-      const firstMessage = truncate(params.message, 48);
+      const firstMessage = firstFriendMessageSummary(params);
       const openPhone = asBoolean(params.openPhone, true);
       const waitClose = asBoolean(params.waitUntilClose, false);
       return {
@@ -733,7 +792,7 @@ function renderDetails(
     }
     case "await-player-reply": {
       const replyCount = countReplyOptions(params);
-      const firstReply = truncate(params.reply1, 48);
+      const firstReply = firstReplySummary(params);
       const requireReply = asBoolean(params.requireReply, true);
       const closeAfter = asBoolean(params.closePhoneAfter, false);
       const status = displayValue(params.outgoingStatus, 16) || "read";

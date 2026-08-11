@@ -170,6 +170,13 @@ export const PhoneStoryMessageItem: React.FC<{ storyMessage: PhoneStoryMessage }
     bubbleStyleParts && Object.keys(bubbleStyleParts.body).length > 0
       ? bubbleStyleParts.body
       : undefined;
+  const isImage = storyMessage.contentType === "image";
+  const imageUrl = isImage
+    ? resolveAssetUrl(ctx, storyMessage.imageAsset)
+    : undefined;
+  const [imageLoadFailed, setImageLoadFailed] = useState(false);
+
+  useEffect(() => setImageLoadFailed(false), [imageUrl]);
 
   // 撤回完成：仅居中系统行（角色名 + 后缀）。
   if (
@@ -237,7 +244,19 @@ export const PhoneStoryMessageItem: React.FC<{ storyMessage: PhoneStoryMessage }
             </span>
           ) : null}
           <div className="phone-story-bubble" style={bubbleStyle}>
-            <p style={bodyStyle}>{storyMessage.message}</p>
+            {storyMessage.status === "recalled" ? null : isImage ? (
+              imageLoadFailed || !imageUrl ? (
+                <p style={bodyStyle}>图片加载失败</p>
+              ) : (
+                <img
+                  src={imageUrl}
+                  alt=""
+                  onError={() => setImageLoadFailed(true)}
+                />
+              )
+            ) : (
+              <p style={bodyStyle}>{storyMessage.message}</p>
+            )}
           </div>
         </div>
       </div>
