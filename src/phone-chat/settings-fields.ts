@@ -18,6 +18,10 @@ export function buildChatSettingsFields(
   s: SettingsBuilder,
 ): Record<string, AnyFieldBuilder> {
   return {
+    selfCharacterId: s
+      .character("我方角色")
+      .describe("未选择时会话内显示为「我」。")
+      .default(""),
     appTitle: s.string("应用标题").default("聊天"),
     chatsTabLabel: s.string("聊天 Tab 名称").default("聊天"),
     friendsTabLabel: s.string("好友 Tab 名称").default("好友"),

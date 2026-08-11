@@ -134,7 +134,8 @@ export type PhoneEditorFieldType =
   | "enum"
   | "asset"
   | "shortcut"
-  | "boolean";
+  | "boolean"
+  | "character";
 
 /**
  * 枚举选项。

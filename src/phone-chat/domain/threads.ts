@@ -111,12 +111,16 @@ export function clearThreadUnread(
  * 取会话最后一条文本摘要。
  *
  * @param thread - 会话
+ * @param selfDisplayName - 我方显示名；空配置时为「我」
  * @returns 摘要；无消息时为空串
  */
-export function threadPreviewText(thread: ChatThread | undefined): string {
+export function threadPreviewText(
+  thread: ChatThread | undefined,
+  selfDisplayName = "我",
+): string {
   if (!thread || thread.messages.length === 0) return "";
   const last = thread.messages[thread.messages.length - 1]!;
-  const prefix = last.direction === "outgoing" ? "我: " : "";
+  const prefix = last.direction === "outgoing" ? `${selfDisplayName}: ` : "";
   if (last.contentType === "image") {
     return `${prefix}[图片]`.slice(0, 48);
   }

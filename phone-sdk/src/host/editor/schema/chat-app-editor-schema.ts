@@ -27,6 +27,16 @@ export const PHONE_SETTINGS_MODULE_ID = "phone";
  */
 export const CHAT_APP_CONTENT_ITEMS: readonly PhoneEditorContentItemSchema[] = [
   {
+    id: "selfCharacterId",
+    group: "文案",
+    label: "我方角色",
+    icon: "user",
+    fieldType: "character",
+    defaultValue: "",
+    allowEmpty: true,
+    description: "未选择时会话内显示为「我」。",
+  },
+  {
     id: "appTitle",
     group: "文案",
     label: "应用标题",
@@ -69,6 +79,7 @@ export const CHAT_APP_CONTENT_ITEMS: readonly PhoneEditorContentItemSchema[] = [
 ];
 
 const COPY_IDS = [
+  "selfCharacterId",
   "appTitle",
   "chatsTabLabel",
   "friendsTabLabel",

@@ -17,6 +17,7 @@ import type { ChatAttributeField } from "../types/index";
  * 作者设置快照（运行时规范化后）。
  */
 export interface ChatAuthorSettings {
+  selfCharacterId: string;
   defaultFriends: string[];
   attributeFields: ChatAttributeField[];
   chatsTabLabel: string;
@@ -27,6 +28,7 @@ export interface ChatAuthorSettings {
 }
 
 const DEFAULTS: ChatAuthorSettings = {
+  selfCharacterId: "",
   defaultFriends: [],
   attributeFields: [],
   chatsTabLabel: "聊天",
@@ -38,6 +40,7 @@ const DEFAULTS: ChatAuthorSettings = {
 
 /** 供 `ChatController.onRegister` 订阅。 */
 export const CHAT_SETTINGS_KEYS = [
+  "selfCharacterId",
   "defaultFriends",
   "attributeFields",
   "appTitle",
@@ -87,6 +90,7 @@ export function readAuthorSettings(ctx: ExtensionContext): ChatAuthorSettings {
   }
 
   return {
+    selfCharacterId: String(ctx.settings.get("selfCharacterId") ?? "").trim(),
     defaultFriends,
     attributeFields,
     chatsTabLabel: nonEmpty(

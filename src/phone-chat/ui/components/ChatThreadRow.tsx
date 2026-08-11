@@ -12,6 +12,7 @@ import React from "react";
 import { threadPreviewText } from "../../domain/threads";
 import type { ChatThread } from "../../types/index";
 import { useCharacterView } from "../hooks/useCharacterView";
+import { useSelfCharacterView } from "../hooks/useSelfCharacterView";
 import { Avatar } from "./Avatar";
 
 export interface ChatThreadRowProps {
@@ -26,7 +27,8 @@ export interface ChatThreadRowProps {
 export function ChatThreadRow(props: ChatThreadRowProps) {
   const ctx = useExtensionContext();
   const view = useCharacterView(ctx, props.thread.friendCharacterId);
-  const preview = threadPreviewText(props.thread);
+  const selfView = useSelfCharacterView(ctx);
+  const preview = threadPreviewText(props.thread, selfView.displayName);
 
   return (
     <button

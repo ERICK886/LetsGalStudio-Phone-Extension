@@ -12,6 +12,7 @@ import React, { useEffect, useState } from "react";
 import { resolveAssetUrl } from "../../domain/character";
 import type { ChatMessage } from "../../types/index";
 import { useCharacterView } from "../hooks/useCharacterView";
+import { useSelfCharacterView } from "../hooks/useSelfCharacterView";
 import { Avatar } from "./Avatar";
 import { StatusLabel } from "./StatusLabel";
 
@@ -29,9 +30,10 @@ export interface MessageBubbleProps {
 export function MessageBubble(props: MessageBubbleProps) {
   const ctx = useExtensionContext();
   const friendView = useCharacterView(ctx, props.friendCharacterId);
+  const selfView = useSelfCharacterView(ctx);
   const isOutgoing = props.message.direction === "outgoing";
-  const glyph = isOutgoing ? "我" : friendView.glyph;
-  const avatarUrl = isOutgoing ? undefined : friendView.avatarUrl;
+  const glyph = isOutgoing ? selfView.glyph : friendView.glyph;
+  const avatarUrl = isOutgoing ? selfView.avatarUrl : friendView.avatarUrl;
   const isImage = props.message.contentType === "image";
   const imageUrl = isImage
     ? resolveAssetUrl(ctx, props.message.imageAsset)

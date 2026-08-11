@@ -10,6 +10,7 @@ import React, { useMemo } from "react";
 
 import type { PhoneEditorContentItemSchema } from "../../../client/runtime/types";
 import { AssetUriField } from "../shared/asset-uri-field";
+import { CharacterAssetSelect } from "../shared/character-select";
 import { ColorPicker } from "../shared/color-picker";
 import { EnumSelect } from "../shared/enum-select";
 import { ShortcutField } from "../shared/shortcut-field";
@@ -236,6 +237,16 @@ export function PhonePropertyPanel({
             placeholder="素材 URI（可空）"
             ariaLabel={`${item.label} 素材 URI`}
             tokens={tokens}
+          />
+        ) : null}
+
+        {item.fieldType === "character" ? (
+          <CharacterAssetSelect
+            value={value}
+            onChange={(next) => onChange(item.id, next)}
+            allowEmpty={item.allowEmpty === true}
+            disabled={dependencyBlocked}
+            emptyLabel="（未选择角色）"
           />
         ) : null}
 
