@@ -9,6 +9,31 @@
 import type { ReactNode } from "react";
 
 /**
+ * 自定义编辑器三栏（左 / 中 / 右）节点。
+ * 由 `resolveCustomPanes` 返回；`null` 表示回落默认标量编辑 UI。
+ */
+export type PhoneEditorCustomPanes = {
+  left: ReactNode;
+  center: ReactNode;
+  right: ReactNode;
+};
+
+/**
+ * 按当前页面与 settings 值解析自定义三栏。
+ *
+ * @param args.pageId - 当前竖栏页面 id
+ * @param args.values - 分区 settings 字段快照（文案页预览等用）
+ * @param args.revision - 宿主 revision 令牌；变化时重新调用
+ * @param args.bump - 写入 settings 后调用以触发重算
+ */
+export type ResolvePhoneEditorCustomPanes = (args: {
+  pageId: string;
+  values: Record<string, string>;
+  revision: number;
+  bump: () => void;
+}) => PhoneEditorCustomPanes | null;
+
+/**
  * 手机屏幕安全区（单位：CSS 像素，相对手机屏幕内容区）。
  *
  * - `top`：状态栏 + 刘海 / 灵动岛占用高度
@@ -79,12 +104,126 @@ export interface PhoneAppRegistration {
  * @property label - Tab 文案；缺省回落 `title` 或 `id`
  * @property icon - Font Awesome 图标名（不含 `fa-`）
  * @property order - 排序权重，越小越靠前；缺省 100
+ * @property settingsModuleId - 跨模块读写 settings 的目标模块 id；缺省为注册 app 的 `id`
+ * @property contentItems - 本分区可编辑字段目录（pages 通过 contentItemIds 引用）
+ * @property pages - 可编辑页面 schema；驱动左竖栏导航、内容项与预览类型
  */
 export interface PhoneAppStyleEditorMeta {
   enabled?: boolean;
   label?: string;
   icon?: string;
   order?: number;
+  settingsModuleId?: string;
+  contentItems?: PhoneEditorContentItemSchema[];
+  /**
+   * 该分区下的可编辑页面列表。
+   * 宿主「手机」使用内置 schema；内页可声明自己的 pages。
+   */
+  pages?: PhoneEditorPageSchema[];
+  /**
+   * 可选：完全自定义左 / 中 / 右三栏（如相册网格 + 预览）。
+   * 未提供或返回 `null` 时回落默认 contentItems + 预览 + 属性面板。
+   */
+  resolveCustomPanes?: ResolvePhoneEditorCustomPanes;
+}
+
+/** 内容项字段控件类型。 */
+export type PhoneEditorFieldType =
+  | "string"
+  | "color"
+  | "enum"
+  | "asset"
+  | "shortcut"
+  | "boolean";
+
+/**
+ * 枚举选项。
+ */
+export interface PhoneEditorEnumOption {
+  /** 写入 settings 的值。 */
+  value: string;
+  /** 界面展示文案。 */
+  label: string;
+}
+
+/**
+ * 编辑器内容项（左栏一项 / 右栏表单）schema。
+ *
+ * @property id - 稳定 id；默认同时作为 settings 键
+ * @property group - 左栏分组标题
+ * @property label - 展示名
+ * @property icon - FA 图标名（不含 fa-）
+ * @property fieldType - 控件类型
+ * @property defaultValue - 缺省值（boolean 用 `"true"` / `"false"`）
+ * @property description - 说明
+ * @property enumOptions - enum 选项
+ * @property settingKey - 覆盖 settings 键；缺省等于 id
+ * @property allowEmpty - 空串是否保留（不回退 default）；壁纸等用
+ * @property dependsOn - 依赖另一内容项取值时才可编辑
+ * @property multiline - 为 true 且 fieldType 为 string 时，属性面板使用多行 textarea
+ */
+export interface PhoneEditorContentItemSchema {
+  id: string;
+  group: string;
+  label: string;
+  icon?: string;
+  fieldType: PhoneEditorFieldType;
+  defaultValue: string;
+  description?: string;
+  enumOptions?: PhoneEditorEnumOption[];
+  settingKey?: string;
+  allowEmpty?: boolean;
+  /**
+   * 覆盖分区默认 `settingsModuleId`；用于聊天分区内编辑宿主 `phone` 字段。
+   */
+  settingsModuleId?: string;
+  /**
+   * 当指定内容项当前值等于 `equals` 时本字段可编辑；否则禁用。
+   */
+  dependsOn?: {
+    contentItemId: string;
+    equals: string;
+  };
+  /** 为 true 且 fieldType 为 string 时，属性面板渲染多行 textarea。 */
+  multiline?: boolean;
+}
+
+/**
+ * 编辑器单个可编辑页面描述（竖向导航一项）。
+ *
+ * @property id - 页面稳定 id（如 `home-style`）
+ * @property label - 竖栏展示名
+ * @property icon - FA 图标名（不含 fa-）
+ * @property order - 排序，越小越靠前
+ * @property status - `ready` 可编辑；`comingSoon` 显示占位
+ * @property contentItemIds - 引用 section.contentItems 的 id 列表
+ * @property preview - 预览类型：`desktop` 桌面；`chat` 聊天内页；`placeholder` 占位
+ */
+export interface PhoneEditorPageSchema {
+  id: string;
+  label: string;
+  icon?: string;
+  order?: number;
+  status?: "ready" | "comingSoon";
+  contentItemIds?: string[];
+  preview?: "desktop" | "chat" | "placeholder";
+}
+
+/**
+ * 某一顶栏分区的完整编辑 schema。
+ *
+ * @property sectionId - 顶栏分区 id（如 `phone` / `phone-chat`）
+ * @property settingsModuleId - settings.cross 目标模块
+ * @property contentItems - 字段目录
+ * @property pages - 页面列表
+ */
+export interface PhoneEditorSectionSchema {
+  sectionId: string;
+  settingsModuleId: string;
+  contentItems: PhoneEditorContentItemSchema[];
+  pages: PhoneEditorPageSchema[];
+  /** 自 styleEditor 转发；与注册时同一函数引用。 */
+  resolveCustomPanes?: ResolvePhoneEditorCustomPanes;
 }
 
 /** `openPhoneApp` 的等待策略：关闭应用后返回，或不等待。 */

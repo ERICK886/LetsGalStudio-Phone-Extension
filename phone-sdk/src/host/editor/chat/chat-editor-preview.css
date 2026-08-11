@@ -1,0 +1,150 @@
+/**
+ * @file chat-editor-preview.css
+ * @description 聊天编辑器中栏预览：覆盖外壳内容区为聊天示意布局。
+ * @author 池水三两升
+ * @date 2026-08-10
+ * @version 0.1.0
+ */
+
+[data-phone-editor-chat-preview] .phone-toolbar,
+[data-phone-editor-chat-preview] .phone-app-grid {
+  display: none !important;
+}
+
+[data-phone-editor-chat-preview] .phone-chat-preview-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #ededed;
+  color: #111;
+  font-family: "PingFang SC", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif;
+}
+
+[data-phone-editor-chat-preview] .phone-chat-preview-header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  font-size: 17px;
+  font-weight: 650;
+}
+
+[data-phone-editor-chat-preview] .phone-chat-preview-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 8px 0;
+}
+
+[data-phone-editor-chat-preview] .phone-chat-preview-empty {
+  padding: 28px 20px;
+  text-align: center;
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.45);
+  line-height: 1.5;
+}
+
+[data-phone-editor-chat-preview] .phone-chat-preview-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+[data-phone-editor-chat-preview] .phone-chat-preview-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: #cfd8e6;
+  color: #334;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  flex: 0 0 auto;
+}
+
+[data-phone-editor-chat-preview] .phone-chat-preview-row-text {
+  min-width: 0;
+  flex: 1;
+}
+
+[data-phone-editor-chat-preview] .phone-chat-preview-row-title {
+  font-size: 14px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+[data-phone-editor-chat-preview] .phone-chat-preview-row-sub {
+  margin-top: 2px;
+  font-size: 11px;
+  color: rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+[data-phone-editor-chat-preview] .phone-chat-preview-tabs {
+  flex: 0 0 auto;
+  display: flex;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  background: #f7f7f7;
+}
+
+[data-phone-editor-chat-preview] .phone-chat-preview-tab {
+  flex: 1;
+  padding: 10px 4px 12px;
+  text-align: center;
+  font-size: 11px;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+[data-phone-editor-chat-preview] .phone-chat-preview-tab[data-active="true"] {
+  color: #111;
+  font-weight: 650;
+}
+
+[data-phone-editor-chat-preview] .phone-chat-preview-bubbles {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 14px;
+}
+
+[data-phone-editor-chat-preview] .phone-chat-preview-name {
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+[data-phone-editor-chat-preview] .phone-chat-preview-bubble {
+  max-width: 82%;
+  padding: 11px 13px;
+  border-radius: 18px 18px 18px 5px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(12px);
+  font-size: 14px;
+  line-height: 1.45;
+  color: #fff;
+  background: rgba(12, 18, 30, 0.84);
+}
+
+[data-phone-editor-chat-preview] .phone-chat-preview-behavior {
+  padding: 20px 16px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: rgba(0, 0, 0, 0.7);
+}
+
+[data-phone-editor-chat-preview] .phone-chat-preview-behavior strong {
+  color: #111;
+}

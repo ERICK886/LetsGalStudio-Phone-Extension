@@ -1,0 +1,67 @@
+/**
+ * @file phone-editor-preview.css
+ * @description 编辑器中栏嵌入真机预览时的布局覆盖（取消全屏 overlay / 入场动画）。
+ * @author 池水三两升
+ * @date 2026-08-10
+ * @version 0.1.2
+ *
+ * @remarks
+ * 与 `phone.css` 一并注入；选择器挂在 `[data-phone-editor-preview]` 上，
+ * 节点同时带 `data-phone-root` 以复用真机 chrome 样式。
+ * 外壳尺寸与运行时一致（约 390×780 / Android 400×760），中栏不足时可滚动。
+ */
+
+[data-phone-editor-preview] {
+  position: relative !important;
+  inset: auto !important;
+  z-index: auto !important;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  padding: 12px !important;
+  overflow: auto !important;
+  box-sizing: border-box;
+  color: #fff;
+  background: transparent !important;
+  backdrop-filter: none !important;
+  animation: none !important;
+  pointer-events: auto !important;
+}
+
+/* 取消入场动画；尺寸跟真机默认，不被视口 min() 压小 */
+[data-phone-editor-preview] .phone-shell {
+  width: 390px !important;
+  height: 780px !important;
+  min-height: 780px !important;
+  animation: none !important;
+  transform: none !important;
+  will-change: auto !important;
+}
+
+[data-phone-editor-preview][data-phone-style-preset="android"] .phone-shell {
+  width: 400px !important;
+  height: 760px !important;
+  min-height: 760px !important;
+}
+
+[data-phone-editor-preview] .phone-app,
+[data-phone-editor-preview] .phone-round-button,
+[data-phone-editor-preview] .phone-home-button {
+  cursor: default !important;
+  pointer-events: none !important;
+}
+
+/* 消息手机预览：覆盖运行时 message-mode 的 pointer-events:none，允许列表滚动 */
+[data-phone-editor-preview][data-phone-message-mode="true"] {
+  pointer-events: auto !important;
+}
+
+[data-phone-editor-preview][data-phone-message-mode="true"] .phone-shell {
+  pointer-events: auto !important;
+}
+
+[data-phone-editor-preview][data-phone-message-mode="true"] .phone-story-message {
+  pointer-events: auto !important;
+}

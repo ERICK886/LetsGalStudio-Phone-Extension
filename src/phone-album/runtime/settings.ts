@@ -19,6 +19,11 @@ import type {
   MediaType,
 } from "../types";
 import { parseCommaIds, parseMediaType } from "../domain/index";
+import {
+  ALBUM_APPEARANCE_SETTINGS_KEYS,
+  DEFAULT_ALBUM_APPEARANCE,
+  parseAppearanceFromSettings,
+} from "./appearance-parse";
 
 /** 文案默认值。 */
 const DEFAULT_LABELS = {
@@ -39,6 +44,7 @@ export const ALBUM_SETTINGS_KEYS = [
   "emptyAlbumHint",
   "defaultAlbums",
   "defaultMedia",
+  ...ALBUM_APPEARANCE_SETTINGS_KEYS,
 ] as const;
 
 /** 字符串字段规范化：非字符串 / 空白回落到 fallback，并截断到 max。 */
@@ -155,7 +161,13 @@ export function readAuthorSettings(ctx: ExtensionContext): AlbumAuthorSettings {
     defaultMedia.push(seed);
   }
 
+  const appearanceRaw: Record<string, unknown> = {};
+  for (const key of ALBUM_APPEARANCE_SETTINGS_KEYS) {
+    appearanceRaw[key] = ctx.settings.get(key);
+  }
+
   return {
+    ...parseAppearanceFromSettings(appearanceRaw),
     appTitle: nonEmpty(ctx.settings.get("appTitle"), DEFAULT_LABELS.appTitle),
     allAlbumsLabel: nonEmpty(
       ctx.settings.get("allAlbumsLabel"),
@@ -172,6 +184,7 @@ export function readAuthorSettings(ctx: ExtensionContext): AlbumAuthorSettings {
 }
 
 let cachedSettings: AlbumAuthorSettings = {
+  ...DEFAULT_ALBUM_APPEARANCE,
   appTitle: DEFAULT_LABELS.appTitle,
   allAlbumsLabel: DEFAULT_LABELS.allAlbumsLabel,
   emptyAlbumHint: DEFAULT_LABELS.emptyAlbumHint,

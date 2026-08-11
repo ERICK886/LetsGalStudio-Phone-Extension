@@ -23,10 +23,17 @@ export type {
   PhoneAppRegistration,
   PhoneAppRenderProps,
   PhoneAppStyleEditorMeta,
+  PhoneEditorContentItemSchema,
+  PhoneEditorCustomPanes,
+  PhoneEditorEnumOption,
+  PhoneEditorFieldType,
+  PhoneEditorPageSchema,
+  PhoneEditorSectionSchema,
   PhoneNavigationController,
   PhoneSafeAreaInsets,
   PhoneSdkGlobalSlot,
   PhoneSdkHost,
+  ResolvePhoneEditorCustomPanes,
 } from "./runtime/types";
 
 export type { PhoneSdkRenderPropsAccessReport } from "./debug/debug";

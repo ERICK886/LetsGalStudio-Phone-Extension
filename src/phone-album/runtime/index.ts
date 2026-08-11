@@ -8,6 +8,7 @@
 
 export * from "./bus";
 export * from "./settings";
+export * from "./appearance-parse";
 export * from "./store";
 export * from "./actions";
 export * from "./camera-session";

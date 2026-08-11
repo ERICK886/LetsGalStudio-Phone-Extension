@@ -62,8 +62,28 @@ export interface DefaultMediaSeed {
   posterAsset?: string;
 }
 
+/** 相册外观 settings（CSS 变量驱动）。 */
+export interface AlbumAppearanceSettings {
+  styleBg: string;
+  styleFg: string;
+  styleFgMuted: string;
+  styleAccent: string;
+  styleHeaderBg: string;
+  styleTabbarBg: string;
+  styleCardBg: string;
+  styleDanger: string;
+  styleCameraBg: string;
+  styleViewerBg: string;
+  styleHomeColumns: "2" | "3";
+  styleGridColumns: "3" | "4";
+  styleRadius: "sm" | "md" | "lg";
+  styleCardGap: "sm" | "md" | "lg";
+  styleShowTabLabels: boolean;
+  styleCustomCss: string;
+}
+
 /** 作者设置快照。 */
-export interface AlbumAuthorSettings {
+export interface AlbumAuthorSettings extends AlbumAppearanceSettings {
   appTitle: string;
   allAlbumsLabel: string;
   emptyAlbumHint: string;

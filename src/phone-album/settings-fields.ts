@@ -46,5 +46,36 @@ export function buildAlbumSettingsFields(
       }))
       .maxItems(200)
       .addLabel("添加默认媒体"),
+    styleBg: s.color("根背景").default("#0F1419"),
+    styleFg: s.color("主文字").default("#F5F5F5"),
+    styleFgMuted: s.color("次要文字").default("rgba(255,255,255,0.45)"),
+    styleAccent: s.color("强调色").default("#7EC8FF"),
+    styleHeaderBg: s.color("顶栏背景").default("#0F1419"),
+    styleTabbarBg: s.color("Tab 栏背景").default("rgba(12,16,22,0.96)"),
+    styleCardBg: s.color("卡片 / 媒体格底").default("#1C232F"),
+    styleDanger: s.color("危险操作").default("#FF6B7A"),
+    styleCameraBg: s.color("拍照页背景").default("#05070A"),
+    styleViewerBg: s.color("查看器背景").default("#000000"),
+    styleHomeColumns: s
+      .enum("首页列数", ["2", "3"] as const)
+      .default("2")
+      .labels({ "2": "2 列", "3": "3 列" }),
+    styleGridColumns: s
+      .enum("网格列数", ["3", "4"] as const)
+      .default("3")
+      .labels({ "3": "3 列", "4": "4 列" }),
+    styleRadius: s
+      .enum("圆角档", ["sm", "md", "lg"] as const)
+      .default("md")
+      .labels({ sm: "小 (8px)", md: "中 (12px)", lg: "大 (16px)" }),
+    styleCardGap: s
+      .enum("间距档", ["sm", "md", "lg"] as const)
+      .default("md")
+      .labels({ sm: "小 (6px)", md: "中 (10px)", lg: "大 (14px)" }),
+    styleShowTabLabels: s.boolean("Tab 显示文字").default(true),
+    styleCustomCss: s
+      .string("自定义 CSS")
+      .default("")
+      .describe("多行 CSS；空则不注入。建议以 .pa-root 开头限定作用域。"),
   };
 }

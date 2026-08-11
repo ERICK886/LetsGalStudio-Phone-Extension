@@ -1,18 +1,20 @@
 /**
  * @file phone-editor-shell.tsx
- * @description 手机编辑器外壳：顶栏（品牌 + 动态分区 Tab + 主题 / 预览）与三栏占位 body。
+ * @description 手机编辑器外壳：顶栏 + 可选竖栏导航 + 左中右三栏 body。
  * @author 池水三两升
  * @date 2026-08-10
- * @version 0.2.0
+ * @version 0.4.0
  *
  * @remarks
  * 顶栏 Tab 由调用方传入的 `sections` 决定（宿主固定区 + 已注册且 opt-in 的 APP）。
+ * 可选 `navPane` / `leftPane` / `centerPane` / `rightPane` 替换对应区域。
  */
 
 import React from "react";
 
 import { BRAND_LABEL } from "../constants";
 import type { PhoneEditorSection } from "../editor-sections";
+import { COLOR_PICKER_SHELL_ATTR } from "../shared/color-picker";
 import { IconLabel } from "../shared/fa-icon";
 import { useTheme, FONT_SIZE_TITLE } from "../theme/theme-provider";
 import { PlaceholderPane } from "./placeholder-pane";
@@ -31,8 +33,18 @@ export interface PhoneEditorShellProps {
   leftWidth: number | string;
   /** 右栏宽度。 */
   rightWidth: number | string;
+  /** 最左竖栏宽度；仅在提供 `navPane` 时生效。 @default 72 */
+  navWidth?: number | string;
   /** 切换主题。 */
   onToggleTheme: () => void;
+  /** 可选最左竖向页面导航。 */
+  navPane?: React.ReactNode;
+  /** 可选左栏内容；缺省为占位。 */
+  leftPane?: React.ReactNode;
+  /** 可选中栏内容；缺省为占位。 */
+  centerPane?: React.ReactNode;
+  /** 可选右栏内容；缺省为占位。 */
+  rightPane?: React.ReactNode;
 }
 
 const topBarButtonStyle: React.CSSProperties = {
@@ -61,7 +73,12 @@ export function PhoneEditorShell({
   onSectionChange,
   leftWidth,
   rightWidth,
+  navWidth = 72,
   onToggleTheme,
+  navPane,
+  leftPane,
+  centerPane,
+  rightPane,
 }: PhoneEditorShellProps): React.ReactElement {
   const { tokens, mode } = useTheme();
 
@@ -70,8 +87,20 @@ export function PhoneEditorShell({
   const sectionLabel = current?.label ?? "分区";
   const centerHint = current?.centerHint ?? "样式预览（即将推出）";
 
+  const leftNode = leftPane ?? (
+    <PlaceholderPane title={`${sectionLabel} · 导航 / 列表`} />
+  );
+  const centerNode = centerPane ?? <PlaceholderPane title={centerHint} />;
+  const rightNode = rightPane ?? (
+    <PlaceholderPane title={`${sectionLabel} · 属性`} />
+  );
+
+  const navWidthCss =
+    typeof navWidth === "number" ? `${navWidth}px` : navWidth;
+
   return (
     <div
+      {...{ [COLOR_PICKER_SHELL_ATTR]: "" }}
       style={{
         width: "100%",
         height: "100%",
@@ -225,6 +254,20 @@ export function PhoneEditorShell({
           minHeight: 0,
         }}
       >
+        {navPane ? (
+          <div
+            style={{
+              flex: `0 0 ${navWidthCss}`,
+              width: navWidthCss,
+              padding: 8,
+              boxSizing: "border-box",
+              borderRight: `1px solid ${tokens.border}`,
+            }}
+          >
+            {navPane}
+          </div>
+        ) : null}
+
         <div
           style={{
             flex: `0 0 ${typeof leftWidth === "number" ? `${leftWidth}px` : leftWidth}`,
@@ -234,7 +277,7 @@ export function PhoneEditorShell({
             borderRight: `1px solid ${tokens.border}`,
           }}
         >
-          <PlaceholderPane title={`${sectionLabel} · 导航 / 列表`} />
+          {leftNode}
         </div>
 
         <div
@@ -245,7 +288,7 @@ export function PhoneEditorShell({
             boxSizing: "border-box",
           }}
         >
-          <PlaceholderPane title={centerHint} />
+          {centerNode}
         </div>
 
         <div
@@ -258,7 +301,7 @@ export function PhoneEditorShell({
             borderLeft: `1px solid ${tokens.border}`,
           }}
         >
-          <PlaceholderPane title={`${sectionLabel} · 属性`} />
+          {rightNode}
         </div>
       </div>
     </div>

@@ -32,6 +32,11 @@ import {
 } from "./screens/index";
 import { ensureFontAwesome } from "./styles/font-awesome";
 import { ensureAlbumStyles } from "./styles/inject-styles";
+import {
+  buildAlbumSkinCssVars,
+  buildAlbumSkinDataAttrs,
+  ensureAuthorCss,
+} from "./styles/album-skin";
 
 /**
  * Phone SDK 内页根组件。
@@ -66,6 +71,23 @@ export function AlbumApp(props: PhoneAppRenderProps) {
     openViewer,
     goBack,
   } = session;
+
+  const skinStyle = useMemo(
+    () => buildAlbumSkinCssVars(settings),
+    [settings],
+  );
+  const rootDataAttrs = useMemo(
+    () => buildAlbumSkinDataAttrs(settings),
+    [settings],
+  );
+  const mergedRootStyle = useMemo(
+    () => ({ ...rootStyle, ...skinStyle }),
+    [rootStyle, skinStyle],
+  );
+
+  useEffect(() => {
+    ensureAuthorCss(settings.styleCustomCss);
+  }, [settings.styleCustomCss]);
 
   const onTabChange = useCallback((next: AlbumMainTab) => {
     setTab(next);
@@ -117,7 +139,7 @@ export function AlbumApp(props: PhoneAppRenderProps) {
   }, [nav, settings, catalog, closeApp, openGrid, openViewer, goBack]);
 
   return (
-    <div className="pa-root" style={rootStyle}>
+    <div className="pa-root" style={mergedRootStyle} {...rootDataAttrs}>
       <div className="pa-main">
         {tab === "album" ? (
           <PageTransition pageKey={pageKey} direction={transitionDirection}>

@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@ink-zenly/create-phone-app':
-        specifier: 0.1.2
-        version: 0.1.2
+        specifier: 0.3.7
+        version: 0.3.7
       '@ink-zenly/phone-sdk':
         specifier: file:phone-sdk
         version: file:phone-sdk(@avg-studio/sdk@file:sdk(react@18.3.1))(react@18.3.1)
@@ -433,8 +433,8 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@ink-zenly/create-phone-app@0.1.2':
-    resolution: {integrity: sha512-bYcSk9PbnA+1Osd7itNpRfjDcyfkG1EmExr8OTzrgSc4LIx1QfQqPBLyMtb2JlbU9llytDnJN0iM1/BSmYB5UA==}
+  '@ink-zenly/create-phone-app@0.3.7':
+    resolution: {integrity: sha512-z7Iq6ZACOioqeNaLThba/QCykgtldeGXD5fxNmWA2+fTFLfbOZhqsSdpbXPzZtjRbtq+FhTjjMKY+ABCsuQtMQ==}
     engines: {node: '>=18'}
     hasBin: true
 
@@ -1097,7 +1097,7 @@ snapshots:
   '@esbuild/win32-x64@0.28.1':
     optional: true
 
-  '@ink-zenly/create-phone-app@0.1.2':
+  '@ink-zenly/create-phone-app@0.3.7':
     dependencies:
       '@clack/prompts': 0.10.1
       citty: 0.1.6

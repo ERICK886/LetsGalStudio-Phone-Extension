@@ -9,6 +9,7 @@
  * - 所有 class 前缀 `pa-`，避免与 chat / demo-shop 内页样式冲突。
  * - 深色底，安全区由根容器 padding 吸收（来自 useSafeAreaStyle）。
  * - 不依赖任何全局 CSS；HMR 时若 textContent 变化则同步更新。
+ * - 颜色/布局 token 全部走 CSS 变量，保证外观自定义即时生效。
  */
 
 const STYLE_ID = "ink.zenly.ext-7a9373-phone-album-styles";
@@ -20,8 +21,8 @@ const CSS_TEXT = `
   flex-direction: column;
   height: 100%;
   min-height: 0;
-  background: #0f1419;
-  color: #f5f5f5;
+  background: var(--pa-bg, #0f1419);
+  color: var(--pa-fg, #f5f5f5);
   font-family: "PingFang SC", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
@@ -29,6 +30,7 @@ const CSS_TEXT = `
 .pa-root *,
 .pa-root *::before,
 .pa-root *::after { box-sizing: border-box; }
+.pa-root[data-pa-tab-labels="0"] .pa-tab > span { display: none; }
 
 .pa-main {
   position: relative;
@@ -52,7 +54,7 @@ const CSS_TEXT = `
   grid-template-columns: 1fr 1fr;
   gap: 4px;
   padding: 6px 10px calc(8px + var(--phone-safe-bottom, env(safe-area-inset-bottom, 0px)));
-  background: rgba(12, 16, 22, 0.96);
+  background: var(--pa-tabbar-bg, rgba(12, 16, 22, 0.96));
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   z-index: 5;
 }
@@ -66,7 +68,7 @@ const CSS_TEXT = `
   border: none;
   border-radius: 12px;
   background: transparent;
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--pa-fg-muted, rgba(255, 255, 255, 0.45));
   font-size: 11px;
   cursor: pointer;
   padding: 6px 4px;
@@ -76,8 +78,8 @@ const CSS_TEXT = `
   line-height: 1;
 }
 .pa-tab.is-active {
-  color: #7ec8ff;
-  background: rgba(126, 200, 255, 0.1);
+  color: var(--pa-accent, #7ec8ff);
+  background: color-mix(in srgb, var(--pa-accent, #7ec8ff) 10%, transparent);
 }
 .pa-tab:active { opacity: 0.75; }
 
@@ -87,8 +89,8 @@ const CSS_TEXT = `
   min-height: 0;
   display: flex;
   flex-direction: column;
-  background: #05070a;
-  color: #fff;
+  background: var(--pa-camera-bg, #05070a);
+  color: var(--pa-fg, #f5f5f5);
 }
 .pa-camera-top {
   flex: 0 0 auto;
@@ -102,11 +104,11 @@ const CSS_TEXT = `
   font-size: 16px;
   font-weight: 650;
 }
-.pa-camera-top-title i { color: #9ad4ff; }
+.pa-camera-top-title i { color: var(--pa-accent, #7ec8ff); }
 .pa-camera-hint {
   margin: 8px 0 0;
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--pa-fg-muted, rgba(255, 255, 255, 0.55));
   line-height: 1.4;
 }
 .pa-camera-viewfinder {
@@ -174,7 +176,7 @@ const CSS_TEXT = `
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.18);
   background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--pa-fg-muted, rgba(255, 255, 255, 0.45));
   overflow: hidden;
   padding: 0;
   cursor: pointer;
@@ -241,7 +243,7 @@ const CSS_TEXT = `
   display: flex;
   flex-direction: column;
   min-height: 0;
-  background: #0f1419;
+  background: var(--pa-bg, #0f1419);
   will-change: transform, opacity;
 }
 .pa-page-steady {
@@ -319,7 +321,7 @@ const CSS_TEXT = `
   gap: 8px;
   min-height: 44px;
   padding: 8px 12px;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--pa-header-bg, #0f1419);
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 .pa-header h1 {
@@ -335,7 +337,7 @@ const CSS_TEXT = `
 .pa-back {
   border: none;
   background: transparent;
-  color: #4ea1ff;
+  color: var(--pa-accent, #4ea1ff);
   font-size: 15px;
   padding: 4px 0;
   cursor: pointer;
@@ -356,7 +358,7 @@ const CSS_TEXT = `
 .pa-header-action {
   border: none;
   background: transparent;
-  color: #4ea1ff;
+  color: var(--pa-accent, #4ea1ff);
   font-size: 16px;
   padding: 6px 8px;
   cursor: pointer;
@@ -364,7 +366,7 @@ const CSS_TEXT = `
   line-height: 1;
 }
 .pa-header-action:active { opacity: 0.7; }
-.pa-header-action-danger { color: #ff6b7a; }
+.pa-header-action-danger { color: var(--pa-danger, #ff6b7a); }
 
 .pa-body {
   flex: 1 1 auto;
@@ -375,8 +377,8 @@ const CSS_TEXT = `
 
 .pa-home-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
+  grid-template-columns: repeat(var(--pa-home-columns, 2), minmax(0, 1fr));
+  gap: var(--pa-gap, 10px);
   padding: 14px;
 }
 
@@ -396,12 +398,12 @@ const CSS_TEXT = `
   position: relative;
   width: 100%;
   aspect-ratio: 1 / 1;
-  border-radius: 12px;
+  border-radius: var(--pa-radius, 12px);
   overflow: hidden;
-  background: #1c232f;
+  background: var(--pa-card-bg, #1c232f);
   display: grid;
   place-items: center;
-  color: rgba(255, 255, 255, 0.35);
+  color: var(--pa-fg-muted, rgba(255, 255, 255, 0.35));
   font-size: 28px;
   font-weight: 700;
 }
@@ -420,7 +422,7 @@ const CSS_TEXT = `
   padding: 2px 8px;
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.55);
-  color: #fff;
+  color: var(--pa-fg, #fff);
   font-size: 11px;
   line-height: 1.4;
 }
@@ -435,12 +437,9 @@ const CSS_TEXT = `
 
 .pa-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 4px;
+  grid-template-columns: repeat(var(--pa-grid-columns, 3), minmax(0, 1fr));
+  gap: var(--pa-gap, 10px);
   padding: 4px;
-}
-@media (min-width: 420px) {
-  .pa-grid { grid-template-columns: repeat(4, 1fr); }
 }
 .pa-tile-wrap {
   position: relative;
@@ -452,10 +451,10 @@ const CSS_TEXT = `
   aspect-ratio: 1 / 1;
   border: none;
   padding: 0;
-  background: #1c232f;
+  background: var(--pa-card-bg, #1c232f);
   cursor: pointer;
   overflow: hidden;
-  border-radius: 4px;
+  border-radius: var(--pa-radius, 12px);
   display: block;
 }
 .pa-tile:active { opacity: 0.85; }
@@ -469,7 +468,7 @@ const CSS_TEXT = `
   border: none;
   border-radius: 50%;
   background: rgba(0, 0, 0, 0.55);
-  color: #ff8a96;
+  color: var(--pa-danger, #ff8a96);
   display: grid;
   place-items: center;
   cursor: pointer;
@@ -492,9 +491,9 @@ const CSS_TEXT = `
   inset: 0;
   display: grid;
   place-items: center;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--pa-fg-muted, rgba(255, 255, 255, 0.4));
   font-size: 12px;
-  background: #1c232f;
+  background: var(--pa-card-bg, #1c232f);
 }
 .pa-tile .pa-tile-fallback-video {
   background: linear-gradient(160deg, #1a2330, #121820);
@@ -506,7 +505,7 @@ const CSS_TEXT = `
   display: grid;
   place-items: center;
   background: rgba(255, 255, 255, 0.14);
-  color: rgba(255, 255, 255, 0.75);
+  color: var(--pa-fg, rgba(255, 255, 255, 0.75));
   font-size: 12px;
   padding-left: 2px;
 }
@@ -517,7 +516,7 @@ const CSS_TEXT = `
   padding: 2px 6px;
   border-radius: 6px;
   background: rgba(0, 0, 0, 0.6);
-  color: #fff;
+  color: var(--pa-fg, #fff);
   font-size: 10px;
   line-height: 1.4;
   display: inline-flex;
@@ -534,7 +533,7 @@ const CSS_TEXT = `
 .pa-empty {
   padding: 64px 20px;
   text-align: center;
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--pa-fg-muted, rgba(255, 255, 255, 0.45));
   font-size: 14px;
   line-height: 1.6;
 }
@@ -545,7 +544,7 @@ const CSS_TEXT = `
   min-height: 0;
   display: flex;
   flex-direction: column;
-  background: #000;
+  background: var(--pa-viewer-bg, #000);
 }
 .pa-viewer-stage {
   position: relative;
@@ -575,7 +574,7 @@ const CSS_TEXT = `
   height: 100%;
   display: grid;
   place-items: center;
-  background: #000;
+  background: var(--pa-viewer-bg, #000);
   cursor: pointer;
 }
 .pa-video-player > video {
@@ -584,7 +583,7 @@ const CSS_TEXT = `
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
-  background: #000;
+  background: var(--pa-viewer-bg, #000);
 }
 .pa-vctrl {
   position: absolute;
@@ -611,14 +610,14 @@ const CSS_TEXT = `
   border-radius: 8px;
   padding: 6px 10px;
   background: rgba(255, 255, 255, 0.14);
-  color: #fff;
+  color: var(--pa-fg, #fff);
   font-size: 12px;
   cursor: pointer;
 }
 .pa-vctrl-seek {
   flex: 1 1 auto;
   min-width: 0;
-  accent-color: #7ec8ff;
+  accent-color: var(--pa-accent, #7ec8ff);
 }
 .pa-vctrl-time {
   flex: 0 0 auto;
@@ -640,7 +639,7 @@ const CSS_TEXT = `
   place-items: center;
   gap: 8px;
   padding: 24px;
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--pa-fg-muted, rgba(255, 255, 255, 0.55));
   font-size: 14px;
   text-align: center;
 }
@@ -651,7 +650,7 @@ const CSS_TEXT = `
   background: rgba(255, 255, 255, 0.08);
   display: grid;
   place-items: center;
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--pa-fg-muted, rgba(255, 255, 255, 0.45));
   font-size: 22px;
 }
 .pa-viewer-nav {
@@ -663,7 +662,7 @@ const CSS_TEXT = `
   border-radius: 50%;
   border: none;
   background: rgba(0, 0, 0, 0.45);
-  color: #fff;
+  color: var(--pa-fg, #fff);
   font-size: 20px;
   cursor: pointer;
   display: grid;
@@ -680,7 +679,7 @@ const CSS_TEXT = `
   padding: 8px 12px;
   text-align: center;
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.65);
+  color: var(--pa-fg-muted, rgba(255, 255, 255, 0.65));
   background: rgba(255, 255, 255, 0.04);
 }
 `;

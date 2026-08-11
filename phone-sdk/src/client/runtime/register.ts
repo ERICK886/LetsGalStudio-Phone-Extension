@@ -9,7 +9,14 @@
 import { isPhoneAppId, toPhoneAppId } from "./app-id";
 import { phoneSdkDebug } from "../debug/debug";
 import { getPhoneSdkSlot } from "./slot";
-import type { PhoneAppRegistration } from "./types";
+import { normalizeCustomPanesResolver } from "./normalize-custom-panes";
+import type {
+  PhoneAppRegistration,
+  PhoneAppStyleEditorMeta,
+  PhoneEditorContentItemSchema,
+  PhoneEditorFieldType,
+  PhoneEditorPageSchema,
+} from "./types";
 
 export { isPhoneAppId } from "./app-id";
 
@@ -82,13 +89,196 @@ function normalizeStyleEditor(
     typeof raw.order === "number" && Number.isFinite(raw.order)
       ? raw.order
       : undefined;
+  const pages = normalizeEditorPages(raw.pages);
+  const contentItems = normalizeEditorContentItems(raw.contentItems);
+  const settingsModuleId =
+    typeof raw.settingsModuleId === "string" && raw.settingsModuleId.trim()
+      ? raw.settingsModuleId.trim().slice(0, 64)
+      : undefined;
 
   return {
     enabled,
     ...(label ? { label } : {}),
     ...(icon ? { icon } : {}),
     ...(order !== undefined ? { order } : {}),
+    ...(settingsModuleId ? { settingsModuleId } : {}),
+    ...(contentItems ? { contentItems } : {}),
+    ...(pages ? { pages } : {}),
+    ...normalizeCustomPanesResolver(raw),
   };
+}
+
+const FIELD_TYPES = new Set<PhoneEditorFieldType>([
+  "string",
+  "color",
+  "enum",
+  "asset",
+  "shortcut",
+  "boolean",
+]);
+
+/**
+ * 规范化 styleEditor.contentItems。
+ *
+ * @param raw - 原始内容项
+ * @returns 净化列表或 undefined
+ */
+function normalizeEditorContentItems(
+  raw: PhoneAppStyleEditorMeta["contentItems"] | undefined,
+): PhoneEditorContentItemSchema[] | undefined {
+  if (!Array.isArray(raw) || raw.length === 0) return undefined;
+
+  const items: PhoneEditorContentItemSchema[] = [];
+
+  for (const item of raw.slice(0, 80)) {
+    if (!item || typeof item !== "object") continue;
+    const id =
+      typeof item.id === "string" && item.id.trim()
+        ? item.id.trim().slice(0, 64)
+        : "";
+    const group =
+      typeof item.group === "string" && item.group.trim()
+        ? item.group.trim().slice(0, 40)
+        : "";
+    const label =
+      typeof item.label === "string" && item.label.trim()
+        ? item.label.trim().slice(0, 40)
+        : "";
+    if (!id || !group || !label) continue;
+    if (!FIELD_TYPES.has(item.fieldType)) continue;
+
+    const icon =
+      typeof item.icon === "string" && item.icon.trim()
+        ? item.icon.trim().slice(0, 64)
+        : undefined;
+    const defaultValue =
+      typeof item.defaultValue === "string" ? item.defaultValue : "";
+    const description =
+      typeof item.description === "string" && item.description.trim()
+        ? item.description.trim().slice(0, 240)
+        : undefined;
+    const settingKey =
+      typeof item.settingKey === "string" && item.settingKey.trim()
+        ? item.settingKey.trim().slice(0, 64)
+        : undefined;
+    const allowEmpty = item.allowEmpty === true ? true : undefined;
+    const multiline = item.multiline === true ? true : undefined;
+    const settingsModuleId =
+      typeof item.settingsModuleId === "string" && item.settingsModuleId.trim()
+        ? item.settingsModuleId.trim().slice(0, 64)
+        : undefined;
+    const dependsOn =
+      item.dependsOn &&
+      typeof item.dependsOn === "object" &&
+      typeof item.dependsOn.contentItemId === "string" &&
+      item.dependsOn.contentItemId.trim() &&
+      typeof item.dependsOn.equals === "string"
+        ? {
+            contentItemId: item.dependsOn.contentItemId.trim().slice(0, 64),
+            equals: item.dependsOn.equals.slice(0, 64),
+          }
+        : undefined;
+    const enumOptions = Array.isArray(item.enumOptions)
+      ? item.enumOptions
+          .filter(
+            (opt): opt is { value: string; label: string } =>
+              Boolean(opt) &&
+              typeof opt === "object" &&
+              typeof opt.value === "string" &&
+              typeof opt.label === "string",
+          )
+          .map((opt) => ({
+            value: opt.value.trim().slice(0, 64),
+            label: opt.label.trim().slice(0, 40),
+          }))
+          .filter((opt) => opt.value && opt.label)
+          .slice(0, 40)
+      : undefined;
+
+    items.push({
+      id,
+      group,
+      label,
+      fieldType: item.fieldType,
+      defaultValue,
+      ...(icon ? { icon } : {}),
+      ...(description ? { description } : {}),
+      ...(settingKey ? { settingKey } : {}),
+      ...(allowEmpty ? { allowEmpty } : {}),
+      ...(multiline ? { multiline } : {}),
+      ...(settingsModuleId ? { settingsModuleId } : {}),
+      ...(dependsOn ? { dependsOn } : {}),
+      ...(enumOptions && enumOptions.length > 0 ? { enumOptions } : {}),
+    });
+  }
+
+  return items.length > 0 ? items : undefined;
+}
+
+/**
+ * 规范化 `styleEditor.pages`；非法项丢弃，全空则返回 undefined。
+ *
+ * @param raw - 原始 pages
+ * @returns 净化后的页面列表
+ */
+function normalizeEditorPages(
+  raw: PhoneAppStyleEditorMeta["pages"] | undefined,
+): PhoneEditorPageSchema[] | undefined {
+  if (!Array.isArray(raw) || raw.length === 0) return undefined;
+
+  const pages: PhoneEditorPageSchema[] = [];
+
+  for (const item of raw.slice(0, 40)) {
+    if (!item || typeof item !== "object") continue;
+    const id =
+      typeof item.id === "string" && item.id.trim()
+        ? item.id.trim().slice(0, 64)
+        : "";
+    const label =
+      typeof item.label === "string" && item.label.trim()
+        ? item.label.trim().slice(0, 40)
+        : "";
+    if (!id || !label) continue;
+
+    const icon =
+      typeof item.icon === "string" && item.icon.trim()
+        ? item.icon.trim().slice(0, 64)
+        : undefined;
+    const order =
+      typeof item.order === "number" && Number.isFinite(item.order)
+        ? item.order
+        : undefined;
+    const status =
+      item.status === "comingSoon" || item.status === "ready"
+        ? item.status
+        : undefined;
+    const preview =
+      item.preview === "desktop" ||
+      item.preview === "chat" ||
+      item.preview === "placeholder"
+        ? item.preview
+        : undefined;
+    const contentItemIds = Array.isArray(item.contentItemIds)
+      ? item.contentItemIds
+          .filter((x): x is string => typeof x === "string" && x.trim().length > 0)
+          .map((x) => x.trim().slice(0, 64))
+          .slice(0, 80)
+      : undefined;
+
+    pages.push({
+      id,
+      label,
+      ...(icon ? { icon } : {}),
+      ...(order !== undefined ? { order } : {}),
+      ...(status ? { status } : {}),
+      ...(preview ? { preview } : {}),
+      ...(contentItemIds && contentItemIds.length > 0
+        ? { contentItemIds }
+        : {}),
+    });
+  }
+
+  return pages.length > 0 ? pages : undefined;
 }
 
 /**

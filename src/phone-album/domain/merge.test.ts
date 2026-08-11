@@ -9,6 +9,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { ALL_ALBUM_ID } from "../constants";
+import { DEFAULT_ALBUM_APPEARANCE } from "../runtime/appearance-parse";
 import type { AlbumAuthorSettings, AlbumSaveState } from "../types";
 import { buildAlbumCatalog } from "./merge";
 
@@ -22,6 +23,7 @@ const emptySave = (): AlbumSaveState => ({
 });
 
 const baseSettings = (): AlbumAuthorSettings => ({
+  ...DEFAULT_ALBUM_APPEARANCE,
   appTitle: "相册",
   allAlbumsLabel: "全部",
   emptyAlbumHint: "空",

@@ -3,7 +3,7 @@
  * @description 手机编辑器根组件：订阅已注册 APP，动态生成顶栏分区并渲染外壳。
  * @author 池水三两升
  * @date 2026-08-10
- * @version 0.2.0
+ * @version 0.4.1
  */
 
 import React, { useEffect, useMemo, useState } from "react";
@@ -14,8 +14,50 @@ import {
   buildPhoneEditorSections,
   defaultPhoneEditorSectionId,
 } from "../editor-sections";
+import { resolveEditorSectionSchema } from "../schema/resolve-editor-section-schema";
+import { useSchemaEditorPanes } from "../schema/use-schema-editor-panes";
 import { ThemeProvider } from "../theme/theme-provider";
 import { PhoneEditorShell } from "../shell/phone-editor-shell";
+
+/**
+ * 主题内实际渲染的外壳（按当前分区 schema 驱动四栏）。
+ */
+function PhoneEditorShellHost({
+  sections,
+  sectionId,
+  onSectionChange,
+  leftWidth,
+  rightWidth,
+  onToggleTheme,
+}: {
+  sections: ReturnType<typeof buildPhoneEditorSections>;
+  sectionId: string;
+  onSectionChange: (id: string) => void;
+  leftWidth: number;
+  rightWidth: number;
+  onToggleTheme: () => void;
+}): React.ReactElement {
+  const schema = useMemo(
+    () => resolveEditorSectionSchema(sectionId),
+    [sectionId, sections],
+  );
+  const panes = useSchemaEditorPanes(schema);
+
+  return (
+    <PhoneEditorShell
+      sections={sections}
+      sectionId={sectionId}
+      onSectionChange={onSectionChange}
+      leftWidth={leftWidth}
+      rightWidth={rightWidth}
+      navPane={panes.nav}
+      leftPane={panes.left}
+      centerPane={panes.center}
+      rightPane={panes.right}
+      onToggleTheme={onToggleTheme}
+    />
+  );
+}
 
 /**
  * 手机编辑器 App。
@@ -67,7 +109,7 @@ export function PhoneEditorApp(): React.ReactElement {
 
   return (
     <ThemeProvider key={mode} initialMode={mode}>
-      <PhoneEditorShell
+      <PhoneEditorShellHost
         sections={sections}
         sectionId={sectionId}
         onSectionChange={setSectionId}
