@@ -21,6 +21,7 @@ import type {
   ChatThread,
 } from "../types/index";
 import { normalizeGroupMemberOverrides } from "../domain/groups";
+import { normalizeReplyEffectOperator } from "../domain/effects";
 import { emitChatBus } from "./bus";
 
 /**
@@ -269,10 +270,14 @@ function cloneReplyOption(option: ChatReplyOption): ChatReplyOption {
     effects: Array.isArray(option.effects)
       ? option.effects
           .filter((effect) => Boolean(effect && typeof effect === "object"))
-          .map((effect) => ({
-            variable: String(effect.variable ?? "").trim(),
-            value: String(effect.value ?? ""),
-          }))
+          .map((effect) => {
+            const operator = normalizeReplyEffectOperator(effect.operator);
+            return {
+              variable: String(effect.variable ?? "").trim(),
+              value: String(effect.value ?? ""),
+              ...(operator === "=" ? {} : { operator }),
+            };
+          })
       : [],
     contentType: option.contentType === "image" ? "image" : "text",
     ...(imageAsset ? { imageAsset } : {}),

@@ -15,6 +15,7 @@ import {
 } from "../constants.ts";
 import { resolveMessageSlot } from "./message-content.ts";
 import { nextId } from "./id.ts";
+import { normalizeReplyEffectOperator } from "./effects.ts";
 import type { AppendMessageInput } from "./threads";
 import type { ChatMessageStatus, ChatReplyOption } from "../types/index";
 
@@ -196,7 +197,14 @@ export function parseRepliesFromParams(
           : params[`reply${i}Val${e}`] == null
             ? ""
             : String(params[`reply${i}Val${e}`]);
-      effects.push({ variable, value });
+      const operator = normalizeReplyEffectOperator(
+        params[`reply${i}Op${e}`],
+      );
+      effects.push({
+        variable,
+        value,
+        ...(operator === "=" ? {} : { operator }),
+      });
     }
     result.push({
       id: nextId("reply"),
@@ -275,9 +283,22 @@ export function buildReplySchemaFields(): BlockSchema {
         type: "variable",
         label: `玩家回复 ${i} · 效果${e} 变量`,
       };
+      fields[`reply${i}Op${e}`] = {
+        type: "enum",
+        label: `玩家回复 ${i} · 效果${e} 运算`,
+        default: "=",
+        options: [
+          { label: "赋值 (=)", value: "=" },
+          { label: "加 (+=)", value: "+=" },
+          { label: "减 (-=)", value: "-=" },
+          { label: "乘 (*=)", value: "*=" },
+          { label: "除 (/=)", value: "/=" },
+          { label: "取余 (%=)", value: "%=" },
+        ],
+      };
       fields[`reply${i}Val${e}`] = {
         type: "string",
-        label: `玩家回复 ${i} · 效果${e} 写入值`,
+        label: `玩家回复 ${i} · 效果${e} 操作数 / 写入值`,
       };
     }
   }

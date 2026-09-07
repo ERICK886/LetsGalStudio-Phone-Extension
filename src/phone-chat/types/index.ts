@@ -62,9 +62,14 @@ export interface ChatGroupMemberOverride {
   removedCharacterIds: string[];
 }
 
+/** 玩家回复效果支持的赋值 / 复合赋值运算。 */
+export type ChatReplyEffectOperator = "=" | "+=" | "-=" | "*=" | "/=" | "%=";
+
 export interface ChatReplyEffect {
   variable: string;
   value: string;
+  /** 旧存档缺省时按直接赋值 `=` 处理。 */
+  operator?: ChatReplyEffectOperator;
 }
 
 export interface ChatReplyOption {

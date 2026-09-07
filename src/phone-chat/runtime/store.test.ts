@@ -50,7 +50,11 @@ describe("chat save normalization", () => {
               {
                 id: 3,
                 text: 4,
-                effects: [{ variable: 5, value: 6 }],
+                effects: [
+                  { variable: 5, value: 6 },
+                  { variable: "score", operator: "+=", value: 2 },
+                  { variable: "fallback", operator: "invalid", value: 3 },
+                ],
               },
             ],
             outgoingStatus: "invalid",
@@ -85,6 +89,8 @@ describe("chat save normalization", () => {
     assert.equal(state.pendingReplies[0]!.outgoingStatus, "read");
     assert.deepEqual(state.pendingReplies[0]!.options[0]!.effects, [
       { variable: "5", value: "6" },
+      { variable: "score", operator: "+=", value: "2" },
+      { variable: "fallback", value: "3" },
     ]);
 
     patchChatState({ threads: state.threads }, "test-clone");

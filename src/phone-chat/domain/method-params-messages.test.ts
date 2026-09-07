@@ -9,6 +9,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  buildReplySchemaFields,
   parseFriendMessagesFromParams,
   parseRepliesFromParams,
 } from "./method-params.ts";
@@ -69,6 +70,23 @@ describe("parseFriendMessagesFromParams", () => {
 });
 
 describe("parseRepliesFromParams", () => {
+  it("为每条效果提供默认赋值与复合运算选项", () => {
+    const fields = buildReplySchemaFields();
+    assert.deepEqual(fields.reply1Op1, {
+      type: "enum",
+      label: "玩家回复 1 · 效果1 运算",
+      default: "=",
+      options: [
+        { label: "赋值 (=)", value: "=" },
+        { label: "加 (+=)", value: "+=" },
+        { label: "减 (-=)", value: "-=" },
+        { label: "乘 (*=)", value: "*=" },
+        { label: "除 (/=)", value: "/=" },
+        { label: "取余 (%=)", value: "%=" },
+      ],
+    });
+  });
+
   it("解析文字回复", () => {
     const result = parseRepliesFromParams({ reply1: "  好的  " });
     assert.equal(result.length, 1);
@@ -119,5 +137,21 @@ describe("parseRepliesFromParams", () => {
     assert.equal(result.length, 1);
     assert.equal(result[0]!.contentType, "image");
     assert.deepEqual(result[0]!.effects, [{ variable: "score", value: "10" }]);
+  });
+
+  it("解析回复效果的复合赋值运算并让旧数据继续按赋值处理", () => {
+    const result = parseRepliesFromParams({
+      reply1: "行动",
+      reply1Var1: "score",
+      reply1Op1: "+=",
+      reply1Val1: "2",
+      reply1Var2: "flag",
+      reply1Val2: "true",
+    });
+
+    assert.deepEqual(result[0]!.effects, [
+      { variable: "score", operator: "+=", value: "2" },
+      { variable: "flag", value: "true" },
+    ]);
   });
 });
