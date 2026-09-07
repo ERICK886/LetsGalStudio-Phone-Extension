@@ -14,6 +14,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useExtensionContext } from "@avg-studio/sdk";
 
 import { ALL_ALBUM_ID } from "../../constants";
 import { buildAlbumCatalog, type AlbumCatalog } from "../../domain/index";
@@ -21,6 +22,7 @@ import type { AlbumAuthorSettings } from "../../types";
 import {
   getCachedAuthorSettings,
   getAlbumSaveState,
+  getAlbumRuntimeKey,
   subscribeAlbumStore,
 } from "../../runtime/index";
 import type { PageTransitionDirection } from "../components/PageTransition";
@@ -68,6 +70,8 @@ export interface AlbumSession {
  * ```
  */
 export function useAlbumSession(onExitHome: () => void): AlbumSession {
+  const ctx = useExtensionContext();
+  const runtimeKey = getAlbumRuntimeKey(ctx);
   const [tick, setTick] = useState(0);
   const [bundle, setBundle] = useState<NavBundle>({
     nav: { screen: "home" },
@@ -79,18 +83,18 @@ export function useAlbumSession(onExitHome: () => void): AlbumSession {
   }, []);
 
   useEffect(() => {
-    return subscribeAlbumStore(() => {
+    return subscribeAlbumStore(runtimeKey, () => {
       refresh();
     });
-  }, [refresh]);
+  }, [refresh, runtimeKey]);
 
   const snapshot = useMemo(() => {
-    const settings = getCachedAuthorSettings();
-    const save = getAlbumSaveState();
+    const settings = getCachedAuthorSettings(runtimeKey);
+    const save = getAlbumSaveState(runtimeKey);
     const catalog = buildAlbumCatalog(settings, save);
     return { settings, catalog };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tick]);
+  }, [runtimeKey, tick]);
 
   const openGrid = useCallback((albumId: string) => {
     setBundle({

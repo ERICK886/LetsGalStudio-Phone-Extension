@@ -42,6 +42,37 @@ export function buildChatSettingsFields(
       .describe(
         "开局出现在好友与可聊名单中的角色。名字与立绘读角色资产；详情属性值读变量。",
       ),
+    defaultGroups: s
+      .array("默认群聊", (item) => ({
+        groupId: item.string("群 ID").default("group-1"),
+        title: item.string("群名称").default("群聊"),
+        avatarAsset: item.asset("群头像").accepts("image"),
+        member1: item.character("成员 1"),
+        member2: item.character("成员 2"),
+        member3: item.character("成员 3"),
+        member4: item.character("成员 4"),
+        member5: item.character("成员 5"),
+        member6: item.character("成员 6"),
+        member7: item.character("成员 7"),
+        member8: item.character("成员 8"),
+      }))
+      .itemDefault({
+        groupId: "group-1",
+        title: "群聊",
+        avatarAsset: "",
+        member1: "",
+        member2: "",
+        member3: "",
+        member4: "",
+        member5: "",
+        member6: "",
+        member7: "",
+        member8: "",
+      })
+      .maxItems(40)
+      .addLabel("添加群聊")
+      .emptyHint("未配置群聊时，群聊方法仍可按群 ID 建立临时会话。")
+      .describe("群 ID 必须稳定且唯一；成员用于群聊资料和发送者校验。"),
     attributeFields: s
       .array("好友详情属性槽", (item) => ({
         id: item.string("槽位 ID").default("mood"),

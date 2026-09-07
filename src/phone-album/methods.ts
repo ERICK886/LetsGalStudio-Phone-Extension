@@ -10,7 +10,7 @@
  * - 只导出五个已构造好的 `method()` 结果（`BrandedExtensionMethod`）。
  * - `run` / `runImmediately` / `skip` 里的 `this` 是本模块 `PhoneAlbumExtension` 实例，
  *   `this.save` 为本模块独立存档（无前缀键名）。
- * - 每个执行体先调用 `bindAlbumSave(this.save)`。
+ * - 每个执行体先按 Preview runtime key 调用 `bindAlbumSave(runtimeKey, this.save)`。
  * - 相册场景为纯数据操作，方法不挂起等待 UI，`run` / `runImmediately` / `skip`
  *   行为一致。
  */
@@ -29,6 +29,7 @@ import {
   executeRemoveAlbum,
   executeRemoveMedia,
   executeSetMediaAlbums,
+  getAlbumRuntimeKey,
   readAuthorSettings,
 } from "./runtime/index";
 
@@ -38,9 +39,14 @@ import {
  * @param instanceSave - 本模块实例 this.save
  * @param ctx - 扩展上下文
  */
-function prepareRuntime(instanceSave: unknown, ctx: ExtensionContext): void {
-  bindAlbumSave(instanceSave as Parameters<typeof bindAlbumSave>[0]);
-  cacheAuthorSettings(readAuthorSettings(ctx));
+function prepareRuntime(instanceSave: unknown, ctx: ExtensionContext): object {
+  const runtimeKey = getAlbumRuntimeKey(ctx);
+  bindAlbumSave(
+    runtimeKey,
+    instanceSave as Parameters<typeof bindAlbumSave>[1],
+  );
+  cacheAuthorSettings(runtimeKey, readAuthorSettings(ctx));
+  return runtimeKey;
 }
 
 /**
@@ -59,10 +65,10 @@ function executeAddAlbumMethod(
   params: Record<string, unknown>,
   instanceSave: unknown,
 ): void {
-  prepareRuntime(instanceSave, ctx);
+  const runtimeKey = prepareRuntime(instanceSave, ctx);
   const coverAsset =
     typeof params.coverAsset === "string" ? params.coverAsset : undefined;
-  executeAddAlbum({
+  executeAddAlbum(runtimeKey, {
     albumId: String(params.albumId ?? ""),
     name: String(params.name ?? ""),
     coverMediaId:
@@ -85,8 +91,8 @@ function executeRemoveAlbumMethod(
   params: Record<string, unknown>,
   instanceSave: unknown,
 ): void {
-  prepareRuntime(instanceSave, ctx);
-  executeRemoveAlbum(String(params.albumId ?? ""));
+  const runtimeKey = prepareRuntime(instanceSave, ctx);
+  executeRemoveAlbum(runtimeKey, String(params.albumId ?? ""));
 }
 
 /**
@@ -117,7 +123,7 @@ function executeAddMediaMethod(
   params: Record<string, unknown>,
   instanceSave: unknown,
 ): void {
-  prepareRuntime(instanceSave, ctx);
+  const runtimeKey = prepareRuntime(instanceSave, ctx);
   const type = parseMediaType(params.type) ?? "image";
   const durationSec =
     typeof params.durationSec === "number" &&
@@ -127,7 +133,7 @@ function executeAddMediaMethod(
       : undefined;
   const asset = coerceMethodAsset(params.asset);
   const posterRaw = coerceMethodAsset(params.posterAsset);
-  executeAddMedia({
+  executeAddMedia(runtimeKey, {
     mediaId: String(params.mediaId ?? ""),
     type,
     asset,
@@ -149,8 +155,8 @@ function executeRemoveMediaMethod(
   params: Record<string, unknown>,
   instanceSave: unknown,
 ): void {
-  prepareRuntime(instanceSave, ctx);
-  executeRemoveMedia(String(params.mediaId ?? ""));
+  const runtimeKey = prepareRuntime(instanceSave, ctx);
+  executeRemoveMedia(runtimeKey, String(params.mediaId ?? ""));
 }
 
 /**
@@ -165,8 +171,9 @@ function executeSetMediaAlbumsMethod(
   params: Record<string, unknown>,
   instanceSave: unknown,
 ): void {
-  prepareRuntime(instanceSave, ctx);
+  const runtimeKey = prepareRuntime(instanceSave, ctx);
   executeSetMediaAlbums(
+    runtimeKey,
     String(params.mediaId ?? ""),
     parseCommaIds(params.albumIds),
   );

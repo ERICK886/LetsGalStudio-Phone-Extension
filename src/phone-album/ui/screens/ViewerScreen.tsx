@@ -17,8 +17,10 @@ import { ALL_ALBUM_ID } from "../../constants";
 import type { AlbumCatalog } from "../../domain/index";
 import { executeRemoveCameraPhoto } from "../../runtime/actions";
 import { isCameraMediaId } from "../../runtime/store";
+import { getAlbumRuntimeKey } from "../../runtime/runtime-key";
 import type { AlbumAuthorSettings, MediaView } from "../../types";
 import {
+  AlbumIcon,
   AppHeader,
   resolveMediaUrl,
   VideoPlayer,
@@ -46,6 +48,7 @@ export interface ViewerScreenProps {
 export function ViewerScreen(props: ViewerScreenProps) {
   const { albumId, mediaId, settings, catalog, onBack, onNavigate } = props;
   const ctx = useExtensionContext();
+  const runtimeKey = getAlbumRuntimeKey(ctx);
 
   const mediaList = useMemo<MediaView[]>(() => {
     if (albumId === ALL_ALBUM_ID) return catalog.allMedia;
@@ -60,7 +63,7 @@ export function ViewerScreen(props: ViewerScreenProps) {
   const current = index >= 0 ? mediaList[index] : undefined;
   const hasPrev = index > 0;
   const hasNext = index >= 0 && index < mediaList.length - 1;
-  const canDelete = Boolean(current && isCameraMediaId(current.id));
+  const canDelete = Boolean(current && isCameraMediaId(runtimeKey, current.id));
 
   const [failed, setFailed] = useState(false);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -109,14 +112,14 @@ export function ViewerScreen(props: ViewerScreenProps) {
   }, [albumId, catalog, settings.allAlbumsLabel]);
 
   const onDelete = useCallback(async () => {
-    if (!current || !isCameraMediaId(current.id)) return;
+    if (!current || !isCameraMediaId(runtimeKey, current.id)) return;
     const ok = window.confirm("删除这张照片？删除后无法恢复。");
     if (!ok) return;
 
     const prevId = hasPrev ? mediaList[index - 1].id : undefined;
     const nextId = hasNext ? mediaList[index + 1].id : undefined;
 
-    if (!executeRemoveCameraPhoto(current.id)) return;
+    if (!executeRemoveCameraPhoto(runtimeKey, current.id)) return;
     try {
       await ctx.archive.flushShared();
     } catch (error) {
@@ -136,6 +139,7 @@ export function ViewerScreen(props: ViewerScreenProps) {
     mediaList,
     onBack,
     onNavigate,
+    runtimeKey,
   ]);
 
   return (
@@ -154,7 +158,7 @@ export function ViewerScreen(props: ViewerScreenProps) {
               aria-label="删除照片"
               title="删除"
             >
-              <i className="fa-solid fa-trash-can" aria-hidden="true" />
+              <AlbumIcon name="trash" size={16} />
             </button>
           ) : undefined
         }

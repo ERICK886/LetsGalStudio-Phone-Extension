@@ -1,12 +1,11 @@
 /**
  * @file ThreadScreen.tsx
- * @description 与某好友的聊天页：气泡列表 + 可选回复。
+ * @description 单聊 / 群聊会话页：气泡列表 + 可选回复。
  * @author 池水三两升
  * @date 2026-08-05
  * @version 0.1.0
  */
 
-import { useExtensionContext } from "@avg-studio/sdk";
 import React from "react";
 
 import type { ChatReplyOption, ChatThread } from "../../types/index";
@@ -15,10 +14,12 @@ import {
   MessageBubble,
   ReplyBar,
 } from "../components/index";
-import { useCharacterView } from "../hooks/useCharacterView";
 
 export interface ThreadScreenProps {
-  friendCharacterId: string;
+  title: string;
+  friendCharacterId?: string;
+  isGroup?: boolean;
+  memberCount?: number;
   thread: ChatThread | undefined;
   animatingIds: Set<string>;
   replyOptions: readonly ChatReplyOption[];
@@ -32,20 +33,23 @@ export interface ThreadScreenProps {
  * @returns 聊天页节点
  */
 export function ThreadScreen(props: ThreadScreenProps) {
-  const ctx = useExtensionContext();
-  const view = useCharacterView(ctx, props.friendCharacterId);
   const messages = props.thread?.messages ?? [];
+  const title =
+    props.isGroup && props.memberCount
+      ? `${props.title} (${props.memberCount})`
+      : props.title;
 
   return (
     <div className="chat-pane">
-      <AppHeader title={view.name} onBack={props.onBack} />
+      <AppHeader title={title} onBack={props.onBack} />
 
       <div className="chat-log" ref={props.logRef}>
         {messages.map((message) => (
           <MessageBubble
             key={message.id}
             message={message}
-            friendCharacterId={props.friendCharacterId}
+            peerCharacterId={props.friendCharacterId}
+            showSenderName={props.isGroup}
             animate={props.animatingIds.has(message.id)}
           />
         ))}

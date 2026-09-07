@@ -69,7 +69,8 @@ export function PhoneEditorApp(): React.ReactElement {
 
   const [themeSetting] = ctx.settings.useValue<"light" | "dark">("theme");
   const [leftWidthSetting] = ctx.settings.useValue<number>("editorLeftWidth");
-  const [rightWidthSetting] = ctx.settings.useValue<number>("editorRightWidth");
+  const [rightWidthSetting] =
+    ctx.settings.useValue<number>("editorRightWidth");
 
   /** 注册表版本戳：subscribe 时递增，触发 sections 重算。 */
   const [registryTick, setRegistryTick] = useState(0);

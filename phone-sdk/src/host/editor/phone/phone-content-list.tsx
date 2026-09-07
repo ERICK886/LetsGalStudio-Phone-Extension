@@ -12,6 +12,7 @@ import type { PhoneEditorContentItemSchema } from "../../../client/runtime/types
 import { IconLabel } from "../shared/fa-icon";
 import { useTheme, FONT_SIZE_DEFAULT } from "../theme/theme-provider";
 import { groupPhoneContentItems } from "./phone-content-items";
+import { ChakraButton, ChakraDiv } from "../shared/chakra-elements";
 
 /**
  * PhoneContentList 属性。
@@ -44,7 +45,7 @@ export function PhoneContentList({
   const groups = useMemo(() => groupPhoneContentItems(items), [items]);
 
   return (
-    <div
+    <ChakraDiv
       style={{
         width: "100%",
         height: "100%",
@@ -59,7 +60,7 @@ export function PhoneContentList({
         borderRadius: 6,
       }}
     >
-      <div
+      <ChakraDiv
         style={{
           fontSize: 11,
           fontWeight: 600,
@@ -70,11 +71,11 @@ export function PhoneContentList({
         }}
       >
         内容项
-      </div>
+      </ChakraDiv>
 
       {groups.map(({ group, items: groupItems }) => (
-        <div key={group} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <div
+        <ChakraDiv key={group} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <ChakraDiv
             style={{
               fontSize: 11,
               color: tokens.textSecondary,
@@ -83,13 +84,13 @@ export function PhoneContentList({
             }}
           >
             {group}
-          </div>
+          </ChakraDiv>
 
           {groupItems.map((item) => {
             const active = item.id === selectedId;
 
             return (
-              <button
+              <ChakraButton
                 key={item.id}
                 type="button"
                 onClick={() => onSelect(item.id)}
@@ -110,12 +111,12 @@ export function PhoneContentList({
                 }}
               >
                 <IconLabel icon={item.icon ?? "circle"}>{item.label}</IconLabel>
-              </button>
+              </ChakraButton>
             );
           })}
-        </div>
+        </ChakraDiv>
       ))}
-    </div>
+    </ChakraDiv>
   );
 }
 

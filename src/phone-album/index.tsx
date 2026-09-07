@@ -35,12 +35,18 @@ import {
 import {
   ALBUM_SETTINGS_KEYS,
   cacheAuthorSettings,
+  disposeAuthorSettings,
   readAuthorSettings,
 } from "./runtime/settings";
-import { bindAlbumSave } from "./runtime/store";
+import { disposeAlbumBus } from "./runtime/bus";
+import { disposeCameraSession } from "./runtime/camera-session";
+import { getAlbumRuntimeKey } from "./runtime/runtime-key";
+import { bindAlbumSave, disposeAlbumStore } from "./runtime/store";
 
 /** Studio 相册方法内联卡片（深蓝主题）；副作用安装。 */
 import "./studio/album-inline-cards";
+
+const albumRegistrationCleanups = new WeakMap<object, () => void>();
 
 /**
  * 手机相册扩展控制器。
@@ -79,20 +85,43 @@ export class PhoneAlbumExtension extends Extension {
    * @param ctx - 本模块扩展上下文
    */
   static onRegister(ctx: ExtensionContext): void {
-    cacheAuthorSettings(readAuthorSettings(ctx));
+    const runtimeKey = getAlbumRuntimeKey(ctx);
+    albumRegistrationCleanups.get(runtimeKey)?.();
+    cacheAuthorSettings(runtimeKey, readAuthorSettings(ctx));
 
+    const unsubscribers: Array<() => void> = [];
     for (const key of ALBUM_SETTINGS_KEYS) {
-      ctx.settings.subscribe(key, () => {
-        cacheAuthorSettings(readAuthorSettings(ctx));
-      });
+      unsubscribers.push(
+        ctx.settings.subscribe(key, () => {
+          if (ctx.flow.signal.aborted) return;
+          cacheAuthorSettings(runtimeKey, readAuthorSettings(ctx));
+        }),
+      );
     }
+
+    const cleanup = () => {
+      for (const unsubscribe of unsubscribers.splice(0)) unsubscribe();
+      ctx.flow.signal.removeEventListener("abort", cleanup);
+      disposeAlbumBus(runtimeKey);
+      disposeCameraSession(runtimeKey);
+      disposeAlbumStore(runtimeKey);
+      disposeAuthorSettings(runtimeKey);
+      if (albumRegistrationCleanups.get(runtimeKey) === cleanup) {
+        albumRegistrationCleanups.delete(runtimeKey);
+      }
+    };
+    albumRegistrationCleanups.set(runtimeKey, cleanup);
+    ctx.flow.signal.addEventListener("abort", cleanup, { once: true });
   }
 
   /**
    * 实例初始化时绑定本模块 save（autonomous 启动或方法调用时都会走到）。
    */
   onInit(): void {
-    bindAlbumSave(this.save as unknown as Parameters<typeof bindAlbumSave>[0]);
+    bindAlbumSave(
+      getAlbumRuntimeKey(this.context),
+      this.save as unknown as Parameters<typeof bindAlbumSave>[1],
+    );
   }
 
   /**
@@ -101,7 +130,10 @@ export class PhoneAlbumExtension extends Extension {
    * @returns 空 UI（exposeUI: false，不向系统槽位导出）
    */
   render() {
-    bindAlbumSave(this.save as unknown as Parameters<typeof bindAlbumSave>[0]);
+    bindAlbumSave(
+      getAlbumRuntimeKey(this.context),
+      this.save as unknown as Parameters<typeof bindAlbumSave>[1],
+    );
     return {
       component: () => null,
       props: {},

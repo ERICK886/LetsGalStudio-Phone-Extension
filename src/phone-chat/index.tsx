@@ -27,6 +27,10 @@ import { chatSaveSchemaFields } from "./save-fields";
 import {
   chatSendFriendMessagesMethod,
   chatAwaitPlayerReplyMethod,
+  chatSendGroupMessagesMethod,
+  chatAwaitGroupReplyMethod,
+  chatJoinGroupMethod,
+  chatLeaveGroupMethod,
   chatAddFriendMethod,
   chatRemoveFriendMethod,
 } from "./methods";
@@ -36,11 +40,14 @@ import {
   readAuthorSettings,
 } from "./runtime/settings";
 import { bindChatSave } from "./runtime/store";
+import { emitChatBus } from "./runtime/bus";
 import { syncChatDesktopBadge } from "./runtime/desktop-badge";
 import { resolveReplyWaitsForFriend } from "./runtime/reply-wait";
 
 /** Studio 聊天方法内联卡片（紫色主题）；副作用安装。 */
 import "./studio/chat-inline-cards";
+
+const settingsRegistrationCleanups = new WeakMap<object, () => void>();
 
 /**
  * 手机聊天扩展控制器。
@@ -55,7 +62,7 @@ import "./studio/chat-inline-cards";
 })
 export class ChatController extends Extension {
   /**
-   * 作者设置：默认好友、详情属性槽、文案（本模块独立命名空间）。
+   * 作者设置：默认好友、默认群聊、详情属性槽、文案（本模块独立命名空间）。
    */
   static settings = settings((s) => buildChatSettingsFields(s));
 
@@ -66,6 +73,10 @@ export class ChatController extends Extension {
 
   static sendFriendMessages = chatSendFriendMessagesMethod;
   static awaitPlayerReply = chatAwaitPlayerReplyMethod;
+  static sendGroupMessages = chatSendGroupMessagesMethod;
+  static awaitGroupReply = chatAwaitGroupReplyMethod;
+  static joinGroup = chatJoinGroupMethod;
+  static leaveGroup = chatLeaveGroupMethod;
   static addFriend = chatAddFriendMethod;
   static removeFriend = chatRemoveFriendMethod;
 
@@ -75,13 +86,35 @@ export class ChatController extends Extension {
    * @param ctx - 本模块扩展上下文
    */
   static onRegister(ctx: ExtensionContext): void {
+    settingsRegistrationCleanups.get(ctx)?.();
     cacheAuthorSettings(readAuthorSettings(ctx));
-
+    const unsubscribers: Array<() => void> = [];
     for (const key of CHAT_SETTINGS_KEYS) {
-      ctx.settings.subscribe(key, () => {
+      const unsubscribe = ctx.settings.subscribe(key, () => {
         cacheAuthorSettings(readAuthorSettings(ctx));
+        emitChatBus({ type: "state-changed", reason: `settings:${key}` });
       });
+      unsubscribers.push(unsubscribe);
     }
+
+    let disposed = false;
+    const cleanup = () => {
+      if (disposed) return;
+      disposed = true;
+      for (const unsubscribe of unsubscribers) {
+        try {
+          unsubscribe();
+        } catch (error) {
+          console.warn("[phone-chat] 释放设置订阅失败", error);
+        }
+      }
+      resolveReplyWaitsForFriend();
+      if (settingsRegistrationCleanups.get(ctx) === cleanup) {
+        settingsRegistrationCleanups.delete(ctx);
+      }
+    };
+    settingsRegistrationCleanups.set(ctx, cleanup);
+    ctx.flow.signal.addEventListener("abort", cleanup, { once: true });
 
     try {
       syncChatDesktopBadge();
@@ -98,19 +131,6 @@ export class ChatController extends Extension {
     syncChatDesktopBadge();
   }
 
-  /**
-   * 卸载时释放全部等待玩家回复的门闩，避免剧情卡死。
-   *
-   * @remarks
-   * 仅当宿主显式调用本静态方法（或未来 SDK 提供卸载钩子）时生效。
-   */
-  static onUnload(): void {
-    try {
-      resolveReplyWaitsForFriend();
-    } catch (error) {
-      console.warn("[phone-chat] 释放回复等待失败", error);
-    }
-  }
 }
 
 export default ChatController;
@@ -129,6 +149,10 @@ export { chatSaveSchemaFields } from "./save-fields";
 export {
   chatSendFriendMessagesMethod,
   chatAwaitPlayerReplyMethod,
+  chatSendGroupMessagesMethod,
+  chatAwaitGroupReplyMethod,
+  chatJoinGroupMethod,
+  chatLeaveGroupMethod,
   chatAddFriendMethod,
   chatRemoveFriendMethod,
 } from "./methods";
@@ -144,7 +168,8 @@ export { syncChatDesktopBadge } from "./runtime/desktop-badge";
 export { resolveReplyWaitsForFriend } from "./runtime/reply-wait";
 
 /**
- * 内页卸载时调用：解除全部等待，避免剧情卡死。
+ * 扩展级卸载兼容入口：解除全部等待，避免热重载后剧情卡死。
+ * 不得在聊天 APP 返回桌面或普通组件卸载时调用，否则会绕过「必须回复」。
  *
  * @returns void
  */

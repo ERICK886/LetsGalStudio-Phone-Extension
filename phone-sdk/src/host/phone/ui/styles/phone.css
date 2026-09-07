@@ -99,11 +99,25 @@
   box-sizing: border-box;
 }
 
+[data-phone-root] .phone-viewport-fit {
+  position: relative;
+  flex: 0 0 auto;
+  pointer-events: none;
+}
+
+[data-phone-root] .phone-viewport-scale {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: top left;
+  pointer-events: auto;
+}
+
 [data-phone-root] .phone-shell {
   position: relative;
-  width: min(390px, calc(100vw - 40px));
-  height: min(780px, calc(100vh - 40px));
-  min-height: 520px;
+  width: 390px;
+  height: 780px;
+  min-height: 0;
   overflow: hidden;
   border: 9px solid var(--phone-shell);
   border-radius: 44px;
@@ -189,8 +203,8 @@
 }
 
 [data-phone-root][data-phone-style-preset="android"] .phone-shell {
-  width: min(400px, calc(100vw - 40px));
-  height: min(760px, calc(100vh - 40px));
+  width: 400px;
+  height: 760px;
   border-width: 7px;
   border-radius: 29px;
   box-shadow: 0 22px 62px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.08);
@@ -1181,3 +1195,26 @@
 [data-phone-root][data-phone-message-mode="true"] .phone-shell {
   z-index: 1;
 }
+
+/* 通话剧情播放时让手机成为不拦截输入的背景 HUD；结束阶段恢复顶层。 */
+[data-phone-root][data-phone-call-layer="background"] {
+  z-index: 100;
+  pointer-events: none;
+  background: transparent;
+  backdrop-filter: none;
+  animation: phone-call-layer-down 260ms ease-out both;
+}
+
+[data-phone-root][data-phone-call-layer="background"] .phone-shell {
+  pointer-events: none;
+  filter: saturate(.82) brightness(.82);
+  transform: scale(.94);
+  transform-origin: var(--phone-transform-origin);
+}
+
+[data-phone-root][data-phone-call-layer="foreground"] {
+  animation: phone-call-layer-up 260ms ease-out both;
+}
+
+@keyframes phone-call-layer-down { from { opacity: 1; } to { opacity: .82; } }
+@keyframes phone-call-layer-up { from { opacity: .82; } to { opacity: 1; } }

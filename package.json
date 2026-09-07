@@ -26,6 +26,9 @@
     "vite": "^5.3.1"
   },
   "dependencies": {
+    "@chakra-ui/react": "^3.31.0",
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
     "@ink-zenly/create-phone-app": "0.3.7",
     "@ink-zenly/phone-sdk": "file:phone-sdk"
   }

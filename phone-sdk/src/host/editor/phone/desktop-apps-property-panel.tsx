@@ -27,6 +27,7 @@ import { useTheme, FONT_SIZE_TITLE } from "../theme/theme-provider";
 import type { ThemeTokens } from "../theme/tokens";
 
 import type { EditableCatalogApp } from "./desktop-apps-bridge";
+import { ChakraCode, ChakraDiv, ChakraInput, ChakraLabel, ChakraSpan } from "../shared/chakra-elements";
 
 
 
@@ -166,7 +167,7 @@ export function DesktopAppsPropertyPanel({
 
     return (
 
-      <div
+      <ChakraDiv
 
         style={{
 
@@ -190,7 +191,7 @@ export function DesktopAppsPropertyPanel({
 
         请选择一个应用
 
-      </div>
+      </ChakraDiv>
 
     );
 
@@ -200,7 +201,7 @@ export function DesktopAppsPropertyPanel({
 
   return (
 
-    <div
+    <ChakraDiv
 
       style={{
 
@@ -230,7 +231,7 @@ export function DesktopAppsPropertyPanel({
 
     >
 
-      <div
+      <ChakraDiv
 
         style={{
 
@@ -246,13 +247,13 @@ export function DesktopAppsPropertyPanel({
 
         {app.name || "应用属性"}
 
-      </div>
+      </ChakraDiv>
 
 
 
       <Field label="应用 ID" labelStyle={labelStyle}>
 
-        <input
+        <ChakraInput
 
           type="text"
 
@@ -270,7 +271,7 @@ export function DesktopAppsPropertyPanel({
 
       <Field label="应用名称" labelStyle={labelStyle}>
 
-        <input
+        <ChakraInput
 
           type="text"
 
@@ -308,7 +309,7 @@ export function DesktopAppsPropertyPanel({
 
       <Field label="默认排序" labelStyle={labelStyle}>
 
-        <input
+        <ChakraInput
 
           type="text"
 
@@ -376,7 +377,7 @@ export function DesktopAppsPropertyPanel({
 
         ) : (
 
-          <input
+          <ChakraInput
 
             type="text"
 
@@ -436,7 +437,7 @@ export function DesktopAppsPropertyPanel({
 
 
 
-      <div
+      <ChakraDiv
 
         style={{
 
@@ -452,11 +453,11 @@ export function DesktopAppsPropertyPanel({
 
       >
 
-        写入模块 <code>phone</code> · 键 <code>catalogApps</code>
+        写入模块 <ChakraCode>phone</ChakraCode> · 键 <ChakraCode>catalogApps</ChakraCode>
 
-      </div>
+      </ChakraDiv>
 
-    </div>
+    </ChakraDiv>
 
   );
 
@@ -490,13 +491,13 @@ function Field({
 
   return (
 
-    <div>
+    <ChakraDiv>
 
-      <label style={labelStyle}>{label}</label>
+      <ChakraLabel style={labelStyle}>{label}</ChakraLabel>
 
       {children}
 
-    </div>
+    </ChakraDiv>
 
   );
 
@@ -528,7 +529,7 @@ function BooleanField({
 
   return (
 
-    <label
+    <ChakraLabel
 
       style={{
 
@@ -546,7 +547,7 @@ function BooleanField({
 
     >
 
-      <input
+      <ChakraInput
 
         type="checkbox"
 
@@ -556,9 +557,9 @@ function BooleanField({
 
       />
 
-      <span>{label}</span>
+      <ChakraSpan>{label}</ChakraSpan>
 
-    </label>
+    </ChakraLabel>
 
   );
 

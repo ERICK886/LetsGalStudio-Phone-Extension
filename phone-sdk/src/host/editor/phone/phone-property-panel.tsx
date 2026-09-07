@@ -6,6 +6,7 @@
  * @version 0.3.3
  */
 
+import { Box, Flex, Input, Text, Textarea, chakra } from "@chakra-ui/react";
 import React, { useMemo } from "react";
 
 import type { PhoneEditorContentItemSchema } from "../../../client/runtime/types";
@@ -16,6 +17,9 @@ import { EnumSelect } from "../shared/enum-select";
 import { ShortcutField } from "../shared/shortcut-field";
 import { useTheme, FONT_SIZE_TITLE } from "../theme/theme-provider";
 import type { ThemeTokens } from "../theme/tokens";
+import { ChakraLabel, ChakraSpan } from "../shared/chakra-elements";
+
+const ChakraCheckbox = chakra.input;
 
 /**
  * PhonePropertyPanel 属性。
@@ -90,16 +94,14 @@ export function PhonePropertyPanel({
 
   if (!item) {
     return (
-      <div
-        style={{
-          width: "100%",
-          height: "100%",
-          color: tokens.textMuted,
-          padding: 12,
-        }}
+      <Box
+        width="100%"
+        minHeight="72px"
+        color={tokens.textMuted}
+        padding="12px"
       >
         未找到内容项
-      </div>
+      </Box>
     );
   }
 
@@ -110,64 +112,54 @@ export function PhonePropertyPanel({
   );
 
   return (
-    <div
-      style={{
-        width: "100%",
-        height: "100%",
-        boxSizing: "border-box",
-        display: "flex",
-        flexDirection: "column",
-        gap: 12,
-        padding: 12,
-        overflow: "auto",
-        background: tokens.bgElevated,
-        border: `1px solid ${tokens.border}`,
-        borderRadius: 6,
-        opacity: dependencyBlocked ? 0.72 : 1,
-      }}
+    <Flex
+      width="100%"
+      minHeight="0"
+      direction="column"
+      gap="12px"
+      padding="12px"
+      overflow="auto"
+      background={tokens.bgElevated}
+      border={`1px solid ${tokens.border}`}
+      borderRadius="6px"
+      opacity={dependencyBlocked ? 0.72 : 1}
     >
-      <div>
-        <div
-          style={{
-            fontSize: FONT_SIZE_TITLE,
-            fontWeight: 600,
-            color: tokens.textPrimary,
-            marginBottom: 4,
-          }}
+      <Box>
+        <Text
+          fontSize={`${FONT_SIZE_TITLE}px`}
+          fontWeight="600"
+          color={tokens.textPrimary}
+          marginBottom="4px"
         >
           {item.label}
-        </div>
+        </Text>
         {item.description ? (
-          <div
-            style={{
-              fontSize: 12,
-              color: tokens.textMuted,
-              lineHeight: 1.5,
-            }}
+          <Text
+            fontSize="12px"
+            color={tokens.textMuted}
+            lineHeight="1.5"
           >
             {item.description}
-          </div>
+          </Text>
         ) : null}
         {dependencyBlocked ? (
-          <div
-            style={{
-              marginTop: 8,
-              fontSize: 12,
-              color: tokens.textMuted,
-              lineHeight: 1.5,
-            }}
+          <Text
+            marginTop="8px"
+            fontSize="12px"
+            color={tokens.textMuted}
+            lineHeight="1.5"
           >
             需先开启「
             {items.find((entry) => entry.id === item.dependsOn?.contentItemId)
               ?.label ?? item.dependsOn?.contentItemId}
             」后才可编辑。
-          </div>
+          </Text>
         ) : null}
-      </div>
+      </Box>
 
-      <div>
+      <Box>
         {item.fieldType !== "boolean" && item.fieldType !== "shortcut" ? (
-          <label style={labelStyle}>值</label>
+          <ChakraLabel style={labelStyle}>值</ChakraLabel>
         ) : null}
 
         {item.fieldType === "enum" && item.enumOptions ? (
@@ -208,16 +200,14 @@ export function PhonePropertyPanel({
         ) : null}
 
         {item.fieldType === "boolean" ? (
-          <label
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              fontSize: 12,
-              color: tokens.textPrimary,
-            }}
+          <Flex
+            as="label"
+            align="center"
+            gap="8px"
+            fontSize="12px"
+            color={tokens.textPrimary}
           >
-            <input
+            <ChakraCheckbox
               type="checkbox"
               checked={value === "true"}
               disabled={dependencyBlocked}
@@ -225,8 +215,22 @@ export function PhonePropertyPanel({
                 onChange(item.id, e.target.checked ? "true" : "false")
               }
             />
-            <span>启用</span>
-          </label>
+            <ChakraSpan>启用</ChakraSpan>
+          </Flex>
+        ) : null}
+
+        {item.fieldType === "number" ? (
+          <Input
+            type="number"
+            style={controlStyle}
+            value={value}
+            min={item.min}
+            max={item.max}
+            step={item.step ?? 1}
+            disabled={dependencyBlocked}
+            onChange={(e) => onChange(item.id, e.target.value)}
+            aria-label={`${item.label} 值`}
+          />
         ) : null}
 
         {item.fieldType === "asset" ? (
@@ -251,7 +255,7 @@ export function PhonePropertyPanel({
         ) : null}
 
         {item.fieldType === "string" && item.multiline === true ? (
-          <textarea
+          <Textarea
             style={{ ...controlStyle, minHeight: 72, resize: "vertical" }}
             value={value}
             disabled={dependencyBlocked}
@@ -262,7 +266,7 @@ export function PhonePropertyPanel({
         ) : null}
 
         {item.fieldType === "string" && item.multiline !== true ? (
-          <input
+          <Input
             type="text"
             style={controlStyle}
             value={value}
@@ -272,21 +276,19 @@ export function PhonePropertyPanel({
             aria-label={`${item.label} 值`}
           />
         ) : null}
-      </div>
+      </Box>
 
-      <div
-        style={{
-          marginTop: "auto",
-          fontSize: 11,
-          color: tokens.textMuted,
-          lineHeight: 1.5,
-        }}
+      <Box
+        marginTop="auto"
+        fontSize="11px"
+        color={tokens.textMuted}
+        lineHeight="1.5"
       >
         写入模块{" "}
-        <code>{item.settingsModuleId ?? settingsModuleId}</code> · 键{" "}
-        <code>{settingKey}</code>
-      </div>
-    </div>
+        <Box as="code">{item.settingsModuleId ?? settingsModuleId}</Box> · 键{" "}
+        <Box as="code">{settingKey}</Box>
+      </Box>
+    </Flex>
   );
 }
 

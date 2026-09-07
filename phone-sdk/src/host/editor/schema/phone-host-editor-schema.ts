@@ -23,6 +23,17 @@ const POPUP_POSITION_OPTIONS = [
   { value: "center", label: "中部" },
 ] as const;
 
+const HUD_POSITION_OPTIONS = [
+  { value: "top-left", label: "左上" },
+  { value: "top-center", label: "上中" },
+  { value: "top-right", label: "右上" },
+  { value: "middle-left", label: "左中" },
+  { value: "middle-right", label: "右中" },
+  { value: "bottom-left", label: "左下" },
+  { value: "bottom-center", label: "下中" },
+  { value: "bottom-right", label: "右下" },
+] as const;
+
 /**
  * 宿主「手机」可编辑字段目录（一期外观）。
  * pages 通过 contentItemIds 引用此处 id。
@@ -68,6 +79,71 @@ export const PHONE_HOST_CONTENT_ITEMS: readonly PhoneEditorContentItemSchema[] =
     fieldType: "shortcut",
     defaultValue: "ArrowUp",
     description: "例如 ArrowUp、KeyP 或 Ctrl+KeyP。",
+  },
+  {
+    id: "showPhoneHudButton",
+    group: "手机 HUD",
+    label: "显示 HUD 图标按钮",
+    icon: "eye",
+    fieldType: "boolean",
+    defaultValue: "true",
+    description: "挂载手机后在游戏画面显示触屏打开按钮。",
+  },
+  {
+    id: "phoneHudIcon",
+    group: "手机 HUD",
+    label: "HUD 按钮图标",
+    icon: "image",
+    fieldType: "asset",
+    defaultValue: "",
+    allowEmpty: true,
+    dependsOn: { contentItemId: "showPhoneHudButton", equals: "true" },
+  },
+  {
+    id: "phoneHudPosition",
+    group: "手机 HUD",
+    label: "HUD 按钮位置",
+    icon: "arrows-up-down-left-right",
+    fieldType: "enum",
+    defaultValue: "bottom-right",
+    enumOptions: [...HUD_POSITION_OPTIONS],
+    dependsOn: { contentItemId: "showPhoneHudButton", equals: "true" },
+  },
+  {
+    id: "phoneHudOffsetX",
+    group: "手机 HUD",
+    label: "横向微调（像素）",
+    icon: "arrows-left-right",
+    fieldType: "number",
+    defaultValue: "0",
+    min: -1000,
+    max: 1000,
+    step: 1,
+    dependsOn: { contentItemId: "showPhoneHudButton", equals: "true" },
+  },
+  {
+    id: "phoneHudOffsetY",
+    group: "手机 HUD",
+    label: "纵向微调（像素）",
+    icon: "arrows-up-down",
+    fieldType: "number",
+    defaultValue: "0",
+    min: -1000,
+    max: 1000,
+    step: 1,
+    dependsOn: { contentItemId: "showPhoneHudButton", equals: "true" },
+  },
+  {
+    id: "phoneHudSize",
+    group: "手机 HUD",
+    label: "按钮大小（像素）",
+    icon: "expand",
+    fieldType: "number",
+    defaultValue: "56",
+    min: 36,
+    max: 120,
+    step: 1,
+    dependsOn: { contentItemId: "showPhoneHudButton", equals: "true" },
   },
   {
     id: "backgroundColor",
@@ -176,6 +252,15 @@ const POPUP_SHORTCUT_CONTENT_IDS = [
   "openPhoneShortcut",
 ] as const;
 
+const PHONE_HUD_CONTENT_IDS = [
+  "showPhoneHudButton",
+  "phoneHudIcon",
+  "phoneHudPosition",
+  "phoneHudOffsetX",
+  "phoneHudOffsetY",
+  "phoneHudSize",
+] as const;
+
 /** 玩家权限页。 */
 const PLAYER_PERMISSIONS_CONTENT_IDS = [
   "allowPlayerCustomization",
@@ -232,16 +317,25 @@ export const PHONE_HOST_EDITOR_SCHEMA: PhoneEditorSectionSchema = {
       id: "player-permissions",
       label: "玩家权限",
       icon: "user-shield",
-      order: 40,
+      order: 50,
       status: "ready",
       contentItemIds: [...PLAYER_PERMISSIONS_CONTENT_IDS],
+      preview: "desktop",
+    },
+    {
+      id: "phone-hud",
+      label: "手机 HUD",
+      icon: "mobile-button",
+      order: 40,
+      status: "ready",
+      contentItemIds: [...PHONE_HUD_CONTENT_IDS],
       preview: "desktop",
     },
     {
       id: "story-role-presets",
       label: "消息角色预设",
       icon: "user-tag",
-      order: 50,
+      order: 60,
       status: "ready",
       preview: "chat",
       // 页内「预设 | 头像库」：chatRolePresets + chatAvatarAssets
@@ -250,7 +344,7 @@ export const PHONE_HOST_EDITOR_SCHEMA: PhoneEditorSectionSchema = {
       id: "story-message-behavior",
       label: "消息行为",
       icon: "envelope",
-      order: 60,
+      order: 70,
       status: "ready",
       contentItemIds: [...STORY_MESSAGE_BEHAVIOR_CONTENT_IDS],
       preview: "chat",

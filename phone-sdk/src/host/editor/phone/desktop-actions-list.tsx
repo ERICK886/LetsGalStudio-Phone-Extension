@@ -16,6 +16,7 @@ import {
   type EditableActionKind,
   type EditableCatalogAction,
 } from "./desktop-actions-bridge";
+import { ChakraButton, ChakraDiv, ChakraHeader, ChakraLabel, ChakraOption, ChakraSection, ChakraSelect, ChakraSpan } from "../shared/chakra-elements";
 
 /**
  * DesktopActionsList 属性。
@@ -54,7 +55,7 @@ export function DesktopActionsList({
   })).filter((group) => group.items.length > 0);
 
   return (
-    <div
+    <ChakraDiv
       style={{
         width: "100%",
         height: "100%",
@@ -69,7 +70,7 @@ export function DesktopActionsList({
         borderRadius: 6,
       }}
     >
-      <div
+      <ChakraDiv
         style={{
           fontSize: 11,
           fontWeight: 600,
@@ -80,9 +81,9 @@ export function DesktopActionsList({
         }}
       >
         动作目录
-      </div>
+      </ChakraDiv>
 
-      <div
+      <ChakraDiv
         style={{
           flex: "1 1 auto",
           minHeight: 0,
@@ -94,7 +95,7 @@ export function DesktopActionsList({
         }}
       >
         {grouped.length === 0 ? (
-          <div
+          <ChakraDiv
             style={{
               padding: 12,
               fontSize: FONT_SIZE_DEFAULT,
@@ -102,10 +103,10 @@ export function DesktopActionsList({
             }}
           >
             暂无动作，点击下方添加。
-          </div>
+          </ChakraDiv>
         ) : (
           grouped.map((group) => (
-            <section
+            <ChakraSection
               key={group.kind}
               style={{
                 display: "flex",
@@ -117,7 +118,7 @@ export function DesktopActionsList({
                 overflow: "hidden",
               }}
             >
-              <header
+              <ChakraHeader
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -128,7 +129,7 @@ export function DesktopActionsList({
                   background: tokens.bgElevated,
                 }}
               >
-                <span
+                <ChakraSpan
                   style={{
                     display: "inline-flex",
                     alignItems: "center",
@@ -140,7 +141,7 @@ export function DesktopActionsList({
                     color: tokens.textPrimary,
                   }}
                 >
-                  <span
+                  <ChakraSpan
                     aria-hidden
                     style={{
                       width: 3,
@@ -150,7 +151,7 @@ export function DesktopActionsList({
                       background: tokens.accent,
                     }}
                   />
-                  <span
+                  <ChakraSpan
                     style={{
                       overflow: "hidden",
                       textOverflow: "ellipsis",
@@ -158,9 +159,9 @@ export function DesktopActionsList({
                     }}
                   >
                     {ACTION_KIND_LABELS[group.kind]}
-                  </span>
-                </span>
-                <span
+                  </ChakraSpan>
+                </ChakraSpan>
+                <ChakraSpan
                   style={{
                     flex: "0 0 auto",
                     minWidth: 18,
@@ -178,10 +179,10 @@ export function DesktopActionsList({
                   }}
                 >
                   {group.items.length}
-                </span>
-              </header>
+                </ChakraSpan>
+              </ChakraHeader>
 
-              <div
+              <ChakraDiv
                 style={{
                   display: "flex",
                   flexDirection: "column",
@@ -192,7 +193,7 @@ export function DesktopActionsList({
                 {group.items.map((action) => {
                   const active = action.id === selectedId;
                   return (
-                    <button
+                    <ChakraButton
                       key={`${action.kind}:${action.id}`}
                       type="button"
                       onClick={() => onSelect(action.id)}
@@ -212,7 +213,7 @@ export function DesktopActionsList({
                         fontSize: FONT_SIZE_DEFAULT,
                       }}
                     >
-                      <span
+                      <ChakraSpan
                         style={{
                           fontWeight: active ? 600 : 400,
                           overflow: "hidden",
@@ -222,8 +223,8 @@ export function DesktopActionsList({
                         }}
                       >
                         {action.name}
-                      </span>
-                      <span
+                      </ChakraSpan>
+                      <ChakraSpan
                         style={{
                           fontSize: 10,
                           color: tokens.textMuted,
@@ -234,17 +235,17 @@ export function DesktopActionsList({
                         }}
                       >
                         {action.id}
-                      </span>
-                    </button>
+                      </ChakraSpan>
+                    </ChakraButton>
                   );
                 })}
-              </div>
-            </section>
+              </ChakraDiv>
+            </ChakraSection>
           ))
         )}
-      </div>
+      </ChakraDiv>
 
-      <div
+      <ChakraDiv
         style={{
           display: "flex",
           flexDirection: "column",
@@ -252,7 +253,7 @@ export function DesktopActionsList({
           padding: "0 4px 4px",
         }}
       >
-        <label
+        <ChakraLabel
           style={{
             display: "flex",
             flexDirection: "column",
@@ -262,7 +263,7 @@ export function DesktopActionsList({
           }}
         >
           添加种类
-          <select
+          <ChakraSelect
             value={addKind}
             onChange={(e) =>
               onAddKindChange(e.target.value as EditableActionKind)
@@ -278,15 +279,15 @@ export function DesktopActionsList({
             }}
           >
             {EDITABLE_ACTION_KINDS.map((kind) => (
-              <option key={kind} value={kind}>
+              <ChakraOption key={kind} value={kind}>
                 {ACTION_KIND_LABELS[kind]}
-              </option>
+              </ChakraOption>
             ))}
-          </select>
-        </label>
+          </ChakraSelect>
+        </ChakraLabel>
 
-        <div style={{ display: "flex", gap: 6 }}>
-          <button
+        <ChakraDiv style={{ display: "flex", gap: 6 }}>
+          <ChakraButton
             type="button"
             onClick={onAdd}
             style={{
@@ -301,8 +302,8 @@ export function DesktopActionsList({
             }}
           >
             <IconLabel icon="plus">添加</IconLabel>
-          </button>
-          <button
+          </ChakraButton>
+          <ChakraButton
             type="button"
             disabled={!selectedId || actions.length <= 1}
             title={actions.length <= 1 ? "至少保留一个动作" : "删除选中动作"}
@@ -322,10 +323,10 @@ export function DesktopActionsList({
             }}
           >
             <IconLabel icon="trash">删除</IconLabel>
-          </button>
-        </div>
-      </div>
-    </div>
+          </ChakraButton>
+        </ChakraDiv>
+      </ChakraDiv>
+    </ChakraDiv>
   );
 }
 

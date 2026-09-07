@@ -19,9 +19,11 @@ import type { ExtensionContext } from "@avg-studio/sdk";
 import {
   emitPhoneClosed,
   getPhoneSdkSlot,
+  isPhoneCloseLocked,
   publishPhoneNavigate,
   waitForPhoneClosed,
   type OpenPhoneAppOptions,
+  type OpenPhoneAppResult,
   type PhoneNavigationController,
 } from "@ink-zenly/phone-sdk/plugin";
 import {
@@ -29,9 +31,6 @@ import {
   getPhoneRuntime,
   hidePhoneUi,
 } from "../extension/phone-extension";
-
-/** `waitUntil: "close"` 的保险释放时间，避免宿主 show 失败时永久挂起调用方。 */
-const PHONE_CLOSE_WAIT_TIMEOUT_MS = 8_000;
 
 /** 调用方维护的单调递增序号，便于宿主去重 / 排序。模块级以跨 onRegister 重建保持递增。 */
 let phoneNavigateSeq = 0;
@@ -44,31 +43,54 @@ let phoneNavigateSeq = 0;
  *
  * @remarks
  * - 剧情消息会话占用时 warn 并跳过，避免抢占当前 Preview 的 phone 容器。
- * - 未显示时以 `interactable: false` 显示手机，交由内页应用接管交互。
- * - `waitUntil: "none"` 立即返回；否则等待 `emitPhoneClosed`，并在 8s 超时后 warn + resolve。
+ * - 未显示时以 `interactable: true` 显示手机，使内页应用能够接管交互。
+ * - `waitUntil: "none"` 立即返回；否则等待 `emitPhoneClosed`，引擎销毁时由 flow signal 取消等待。
  */
 export function createPhoneNavigationController(
   ctx: ExtensionContext,
 ): PhoneNavigationController {
   return {
-    async openPhoneApp(options: OpenPhoneAppOptions): Promise<void> {
+    async openPhoneApp(
+      options: OpenPhoneAppOptions,
+    ): Promise<OpenPhoneAppResult> {
       const runtime = getPhoneRuntime(ctx);
+      const slot = getPhoneSdkSlot();
+      if (options.position) slot.phonePositionOverride = options.position;
+      else delete slot.phonePositionOverride;
+      console.info("[phone-call:incoming]", {
+        event: "host-navigation-enter",
+        appId: options.appId,
+        phoneMounted: runtime.phoneMounted,
+        storyMessageSessionVisible: runtime.storyMessageSessionVisible,
+        phoneUiVisible: ctx.ui.isVisible("phone"),
+      });
       if (runtime.storyMessageSessionVisible) {
         console.warn("[phone] openPhoneApp: 消息手机占用中，已跳过");
-        return;
+        console.warn("[phone-call:incoming] host-navigation-blocked", {
+          reason: "story-message-session",
+          appId: options.appId,
+        });
+        return "blocked";
       }
-      activatePhoneRuntime(runtime);
+      activatePhoneRuntime(ctx, runtime);
 
       if (!ctx.ui.isVisible("phone")) {
         try {
           await ctx.ui.show("phone", undefined, {
             size: "(100%, 100%)",
             position: "(0, 0)",
-            interactable: false,
+            // 程序化打开的内页同样需要接管输入；强制来电、聊天回复等
+            // 都依赖玩家点击。false 会让 Studio 把整层当作不可交互展示层。
+            interactable: true,
+          });
+          console.info("[phone-call:incoming]", {
+            event: "host-ui-show-resolved",
+            appId: options.appId,
+            phoneUiVisible: ctx.ui.isVisible("phone"),
           });
         } catch (error) {
           console.error("[phone] openPhoneApp: 显示手机失败", error);
-          return;
+          return "failed";
         }
       }
 
@@ -77,12 +99,22 @@ export function createPhoneNavigationController(
         seq: ++phoneNavigateSeq,
         ...(options.payload ? { payload: options.payload } : {}),
       });
+      console.info("[phone-call:incoming]", {
+        event: "host-navigation-published",
+        appId: options.appId,
+        navigateSeq: phoneNavigateSeq,
+        phoneUiVisible: ctx.ui.isVisible("phone"),
+      });
 
-      if (options.waitUntil === "none") return;
-      await waitForPhoneClosedWithTimeout();
+      if (options.waitUntil !== "none") {
+        await waitForPhoneClosed(ctx.flow.signal);
+      }
+      return "opened";
     },
 
     async closePhoneApp(): Promise<void> {
+      if (isPhoneCloseLocked()) return;
+      delete getPhoneSdkSlot().phonePositionOverride;
       const animated = getPhoneSdkSlot().requestAnimatedClosePhone;
       if (animated) {
         await animated();
@@ -100,28 +132,6 @@ export function createPhoneNavigationController(
       }
     },
   };
-}
-
-/**
- * 等待手机关闭，超时后 warn 并 resolve，避免调用方永久挂起。
- */
-async function waitForPhoneClosedWithTimeout(): Promise<void> {
-  let timer: ReturnType<typeof globalThis.setTimeout> | undefined;
-  try {
-    await Promise.race([
-      waitForPhoneClosed(),
-      new Promise<void>((resolve) => {
-        timer = globalThis.setTimeout(() => {
-          console.warn(
-            "[phone] openPhoneApp: 等待手机关闭超时，已释放调用方",
-          );
-          resolve();
-        }, PHONE_CLOSE_WAIT_TIMEOUT_MS);
-      }),
-    ]);
-  } finally {
-    if (timer !== undefined) globalThis.clearTimeout(timer);
-  }
 }
 
 /**

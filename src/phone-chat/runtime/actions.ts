@@ -1,107 +1,233 @@
 /**
  * @file actions.ts
- * @description 会话写入、回复选项、好友增删与玩家点选回复（编排 domain + runtime）。
- * @author 池水三两升
- * @date 2026-08-05
- * @version 0.2.0
+ * @description 单聊 / 群聊消息、待回复、未读与好友状态编排。
  */
 
 import type { ExtensionContext } from "@avg-studio/sdk";
 
 import {
   applyReplyEffects,
-  appendMessagesToThreads,
-  clearThreadUnread,
+  appendMessagesToConversation,
+  clearConversationUnread,
+  conversationIdForPending,
+  conversationIdForTarget,
+  directConversationId,
+  findGroupDefinition,
+  groupConversationId,
+  parseConversationId,
+  resolveGroupDefinitions,
   resolveFriendIds,
   type AppendMessageInput,
+  type ChatConversationTarget,
 } from "../domain/index";
-import type { ChatMessageStatus, ChatReplyOption } from "../types/index";
-import { emitChatBus, getOpenChatFriendId, isViewingChat } from "./bus";
+import type {
+  ChatGroupDefinition,
+  ChatGroupMemberOverride,
+  ChatMessageStatus,
+  ChatPendingReplies,
+  ChatReplyOption,
+} from "../types/index";
+import {
+  emitChatBus,
+  getOpenConversationId,
+  isViewingConversation,
+} from "./bus";
 import { syncChatDesktopBadge } from "./desktop-badge";
 import {
   createReplyWait,
   resolveReplyWait,
-  resolveReplyWaitsForFriend,
+  resolveReplyWaitsForConversation,
 } from "./reply-wait";
 import { getCachedAuthorSettings } from "./settings";
 import { patchChatState, readChatState } from "./store";
 
-/**
- * 向指定好友会话追加纯消息（不携带回复选项）。
- *
- * @param options.friendCharacterId - 目标好友角色 ID
- * @param options.messages - 待追加消息列表；为空时不执行任何写入
- * @returns 当消息为空或好友 ID 无效时立即结束
- *
- * @example
- * ```ts
- * await sendFriendMessages({
- *   friendCharacterId: "mika",
- *   messages: [{ text: "嗨", direction: "incoming", status: "read" }],
- * });
- * ```
- */
-export async function sendFriendMessages(options: {
-  friendCharacterId: string;
+function pendingFields(
+  target: ChatConversationTarget,
+): Pick<ChatPendingReplies, "conversationId" | "friendCharacterId" | "groupId"> {
+  const conversationId = conversationIdForTarget(target);
+  return target.kind === "group"
+    ? { conversationId, friendCharacterId: "", groupId: target.groupId.trim() }
+    : {
+        conversationId,
+        friendCharacterId: target.friendCharacterId.trim(),
+      };
+}
+
+function upsertPendingReplies(pending: ChatPendingReplies): void {
+  const conversationId = conversationIdForPending(pending);
+  const state = readChatState();
+  patchChatState(
+    {
+      pendingReplies: [
+        ...state.pendingReplies.filter(
+          (item) => conversationIdForPending(item) !== conversationId,
+        ),
+        pending,
+      ],
+    },
+    "upsert-pending-replies",
+  );
+}
+
+function removePendingReplies(conversationId: string): ChatPendingReplies | undefined {
+  const state = readChatState();
+  const removed = state.pendingReplies.find(
+    (item) => conversationIdForPending(item) === conversationId,
+  );
+  if (!removed) return undefined;
+  patchChatState(
+    {
+      pendingReplies: state.pendingReplies.filter(
+        (item) => conversationIdForPending(item) !== conversationId,
+      ),
+    },
+    "remove-pending-replies",
+  );
+  return removed;
+}
+
+/** 同一会话出现新回复组时先结算旧回复，避免旧剧情等待永久悬挂。 */
+function settleReplacedPending(
+  ctx: ExtensionContext,
+  conversationId: string,
+): void {
+  const previous = readChatState().pendingReplies.find(
+    (item) => conversationIdForPending(item) === conversationId,
+  );
+  if (!previous) return;
+
+  const first = previous.options[0];
+  if (previous.waitToken && first) {
+    console.warn(
+      `[phone-chat] 会话 ${conversationId} 的必选回复被新回复组覆盖，已自动选择第一项`,
+    );
+    selectPlayerReply(ctx, first.id, conversationId);
+    return;
+  }
+
+  resolveReplyWait(previous.waitToken);
+  removePendingReplies(conversationId);
+  emitChatBus({ type: "replies-changed", conversationId });
+}
+
+export async function sendConversationMessages(options: {
+  target: ChatConversationTarget;
   messages: readonly AppendMessageInput[];
 }): Promise<void> {
-  const friendId = options.friendCharacterId.trim();
-  if (!friendId || options.messages.length === 0) return;
+  const conversationId = conversationIdForTarget(options.target);
+  if (!conversationId || options.messages.length === 0) return;
 
-  const viewing = isViewingChat(friendId);
+  const viewing = isViewingConversation(conversationId);
   const state = readChatState();
-  const { threads, appended } = appendMessagesToThreads(
+  const { threads, appended } = appendMessagesToConversation(
     state.threads,
-    friendId,
+    options.target,
     options.messages,
     { bumpUnread: !viewing },
   );
-
-  patchChatState({ threads }, "send-friend-messages");
+  patchChatState({ threads }, "send-conversation-messages");
   if (appended.length > 0) {
-    emitChatBus({
-      type: "messages-appended",
-      friendCharacterId: friendId,
-      messages: appended,
-    });
+    emitChatBus({ type: "messages-appended", conversationId, messages: appended });
   }
   syncChatDesktopBadge();
 }
 
-/**
- * 设置某好友的玩家可选回复，并挂起或快进处理。
- *
- * @param ctx - 扩展上下文，用于快进时自动点选回复并应用效果
- * @param options.friendCharacterId - 目标好友角色 ID
- * @param options.replies - 可选回复列表；为空时不执行任何写入
- * @param options.outgoingStatus - 玩家点选后发出的 outgoing 消息状态
- * @param options.allowWait - false 时为快进/skip：自动点选第一条（与「非必须回复」不同）
- * @param options.waitForReply - 仅 `allowWait===true` 时生效；true 挂起剧情至点选，
- *   false 仅写入 pending（无 waitToken）并立即返回，供玩家稍后在手机内回复
- * @param options.onPendingWritten - 写入 pending 后、挂起等待前回调（通常用于打开手机）
- * @returns 等待模式下返回 Promise；非必须 / 快进模式下立即结束
- *
- * @example
- * ```ts
- * // 必须回复：挂起
- * await awaitPlayerReply(ctx, {
- *   friendCharacterId: "mika",
- *   replies: [{ id: "r1", text: "你好", effects: [] }],
- *   outgoingStatus: "read",
- *   allowWait: true,
- *   waitForReply: true,
- * });
- *
- * // 非必须：写入选项后继续剧情
- * await awaitPlayerReply(ctx, {
- *   friendCharacterId: "mika",
- *   replies: [{ id: "r1", text: "你好", effects: [] }],
- *   outgoingStatus: "read",
- *   allowWait: true,
- *   waitForReply: false,
- * });
- * ```
- */
+export async function sendFriendMessages(options: {
+  friendCharacterId: string;
+  messages: readonly AppendMessageInput[];
+}): Promise<void> {
+  await sendConversationMessages({
+    target: {
+      kind: "direct",
+      friendCharacterId: options.friendCharacterId.trim(),
+    },
+    messages: options.messages,
+  });
+}
+
+export async function sendGroupMessages(options: {
+  groupId: string;
+  senderCharacterId: string;
+  messages: readonly AppendMessageInput[];
+}): Promise<void> {
+  const groupId = options.groupId.trim();
+  const senderCharacterId = options.senderCharacterId.trim();
+  if (!groupId || !senderCharacterId) return;
+
+  const group = getChatGroup(groupId);
+  if (group && !group.memberCharacterIds.includes(senderCharacterId)) {
+    console.warn(
+      `[phone-chat] 群 ${groupId} 收到不在当前成员列表中的发送者 ${senderCharacterId}`,
+    );
+  }
+
+  await sendConversationMessages({
+    target: { kind: "group", groupId },
+    messages: options.messages.map((message) => ({
+      ...message,
+      ...(message.direction === "incoming" ? { senderCharacterId } : {}),
+    })),
+  });
+}
+
+export async function awaitConversationReply(
+  ctx: ExtensionContext,
+  options: {
+    target: ChatConversationTarget;
+    replies: readonly ChatReplyOption[];
+    outgoingStatus: ChatMessageStatus;
+    allowWait: boolean;
+    waitForReply?: boolean;
+    onPendingWritten?: () => void | Promise<void>;
+  },
+): Promise<void> {
+  const conversationId = conversationIdForTarget(options.target);
+  if (!conversationId || options.replies.length === 0) return;
+
+  settleReplacedPending(ctx, conversationId);
+  const basePending: ChatPendingReplies = {
+    ...pendingFields(options.target),
+    options: options.replies.map((reply) => ({
+      ...reply,
+      effects: reply.effects.map((effect) => ({ ...effect })),
+    })),
+    outgoingStatus: options.outgoingStatus,
+  };
+
+  if (!options.allowWait) {
+    const first = options.replies[0];
+    if (!first) return;
+    upsertPendingReplies(basePending);
+    selectPlayerReply(ctx, first.id, conversationId);
+    return;
+  }
+
+  const waitForReply = options.waitForReply !== false;
+  if (!waitForReply) {
+    upsertPendingReplies(basePending);
+    emitChatBus({ type: "replies-changed", conversationId });
+    return;
+  }
+
+  const wait = createReplyWait(conversationId, ctx.flow.signal);
+  upsertPendingReplies({ ...basePending, waitToken: wait.token });
+  emitChatBus({ type: "replies-changed", conversationId });
+
+  try {
+    if (options.onPendingWritten) await options.onPendingWritten();
+  } catch (error) {
+    removePendingReplies(conversationId);
+    resolveReplyWait(wait.token);
+    emitChatBus({ type: "replies-changed", conversationId });
+    throw error;
+  }
+  await wait.promise;
+  if (ctx.flow.signal.aborted) {
+    removePendingReplies(conversationId);
+    emitChatBus({ type: "replies-changed", conversationId });
+  }
+}
+
 export async function awaitPlayerReply(
   ctx: ExtensionContext,
   options: {
@@ -109,93 +235,36 @@ export async function awaitPlayerReply(
     replies: readonly ChatReplyOption[];
     outgoingStatus: ChatMessageStatus;
     allowWait: boolean;
-    /**
-     * 是否挂起剧情直到玩家点选。
-     *
-     * @remarks
-     * 仅在 `allowWait===true` 时有意义；缺省 `true`（必须回复）。
-     * `false` 时写入 pending 且不带 `waitToken`，剧情立即继续。
-     */
     waitForReply?: boolean;
-    /**
-     * 写入 pending 回复后、挂起等待前回调。
-     *
-     * @remarks
-     * 用于在玩家可见回复选项后打开手机内页（深链）；
-     * 仅在「必须回复」挂起分支触发。
-     */
     onPendingWritten?: () => void | Promise<void>;
   },
 ): Promise<void> {
-  const friendId = options.friendCharacterId.trim();
-  if (!friendId || options.replies.length === 0) return;
-
-  resolveReplyWaitsForFriend(friendId);
-
-  const outgoingStatus = options.outgoingStatus;
-
-  // 快进 / skip：自动点选第一条（不是「非必须回复」）
-  if (!options.allowWait) {
-    const first = options.replies[0];
-    if (!first) return;
-
-    patchChatState(
-      {
-        pendingReplies: {
-          friendCharacterId: friendId,
-          options: [...options.replies],
-          outgoingStatus,
-        },
-      },
-      "await-player-reply-skip",
-    );
-    selectPlayerReply(ctx, first.id);
-    return;
-  }
-
-  const waitForReply = options.waitForReply !== false;
-
-  // 非必须回复：只留下可选回复，不挂起、不开手机
-  if (!waitForReply) {
-    patchChatState(
-      {
-        pendingReplies: {
-          friendCharacterId: friendId,
-          options: [...options.replies],
-          outgoingStatus,
-        },
-      },
-      "await-player-reply-optional",
-    );
-    emitChatBus({ type: "replies-changed", friendCharacterId: friendId });
-    return;
-  }
-
-  // 必须回复：写入 waitToken 并挂起至点选
-  const wait = createReplyWait(friendId);
-  patchChatState(
-    {
-      pendingReplies: {
-        friendCharacterId: friendId,
-        options: [...options.replies],
-        waitToken: wait.token,
-        outgoingStatus,
-      },
+  await awaitConversationReply(ctx, {
+    ...options,
+    target: {
+      kind: "direct",
+      friendCharacterId: options.friendCharacterId.trim(),
     },
-    "await-player-reply",
-  );
-  emitChatBus({ type: "replies-changed", friendCharacterId: friendId });
-  if (options.onPendingWritten) {
-    await options.onPendingWritten();
-  }
-  await wait.promise;
+  });
 }
 
-/**
- * 动态添加好友（从 removed 移除并加入 extra）。
- *
- * @param characterId - 角色 ID
- */
+export async function awaitGroupReply(
+  ctx: ExtensionContext,
+  options: {
+    groupId: string;
+    replies: readonly ChatReplyOption[];
+    outgoingStatus: ChatMessageStatus;
+    allowWait: boolean;
+    waitForReply?: boolean;
+    onPendingWritten?: () => void | Promise<void>;
+  },
+): Promise<void> {
+  await awaitConversationReply(ctx, {
+    ...options,
+    target: { kind: "group", groupId: options.groupId.trim() },
+  });
+}
+
 export function addFriend(characterId: string): void {
   const id = characterId.trim();
   if (!id) return;
@@ -207,11 +276,6 @@ export function addFriend(characterId: string): void {
   patchChatState({ friendsExtra, friendsRemoved }, "add-friend");
 }
 
-/**
- * 动态移除好友（仅隐藏列表，保留历史消息）。
- *
- * @param characterId - 角色 ID
- */
 export function removeFriend(characterId: string): void {
   const id = characterId.trim();
   if (!id) return;
@@ -220,98 +284,92 @@ export function removeFriend(characterId: string): void {
   const friendsRemoved = state.friendsRemoved.includes(id)
     ? state.friendsRemoved
     : [...state.friendsRemoved, id];
-  if (state.pendingReplies?.friendCharacterId === id) {
-    resolveReplyWaitsForFriend(id);
-    patchChatState(
-      { friendsExtra, friendsRemoved, pendingReplies: null },
-      "remove-friend",
-    );
-    emitChatBus({ type: "replies-changed", friendCharacterId: null });
-    return;
-  }
-  patchChatState({ friendsExtra, friendsRemoved }, "remove-friend");
+  const conversationId = directConversationId(id);
+  const pendingReplies = state.pendingReplies.filter(
+    (pending) => conversationIdForPending(pending) !== conversationId,
+  );
+  resolveReplyWaitsForConversation(conversationId);
+  patchChatState(
+    { friendsExtra, friendsRemoved, pendingReplies },
+    "remove-friend",
+  );
+  emitChatBus({ type: "replies-changed", conversationId });
 }
 
-/**
- * 玩家点选一条可选回复。
- *
- * @param ctx - 用于写变量的扩展上下文（宿主内页上下文亦可）
- * @param replyId - 回复选项 ID
- * @returns 是否成功处理
- *
- * @throws 不抛出；无效选项时返回 false
- */
 export function selectPlayerReply(
   ctx: ExtensionContext,
   replyId: string,
+  conversationId?: string,
 ): boolean {
   const state = readChatState();
-  const pending = state.pendingReplies;
-  if (!pending) return false;
-  const option = pending.options.find((item) => item.id === replyId);
-  if (!option) return false;
+  const requestedId = conversationId?.trim();
+  const pendingIndex = state.pendingReplies.findIndex((pending) => {
+    if (requestedId && conversationIdForPending(pending) !== requestedId) {
+      return false;
+    }
+    return pending.options.some((option) => option.id === replyId);
+  });
+  if (pendingIndex < 0) return false;
 
-  const friendId = pending.friendCharacterId;
-  const status = pending.outgoingStatus ?? "read";
-  const viewing = isViewingChat(friendId);
-  const { threads, appended } = appendMessagesToThreads(
+  const pending = state.pendingReplies[pendingIndex]!;
+  const option = pending.options.find((item) => item.id === replyId);
+  const targetId = conversationIdForPending(pending);
+  const target = parseConversationId(targetId);
+  if (!option || !target) return false;
+
+  const viewing = isViewingConversation(targetId);
+  const { threads, appended } = appendMessagesToConversation(
     state.threads,
-    friendId,
+    target,
     [
       {
         text: option.contentType === "image" ? "" : option.text,
         contentType: option.contentType ?? "text",
         ...(option.imageAsset ? { imageAsset: option.imageAsset } : {}),
         direction: "outgoing",
-        status,
+        status: pending.outgoingStatus ?? "read",
       },
     ],
     { bumpUnread: false },
   );
+  const nextThreads = viewing
+    ? clearConversationUnread(threads, targetId)
+    : threads;
+  const pendingReplies = state.pendingReplies.filter(
+    (_, index) => index !== pendingIndex,
+  );
 
+  patchChatState(
+    { threads: nextThreads, pendingReplies },
+    "select-reply",
+  );
+  resolveReplyWait(pending.waitToken);
   applyReplyEffects(ctx, option.effects);
-  const waitToken = pending.waitToken;
-  patchChatState({ threads, pendingReplies: null }, "select-reply");
-  resolveReplyWait(waitToken);
 
   if (appended.length > 0) {
     emitChatBus({
       type: "messages-appended",
-      friendCharacterId: friendId,
+      conversationId: targetId,
       messages: appended,
     });
   }
-  emitChatBus({ type: "replies-changed", friendCharacterId: null });
-
-  if (viewing) {
-    patchChatState(
-      { threads: clearThreadUnread(readChatState().threads, friendId) },
-      "select-reply-clear-unread",
-    );
-    syncChatDesktopBadge();
-  }
-
+  emitChatBus({ type: "replies-changed", conversationId: targetId });
+  syncChatDesktopBadge();
   return true;
 }
 
-/**
- * 打开聊天页时清未读。
- *
- * @param friendCharacterId - 好友 ID
- */
-export function markChatOpened(friendCharacterId: string): void {
-  const friendId = friendCharacterId.trim();
-  if (!friendId) return;
-  const threads = clearThreadUnread(readChatState().threads, friendId);
+export function markConversationOpened(conversationId: string): void {
+  const id = conversationId.trim();
+  if (!parseConversationId(id)) return;
+  const threads = clearConversationUnread(readChatState().threads, id);
   patchChatState({ threads }, "open-chat");
   syncChatDesktopBadge();
 }
 
-/**
- * 合并默认好友与存档增删。
- *
- * @returns 可见好友 ID 列表
- */
+export function markChatOpened(friendCharacterId: string): void {
+  markConversationOpened(directConversationId(friendCharacterId));
+}
+
 export function listVisibleFriendIds(): string[] {
   const settings = getCachedAuthorSettings();
   const state = readChatState();
@@ -322,11 +380,106 @@ export function listVisibleFriendIds(): string[] {
   );
 }
 
-/**
- * 当前打开聊天好友（供调试）。
- *
- * @returns 好友 ID 或 null
- */
+export function listChatGroups(): ChatGroupDefinition[] {
+  const settings = getCachedAuthorSettings();
+  return resolveGroupDefinitions(
+    settings.defaultGroups,
+    readChatState().groupMemberOverrides,
+  );
+}
+
+export function getChatGroup(groupId: string): ChatGroupDefinition | undefined {
+  return findGroupDefinition(listChatGroups(), groupId);
+}
+
+/** 将角色加入作者已定义的群聊；重复加入为无操作。 */
+export function joinGroupMember(
+  groupId: string,
+  characterId: string,
+): boolean {
+  return updateGroupMember(groupId, characterId, true);
+}
+
+/** 将角色移出作者已定义的群聊；重复退出为无操作。 */
+export function leaveGroupMember(
+  groupId: string,
+  characterId: string,
+): boolean {
+  return updateGroupMember(groupId, characterId, false);
+}
+
+function updateGroupMember(
+  rawGroupId: string,
+  rawCharacterId: string,
+  shouldJoin: boolean,
+): boolean {
+  const groupId = rawGroupId.trim();
+  const characterId = rawCharacterId.trim();
+  if (!groupId || !characterId) return false;
+
+  const authoredGroup = findGroupDefinition(
+    getCachedAuthorSettings().defaultGroups,
+    groupId,
+  );
+  if (!authoredGroup) {
+    console.warn(`[phone-chat] 找不到群聊 ${groupId}，成员变更已忽略`);
+    return false;
+  }
+
+  const currentGroup = getChatGroup(groupId);
+  const isMember = Boolean(
+    currentGroup?.memberCharacterIds.includes(characterId),
+  );
+  if (isMember === shouldJoin) return false;
+
+  const state = readChatState();
+  const existing = state.groupMemberOverrides.find(
+    (item) => item.groupId === groupId,
+  );
+  const added = new Set(existing?.addedCharacterIds ?? []);
+  const removed = new Set(existing?.removedCharacterIds ?? []);
+  const isAuthoredMember = authoredGroup.memberCharacterIds.includes(characterId);
+
+  if (shouldJoin) {
+    removed.delete(characterId);
+    if (!isAuthoredMember) added.add(characterId);
+  } else {
+    added.delete(characterId);
+    if (isAuthoredMember) removed.add(characterId);
+    else removed.delete(characterId);
+  }
+
+  const nextOverride: ChatGroupMemberOverride = {
+    groupId,
+    addedCharacterIds: [...added],
+    removedCharacterIds: [...removed],
+  };
+  const groupMemberOverrides = state.groupMemberOverrides.filter(
+    (item) => item.groupId !== groupId,
+  );
+  if (
+    nextOverride.addedCharacterIds.length > 0 ||
+    nextOverride.removedCharacterIds.length > 0
+  ) {
+    groupMemberOverrides.push(nextOverride);
+  }
+
+  patchChatState(
+    { groupMemberOverrides },
+    shouldJoin ? "join-group-member" : "leave-group-member",
+  );
+  return true;
+}
+
+export function currentOpenConversationId(): string | null {
+  return getOpenConversationId();
+}
+
 export function currentOpenChatFriendId(): string | null {
-  return getOpenChatFriendId();
+  const target = parseConversationId(getOpenConversationId() ?? "");
+  return target?.kind === "direct" ? target.friendCharacterId : null;
+}
+
+export function groupConversationKey(groupId: string): string {
+  return groupConversationId(groupId);
 }

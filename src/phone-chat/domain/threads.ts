@@ -7,6 +7,13 @@
  */
 
 import { nextId } from "./id";
+import {
+  conversationIdForTarget,
+  conversationIdForThread,
+  directConversationId,
+  targetFields,
+  type ChatConversationTarget,
+} from "./conversations";
 import type {
   ChatMessage,
   ChatMessageDirection,
@@ -21,6 +28,65 @@ export interface AppendMessageInput {
   status: ChatMessageStatus;
   contentType?: MessageContentType;
   imageAsset?: string;
+  senderCharacterId?: string;
+}
+
+/** 向单聊或群聊追加消息。旧单聊 API 由 appendMessagesToThreads 包装。 */
+export function appendMessagesToConversation(
+  threads: readonly ChatThread[],
+  target: ChatConversationTarget,
+  incoming: readonly AppendMessageInput[],
+  options: { bumpUnread: boolean },
+): { threads: ChatThread[]; appended: ChatMessage[] } {
+  const conversationId = conversationIdForTarget(target);
+  if (!conversationId || incoming.length === 0) {
+    return { threads: [...threads], appended: [] };
+  }
+
+  const now = Date.now();
+  const appended: ChatMessage[] = incoming.map((item, index) => {
+    const message: ChatMessage = {
+      id: nextId("msg"),
+      text: item.text,
+      direction: item.direction,
+      status: item.status,
+      createdAt: now + index,
+    };
+    if (item.contentType !== undefined) message.contentType = item.contentType;
+    if (item.imageAsset !== undefined) message.imageAsset = item.imageAsset;
+    if (item.senderCharacterId?.trim()) {
+      message.senderCharacterId = item.senderCharacterId.trim();
+    }
+    return message;
+  });
+
+  const unreadDelta = options.bumpUnread
+    ? appended.filter((message) => message.direction === "incoming").length
+    : 0;
+  const index = threads.findIndex(
+    (thread) => conversationIdForThread(thread) === conversationId,
+  );
+  if (index < 0) {
+    const created: ChatThread = {
+      ...targetFields(target),
+      messages: appended,
+      updatedAt: appended[appended.length - 1]?.createdAt ?? now,
+      unreadCount: unreadDelta,
+    };
+    return { threads: [created, ...threads], appended };
+  }
+
+  const prev = threads[index]!;
+  const nextThread: ChatThread = {
+    ...prev,
+    ...targetFields(target),
+    messages: [...prev.messages, ...appended],
+    updatedAt: appended[appended.length - 1]?.createdAt ?? now,
+    unreadCount: Math.max(0, Number(prev.unreadCount) || 0) + unreadDelta,
+  };
+  const next = [...threads];
+  next.splice(index, 1);
+  return { threads: [nextThread, ...next], appended };
 }
 
 /**
@@ -39,53 +105,25 @@ export function appendMessagesToThreads(
   options: { bumpUnread: boolean },
 ): { threads: ChatThread[]; appended: ChatMessage[] } {
   const friendId = friendCharacterId.trim();
-  if (!friendId || incoming.length === 0) {
-    return { threads: [...threads], appended: [] };
-  }
+  return appendMessagesToConversation(
+    threads,
+    { kind: "direct", friendCharacterId: friendId },
+    incoming,
+    options,
+  );
+}
 
-  const now = Date.now();
-  const appended: ChatMessage[] = incoming.map((item) => {
-    const message: ChatMessage = {
-      id: nextId("msg"),
-      text: item.text,
-      direction: item.direction,
-      status: item.status,
-      createdAt: now,
-    };
-    if (item.contentType !== undefined) {
-      message.contentType = item.contentType;
-    }
-    if (item.imageAsset !== undefined) {
-      message.imageAsset = item.imageAsset;
-    }
-    return message;
-  });
-
-  const unreadDelta = options.bumpUnread
-    ? appended.filter((m) => m.direction === "incoming").length
-    : 0;
-
-  const index = threads.findIndex((t) => t.friendCharacterId === friendId);
-  if (index < 0) {
-    const created: ChatThread = {
-      friendCharacterId: friendId,
-      messages: appended,
-      updatedAt: now,
-      unreadCount: unreadDelta,
-    };
-    return { threads: [created, ...threads], appended };
-  }
-
-  const prev = threads[index]!;
-  const nextThread: ChatThread = {
-    ...prev,
-    messages: [...prev.messages, ...appended],
-    updatedAt: now,
-    unreadCount: prev.unreadCount + unreadDelta,
-  };
-  const next = [...threads];
-  next.splice(index, 1);
-  return { threads: [nextThread, ...next], appended };
+export function clearConversationUnread(
+  threads: readonly ChatThread[],
+  conversationId: string,
+): ChatThread[] {
+  const id = conversationId.trim();
+  if (!id) return [...threads];
+  return threads.map((thread) =>
+    conversationIdForThread(thread) === id
+      ? { ...thread, unreadCount: 0 }
+      : thread,
+  );
 }
 
 /**
@@ -99,11 +137,9 @@ export function clearThreadUnread(
   threads: readonly ChatThread[],
   friendCharacterId: string,
 ): ChatThread[] {
-  const friendId = friendCharacterId.trim();
-  return threads.map((thread) =>
-    thread.friendCharacterId === friendId
-      ? { ...thread, unreadCount: 0 }
-      : thread,
+  return clearConversationUnread(
+    threads,
+    directConversationId(friendCharacterId),
   );
 }
 

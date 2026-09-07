@@ -6,7 +6,7 @@
  * @version 0.2.0
  *
  * @remarks
- * - 注入 `ensureAlbumStyles` / Font Awesome，直接渲染 `HomeScreen`、`GridScreen`、`TabBar`。
+ * - 注入 `ensureAlbumStyles`，直接渲染使用本地内联图标的真实页面组件。
  * - 目录由当前编辑器 defaultAlbums / defaultMedia（含有素材的草稿）经 `buildAlbumCatalog` 生成；
  *   存档用空快照，不混入相机胶卷。
  * - 支持首页 ↔ 网格内切换；`pageId === "album-media"` 时默认打开「全部」网格。
@@ -15,6 +15,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useExtensionContext } from "@avg-studio/sdk";
 import {
+  PhonePreviewStatusBar,
   readPhoneAppearanceValues,
   useTheme,
 } from "@ink-zenly/phone-sdk";
@@ -29,7 +30,6 @@ import { TabBar } from "../ui/components/TabBar";
 import { CameraScreen } from "../ui/screens/CameraScreen";
 import { GridScreen } from "../ui/screens/GridScreen";
 import { HomeScreen } from "../ui/screens/HomeScreen";
-import { ensureFontAwesome } from "../ui/styles/font-awesome";
 import { ensureAlbumStyles } from "../ui/styles/inject-styles";
 import {
   buildAlbumSkinCssVars,
@@ -133,7 +133,6 @@ export function AlbumHomePreview({
   pageId = "album-copy",
 }: AlbumHomePreviewProps): React.ReactElement {
   ensureAlbumStyles();
-  ensureFontAwesome();
 
   const ctx = useExtensionContext();
   const { tokens } = useTheme();
@@ -271,8 +270,9 @@ export function AlbumHomePreview({
       <section
         aria-label={`${phoneTitle} · ${appTitle}预览`}
         style={{
-          width: 300,
-          height: 600,
+          // 与宿主、聊天和其他 APP 编辑器预览统一使用真机默认画布。
+          width: 390,
+          height: 780,
           flex: "0 0 auto",
           overflow: "hidden",
           border: `9px solid ${shellColor}`,
@@ -294,20 +294,12 @@ export function AlbumHomePreview({
             overflow: "hidden",
           }}
         >
-          <header
-            style={{
-              flex: "0 0 auto",
-              display: "flex",
-              justifyContent: "space-between",
-              padding: "10px 16px 4px",
-              fontSize: 11,
-              fontWeight: 600,
-              background: "#0f1419",
-            }}
-          >
-            <time>9:41</time>
-            <span aria-hidden="true">● ● ●</span>
-          </header>
+          <PhonePreviewStatusBar
+            stylePreset={isAndroid ? "android" : "apple"}
+            background="#0f1419"
+            color="#fff"
+            style={{ textShadow: "none" }}
+          />
 
           <div
             className="pa-root"

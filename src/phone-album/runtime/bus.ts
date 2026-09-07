@@ -12,7 +12,15 @@
 
 type Listener = () => void;
 
-const listeners = new Set<Listener>();
+const listenersByRuntime = new WeakMap<object, Set<Listener>>();
+
+function listenersFor(runtimeKey: object): Set<Listener> {
+  const existing = listenersByRuntime.get(runtimeKey);
+  if (existing) return existing;
+  const created = new Set<Listener>();
+  listenersByRuntime.set(runtimeKey, created);
+  return created;
+}
 
 /**
  * 订阅相册总线事件。
@@ -22,14 +30,21 @@ const listeners = new Set<Listener>();
  *
  * @example
  * ```ts
- * const off = subscribeAlbumBus(() => {
- *   setCatalog(buildAlbumCatalog(getCachedAuthorSettings(), getAlbumSaveState()));
+ * const off = subscribeAlbumBus(runtimeKey, () => {
+ *   setCatalog(buildAlbumCatalog(
+ *     getCachedAuthorSettings(runtimeKey),
+ *     getAlbumSaveState(runtimeKey),
+ *   ));
  * });
  * // 卸载时
  * off();
  * ```
  */
-export function subscribeAlbumBus(listener: Listener): () => void {
+export function subscribeAlbumBus(
+  runtimeKey: object,
+  listener: Listener,
+): () => void {
+  const listeners = listenersFor(runtimeKey);
   listeners.add(listener);
   return () => {
     listeners.delete(listener);
@@ -41,7 +56,9 @@ export function subscribeAlbumBus(listener: Listener): () => void {
  *
  * 单个监听器抛错不会中断其他监听器，错误会被 `console.error` 兜底。
  */
-export function emitAlbumBus(): void {
+export function emitAlbumBus(runtimeKey: object): void {
+  const listeners = listenersByRuntime.get(runtimeKey);
+  if (!listeners) return;
   for (const listener of listeners) {
     try {
       listener();
@@ -49,4 +66,10 @@ export function emitAlbumBus(): void {
       console.error("[phone-album] bus listener error", error);
     }
   }
+}
+
+/** 清理一个 Preview 的监听器，供 flow abort / 热重注册使用。 */
+export function disposeAlbumBus(runtimeKey: object): void {
+  listenersByRuntime.get(runtimeKey)?.clear();
+  listenersByRuntime.delete(runtimeKey);
 }

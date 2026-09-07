@@ -15,8 +15,8 @@ import {
 } from "../schema/phone-host-editor-schema.ts";
 
 describe("PHONE_HOST_CONTENT_ITEMS", () => {
-  it("has 12 unique items matching schema", () => {
-    assert.equal(PHONE_HOST_CONTENT_ITEMS.length, 12);
+  it("has 19 unique items matching schema", () => {
+    assert.equal(PHONE_HOST_CONTENT_ITEMS.length, 19);
     assert.equal(
       PHONE_HOST_CONTENT_ITEMS.length,
       PHONE_HOST_EDITOR_SCHEMA.contentItems.length,

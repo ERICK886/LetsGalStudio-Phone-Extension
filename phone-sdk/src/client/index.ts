@@ -18,6 +18,7 @@
 export type {
   NavigateRequest,
   OpenPhoneAppOptions,
+  OpenPhoneAppResult,
   OpenPhoneAppWaitUntil,
   PhoneAppBadge,
   PhoneAppRegistration,
@@ -61,6 +62,11 @@ export {
 export { getPhoneSdkHost, installPhoneSdkHost } from "./runtime/host";
 export { openPhoneApp } from "./runtime/open-phone-app";
 export { closePhoneApp } from "./runtime/close-phone-app";
+export {
+  acquirePhoneCloseLock,
+  isPhoneCloseLocked,
+  subscribePhoneCloseLock,
+} from "./runtime/phone-close-lock";
 export {
   clearPhoneAppBadge,
   formatPhoneAppBadgeLabel,

@@ -137,7 +137,7 @@ function coerceSettingsAsset(value: unknown): string {
  * @example
  * ```ts
  * const settings = readAuthorSettings(ctx);
- * cacheAuthorSettings(settings);
+ * cacheAuthorSettings(getAlbumRuntimeKey(ctx), settings);
  * ```
  */
 export function readAuthorSettings(ctx: ExtensionContext): AlbumAuthorSettings {
@@ -183,7 +183,7 @@ export function readAuthorSettings(ctx: ExtensionContext): AlbumAuthorSettings {
   };
 }
 
-let cachedSettings: AlbumAuthorSettings = {
+const DEFAULT_AUTHOR_SETTINGS: AlbumAuthorSettings = {
   ...DEFAULT_ALBUM_APPEARANCE,
   appTitle: DEFAULT_LABELS.appTitle,
   allAlbumsLabel: DEFAULT_LABELS.allAlbumsLabel,
@@ -192,17 +192,26 @@ let cachedSettings: AlbumAuthorSettings = {
   defaultMedia: [],
 };
 
+const settingsByRuntime = new WeakMap<object, AlbumAuthorSettings>();
+
+function cloneAuthorSettings(settings: AlbumAuthorSettings): AlbumAuthorSettings {
+  return {
+    ...settings,
+    defaultAlbums: settings.defaultAlbums.map((item) => ({ ...item })),
+    defaultMedia: settings.defaultMedia.map((item) => ({ ...item })),
+  };
+}
+
 /**
  * 在方法 / onRegister 中缓存设置，供内页 UI 读取。
  *
  * @param settings - 规范化后的作者设置
  */
-export function cacheAuthorSettings(settings: AlbumAuthorSettings): void {
-  cachedSettings = {
-    ...settings,
-    defaultAlbums: settings.defaultAlbums.map((d) => ({ ...d })),
-    defaultMedia: settings.defaultMedia.map((d) => ({ ...d })),
-  };
+export function cacheAuthorSettings(
+  runtimeKey: object,
+  settings: AlbumAuthorSettings,
+): void {
+  settingsByRuntime.set(runtimeKey, cloneAuthorSettings(settings));
 }
 
 /**
@@ -210,10 +219,13 @@ export function cacheAuthorSettings(settings: AlbumAuthorSettings): void {
  *
  * @returns AlbumAuthorSettings 拷贝
  */
-export function getCachedAuthorSettings(): AlbumAuthorSettings {
-  return {
-    ...cachedSettings,
-    defaultAlbums: cachedSettings.defaultAlbums.map((d) => ({ ...d })),
-    defaultMedia: cachedSettings.defaultMedia.map((d) => ({ ...d })),
-  };
+export function getCachedAuthorSettings(runtimeKey: object): AlbumAuthorSettings {
+  return cloneAuthorSettings(
+    settingsByRuntime.get(runtimeKey) ?? DEFAULT_AUTHOR_SETTINGS,
+  );
+}
+
+/** 清理一个 Preview 的作者设置缓存。 */
+export function disposeAuthorSettings(runtimeKey: object): void {
+  settingsByRuntime.delete(runtimeKey);
 }

@@ -7,6 +7,7 @@
  */
 
 import { getPhoneSdkSlot } from "./slot";
+import { isPhoneCloseLocked } from "./phone-close-lock";
 
 /**
  * 关闭整部手机 UI。
@@ -23,7 +24,9 @@ import { getPhoneSdkSlot } from "./slot";
  * ```
  */
 export async function closePhoneApp(): Promise<void> {
-  const nav = getPhoneSdkSlot().navigation;
+  const slot = getPhoneSdkSlot();
+  if (isPhoneCloseLocked()) return;
+  const nav = slot.navigation;
   if (!nav?.closePhoneApp) {
     console.warn("[phone-sdk] closePhoneApp: 手机宿主未安装，已忽略");
     return;

@@ -20,6 +20,7 @@ import {
 import { readEditableChatFriends } from "../chat/chat-friends-bridge";
 import { useChatArrayPagePanes } from "../chat/use-chat-array-pages";
 import { PhoneAppearancePreview } from "../phone/phone-appearance-preview";
+import { PhoneCallPreview } from "../phone/phone-call-preview";
 import { StoryMessageAppearancePreview } from "../phone/story-message-appearance-preview";
 import { PhoneContentList } from "../phone/phone-content-list";
 import { PhonePageNav } from "../phone/phone-page-nav";
@@ -209,6 +210,14 @@ export function useSchemaEditorPanes(
           values={values}
           mode={chatMode}
           friends={chatFriendsForPreview}
+          refreshToken={revision}
+        />
+      );
+    } else if (previewKind === "phone-call") {
+      center = (
+        <PhoneCallPreview
+          values={values}
+          pageId={page?.id ?? ""}
           refreshToken={revision}
         />
       );

@@ -26,6 +26,8 @@
 
 import React from "react";
 
+import { chakra } from "@chakra-ui/react";
+
 import {
 
   AssetUriField,
@@ -45,6 +47,14 @@ import type { EditableDefaultAlbum } from "./albums-bridge.ts";
 import type { EditableDefaultMedia } from "./media-bridge.ts";
 
 import type { MediaType } from "../types.ts";
+
+const ChakraButton = chakra.button;
+const ChakraDiv = chakra.div;
+const ChakraInput = chakra.input;
+const ChakraLabel = chakra.label;
+const ChakraOption = chakra.option;
+const ChakraSelect = chakra.select;
+const ChakraSpan = chakra.span;
 
 
 
@@ -102,13 +112,13 @@ function Field({
 
   return (
 
-    <div>
+    <ChakraDiv>
 
-      <label style={labelStyle}>{label}</label>
+      <ChakraLabel style={labelStyle}>{label}</ChakraLabel>
 
       {children}
 
-    </div>
+    </ChakraDiv>
 
   );
 
@@ -132,7 +142,7 @@ function EmptyRight({ text }: { text: string }): React.ReactElement {
 
   return (
 
-    <div
+    <ChakraDiv
 
       style={{
 
@@ -156,7 +166,7 @@ function EmptyRight({ text }: { text: string }): React.ReactElement {
 
       {text}
 
-    </div>
+    </ChakraDiv>
 
   );
 
@@ -242,7 +252,7 @@ export function AlbumCatalogList({
 
         return (
 
-          <button
+          <ChakraButton
 
             key={album.uid}
 
@@ -254,19 +264,19 @@ export function AlbumCatalogList({
 
           >
 
-            <span style={{ fontWeight: active ? 600 : 400 }}>
+            <ChakraSpan style={{ fontWeight: active ? 600 : 400 }}>
 
               {album.name.trim() || album.id}
 
-            </span>
+            </ChakraSpan>
 
-            <span style={{ fontSize: 10, color: tokens.textMuted }}>
+            <ChakraSpan style={{ fontSize: 10, color: tokens.textMuted }}>
 
               {album.id}
 
-            </span>
+            </ChakraSpan>
 
-          </button>
+          </ChakraButton>
 
         );
 
@@ -274,11 +284,11 @@ export function AlbumCatalogList({
 
       {albums.length === 0 ? (
 
-        <div style={{ padding: 12, color: tokens.textMuted, fontSize: 12 }}>
+        <ChakraDiv style={{ padding: 12, color: tokens.textMuted, fontSize: 12 }}>
 
           暂无相册，点击下方添加。
 
-        </div>
+        </ChakraDiv>
 
       ) : null}
 
@@ -332,7 +342,7 @@ export function AlbumCatalogPropertyPanel({
 
       <Field label="相册 ID" labelStyle={labelStyle}>
 
-        <input
+        <ChakraInput
 
           type="text"
 
@@ -348,7 +358,7 @@ export function AlbumCatalogPropertyPanel({
 
       <Field label="显示名称" labelStyle={labelStyle}>
 
-        <input
+        <ChakraInput
 
           type="text"
 
@@ -476,7 +486,7 @@ export function AlbumMediaList({
 
         return (
 
-          <button
+          <ChakraButton
 
             key={item.uid}
 
@@ -502,7 +512,7 @@ export function AlbumMediaList({
 
             <AssetUriThumb uri={thumbUri} size={28} tokens={tokens} />
 
-            <span
+            <ChakraSpan
 
               style={{
 
@@ -520,19 +530,21 @@ export function AlbumMediaList({
 
             >
 
-              <span style={{ fontWeight: active ? 600 : 400 }}>{item.id}</span>
+              <ChakraSpan style={{ fontWeight: active ? 600 : 400 }}>
+                {item.id}
+              </ChakraSpan>
 
-              <span style={{ fontSize: 10, color: tokens.textMuted }}>
+              <ChakraSpan style={{ fontSize: 10, color: tokens.textMuted }}>
 
                 {item.type === "video" ? "视频" : "图片"}
 
                 {item.asset.trim() ? "" : " · 未填素材"}
 
-              </span>
+              </ChakraSpan>
 
-            </span>
+            </ChakraSpan>
 
-          </button>
+          </ChakraButton>
 
         );
 
@@ -540,11 +552,11 @@ export function AlbumMediaList({
 
       {media.length === 0 ? (
 
-        <div style={{ padding: 12, color: tokens.textMuted, fontSize: 12 }}>
+        <ChakraDiv style={{ padding: 12, color: tokens.textMuted, fontSize: 12 }}>
 
           暂无媒体，点击下方添加。
 
-        </div>
+        </ChakraDiv>
 
       ) : null}
 
@@ -646,7 +658,7 @@ export function AlbumMediaPropertyPanel({
 
       <Field label="媒体 ID" labelStyle={labelStyle}>
 
-        <input
+        <ChakraInput
 
           type="text"
 
@@ -662,7 +674,7 @@ export function AlbumMediaPropertyPanel({
 
       <Field label="类型" labelStyle={labelStyle}>
 
-        <select
+        <ChakraSelect
 
           style={controlStyle}
 
@@ -672,11 +684,11 @@ export function AlbumMediaPropertyPanel({
 
         >
 
-          <option value="image">图片</option>
+          <ChakraOption value="image">图片</ChakraOption>
 
-          <option value="video">视频</option>
+          <ChakraOption value="video">视频</ChakraOption>
 
-        </select>
+        </ChakraSelect>
 
       </Field>
 
@@ -722,7 +734,7 @@ export function AlbumMediaPropertyPanel({
 
           <Field label="时长（秒）" labelStyle={labelStyle}>
 
-            <input
+            <ChakraInput
 
               type="text"
 
@@ -756,15 +768,15 @@ export function AlbumMediaPropertyPanel({
 
         {albums.length === 0 ? (
 
-          <div style={{ fontSize: 12, color: tokens.textMuted }}>
+          <ChakraDiv style={{ fontSize: 12, color: tokens.textMuted }}>
 
             暂无相册，请先在「默认相册」页添加。
 
-          </div>
+          </ChakraDiv>
 
         ) : (
 
-          <div
+          <ChakraDiv
 
             style={{
 
@@ -788,7 +800,7 @@ export function AlbumMediaPropertyPanel({
 
               return (
 
-                <div
+                <ChakraDiv
 
                   key={album.uid}
 
@@ -806,7 +818,7 @@ export function AlbumMediaPropertyPanel({
 
                 >
 
-                  <label
+                  <ChakraLabel
 
                     style={{
 
@@ -824,7 +836,7 @@ export function AlbumMediaPropertyPanel({
 
                   >
 
-                    <input
+                    <ChakraInput
 
                       type="checkbox"
 
@@ -850,13 +862,13 @@ export function AlbumMediaPropertyPanel({
 
                     />
 
-                    <span>{label}</span>
+                    <ChakraSpan>{label}</ChakraSpan>
 
-                  </label>
+                  </ChakraLabel>
 
                   {album.name.trim() ? (
 
-                    <span
+                    <ChakraSpan
 
                       style={{
 
@@ -870,17 +882,17 @@ export function AlbumMediaPropertyPanel({
 
                       {album.id}
 
-                    </span>
+                    </ChakraSpan>
 
                   ) : null}
 
-                </div>
+                </ChakraDiv>
 
               );
 
             })}
 
-          </div>
+          </ChakraDiv>
 
         )}
 
@@ -936,7 +948,7 @@ function ArrayListShell({
 
   return (
 
-    <div
+    <ChakraDiv
 
       style={{
 
@@ -966,7 +978,7 @@ function ArrayListShell({
 
     >
 
-      <div
+      <ChakraDiv
 
         style={{
 
@@ -988,9 +1000,9 @@ function ArrayListShell({
 
         {title}
 
-      </div>
+      </ChakraDiv>
 
-      <div
+      <ChakraDiv
 
         style={{
 
@@ -1012,17 +1024,17 @@ function ArrayListShell({
 
         {children}
 
-      </div>
+      </ChakraDiv>
 
-      <div style={{ display: "flex", gap: 6, padding: "0 4px 4px" }}>
+      <ChakraDiv style={{ display: "flex", gap: 6, padding: "0 4px 4px" }}>
 
-        <button type="button" onClick={onAdd} style={footerBtn(tokens, false)}>
+        <ChakraButton type="button" onClick={onAdd} style={footerBtn(tokens, false)}>
 
           添加
 
-        </button>
+        </ChakraButton>
 
-        <button
+        <ChakraButton
 
           type="button"
 
@@ -1036,11 +1048,11 @@ function ArrayListShell({
 
           删除
 
-        </button>
+        </ChakraButton>
 
-      </div>
+      </ChakraDiv>
 
-    </div>
+    </ChakraDiv>
 
   );
 
@@ -1074,7 +1086,7 @@ function RightShell({
 
   return (
 
-    <div
+    <ChakraDiv
 
       style={{
 
@@ -1104,7 +1116,7 @@ function RightShell({
 
     >
 
-      <div
+      <ChakraDiv
 
         style={{
 
@@ -1120,11 +1132,11 @@ function RightShell({
 
         {title}
 
-      </div>
+      </ChakraDiv>
 
       {children}
 
-    </div>
+    </ChakraDiv>
 
   );
 
@@ -1150,7 +1162,7 @@ function Hint({
 
   return (
 
-    <div
+    <ChakraDiv
 
       style={{
 
@@ -1168,7 +1180,7 @@ function Hint({
 
       {children}
 
-    </div>
+    </ChakraDiv>
 
   );
 

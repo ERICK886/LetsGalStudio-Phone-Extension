@@ -33,7 +33,7 @@ export function registerChatPhoneApp(): void {
   registerPhoneApp({
     id: PROGRAM_ID,
     title: "聊天APP",
-    description: "手机聊天内页，浏览聊天记录与好友",
+    description: "手机聊天内页，浏览单聊、群聊与好友",
     styleEditor: {
       enabled: true,
       label: "聊天APP",

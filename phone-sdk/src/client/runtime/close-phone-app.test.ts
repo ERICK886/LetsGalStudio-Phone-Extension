@@ -9,6 +9,7 @@ import assert from "node:assert/strict";
 import { describe, it, beforeEach } from "node:test";
 import { PHONE_SDK_GLOBAL_KEY, getPhoneSdkSlot } from "./slot.ts";
 import { closePhoneApp } from "./close-phone-app.ts";
+import { acquirePhoneCloseLock } from "./phone-close-lock.ts";
 
 describe("closePhoneApp", () => {
   beforeEach(() => {
@@ -27,6 +28,24 @@ describe("closePhoneApp", () => {
         called += 1;
       },
     };
+    await closePhoneApp();
+    assert.equal(called, 1);
+  });
+
+  it("ignores close requests until the current close lock is released", async () => {
+    let called = 0;
+    getPhoneSdkSlot().navigation = {
+      async openPhoneApp() {},
+      async closePhoneApp() {
+        called += 1;
+      },
+    };
+    const release = acquirePhoneCloseLock();
+
+    await closePhoneApp();
+    assert.equal(called, 0);
+
+    release();
     await closePhoneApp();
     assert.equal(called, 1);
   });

@@ -15,6 +15,7 @@ import {
   Extension,
   extension,
   settings,
+  type ExtensionProps,
   type ExtensionRenderData,
 } from "@avg-studio/sdk";
 
@@ -56,7 +57,7 @@ export class PhoneEditorExtension extends Extension {
    *
    * @returns ExtensionRenderData
    */
-  render(): ExtensionRenderData {
+  render(): ExtensionRenderData<ExtensionProps> {
     return {
       component: PhoneEditorApp,
       props: {},

@@ -23,6 +23,7 @@ import type {
   EditableChatAvatarAsset,
   EditableChatRolePreset,
 } from "./chat-role-presets-bridge";
+import { ChakraButton, ChakraDiv, ChakraInput, ChakraLabel, ChakraSpan, ChakraTextarea } from "../shared/chakra-elements";
 
 /**
  * 列表主标题：优先显示角色资产名称（否则缩短 id）。
@@ -72,9 +73,9 @@ function CharacterSubtitle({
       : id;
 
   return (
-    <span style={{ fontSize: 10, opacity: 0.85 }}>
+    <ChakraSpan style={{ fontSize: 10, opacity: 0.85 }}>
       {name ? name : `未解析 · ${fallback}`}
-    </span>
+    </ChakraSpan>
   );
 }
 
@@ -98,10 +99,10 @@ function Field({
   children: React.ReactNode;
 }): React.ReactElement {
   return (
-    <div>
-      <label style={labelStyle}>{label}</label>
+    <ChakraDiv>
+      <ChakraLabel style={labelStyle}>{label}</ChakraLabel>
       {children}
-    </div>
+    </ChakraDiv>
   );
 }
 
@@ -111,7 +112,7 @@ function Field({
 function EmptyRight({ text }: { text: string }): React.ReactElement {
   const { tokens } = useTheme();
   return (
-    <div
+    <ChakraDiv
       style={{
         width: "100%",
         height: "100%",
@@ -123,7 +124,7 @@ function EmptyRight({ text }: { text: string }): React.ReactElement {
       }}
     >
       {text}
-    </div>
+    </ChakraDiv>
   );
 }
 
@@ -155,17 +156,17 @@ export function ChatFriendsList({
       {friends.map((friend) => {
         const active = friend.uid === selectedUid;
         return (
-          <button
+          <ChakraButton
             key={friend.uid}
             type="button"
             onClick={() => onSelect(friend.uid)}
             style={rowButtonStyle(tokens, active)}
           >
-            <span style={{ fontWeight: active ? 600 : 400 }}>
+            <ChakraSpan style={{ fontWeight: active ? 600 : 400 }}>
               <CharacterPrimaryLabel characterId={friend.characterId} />
-            </span>
-            <span style={{ fontSize: 10, opacity: 0.85 }}>默认好友</span>
-          </button>
+            </ChakraSpan>
+            <ChakraSpan style={{ fontSize: 10, opacity: 0.85 }}>默认好友</ChakraSpan>
+          </ChakraButton>
         );
       })}
     </ArrayListShell>
@@ -220,15 +221,15 @@ export function ChatAttributesList(props: ChatAttributesListProps): React.ReactE
       {props.fields.map((field) => {
         const active = field.id === props.selectedId;
         return (
-          <button
+          <ChakraButton
             key={field.id}
             type="button"
             onClick={() => props.onSelect(field.id)}
             style={rowButtonStyle(tokens, active)}
           >
-            <span style={{ fontWeight: active ? 600 : 400 }}>{field.label}</span>
-            <span style={{ fontSize: 10, color: tokens.textMuted }}>{field.id}</span>
-          </button>
+            <ChakraSpan style={{ fontWeight: active ? 600 : 400 }}>{field.label}</ChakraSpan>
+            <ChakraSpan style={{ fontSize: 10, color: tokens.textMuted }}>{field.id}</ChakraSpan>
+          </ChakraButton>
         );
       })}
     </ArrayListShell>
@@ -249,7 +250,7 @@ export function ChatAttributesPropertyPanel({
   return (
     <RightShell title="属性槽" tokens={tokens}>
       <Field label="槽位 ID" labelStyle={labelStyle}>
-        <input
+        <ChakraInput
           type="text"
           style={controlStyle}
           value={field.id}
@@ -257,7 +258,7 @@ export function ChatAttributesPropertyPanel({
         />
       </Field>
       <Field label="显示名称" labelStyle={labelStyle}>
-        <input
+        <ChakraInput
           type="text"
           style={controlStyle}
           value={field.label}
@@ -265,7 +266,7 @@ export function ChatAttributesPropertyPanel({
         />
       </Field>
       <Field label="变量名" labelStyle={labelStyle}>
-        <input
+        <ChakraInput
           type="text"
           style={controlStyle}
           value={field.variableKey}
@@ -310,7 +311,7 @@ export function ChatRolePresetsList({
   const selectedId = mode === "presets" ? selectedPresetId : selectedAvatarId;
 
   return (
-    <div
+    <ChakraDiv
       style={{
         width: "100%",
         height: "100%",
@@ -320,7 +321,7 @@ export function ChatRolePresetsList({
         minHeight: 0,
       }}
     >
-      <div style={{ display: "flex", gap: 4, padding: "0 4px" }}>
+      <ChakraDiv style={{ display: "flex", gap: 4, padding: "0 4px" }}>
         {(
           [
             { id: "presets" as const, label: "角色预设" },
@@ -329,7 +330,7 @@ export function ChatRolePresetsList({
         ).map((tab) => {
           const active = mode === tab.id;
           return (
-            <button
+            <ChakraButton
               key={tab.id}
               type="button"
               onClick={() => onModeChange(tab.id)}
@@ -346,11 +347,11 @@ export function ChatRolePresetsList({
               }}
             >
               {tab.label}
-            </button>
+            </ChakraButton>
           );
         })}
-      </div>
-      <div style={{ flex: 1, minHeight: 0 }}>
+      </ChakraDiv>
+      <ChakraDiv style={{ flex: 1, minHeight: 0 }}>
         <ArrayListShell
           title={mode === "presets" ? "消息角色预设" : "聊天头像素材库"}
           onAdd={onAdd}
@@ -361,23 +362,23 @@ export function ChatRolePresetsList({
             ? presets.map((preset) => {
                 const active = preset.id === selectedPresetId;
                 return (
-                  <button
+                  <ChakraButton
                     key={preset.id}
                     type="button"
                     onClick={() => onSelectPreset(preset.id)}
                     style={rowButtonStyle(tokens, active)}
                   >
-                    <span style={{ fontWeight: active ? 600 : 400 }}>
+                    <ChakraSpan style={{ fontWeight: active ? 600 : 400 }}>
                       {preset.id}
-                    </span>
+                    </ChakraSpan>
                     <CharacterSubtitle characterId={preset.characterId} />
-                  </button>
+                  </ChakraButton>
                 );
               })
             : avatars.map((avatar) => {
                 const active = avatar.id === selectedAvatarId;
                 return (
-                  <button
+                  <ChakraButton
                     key={avatar.id}
                     type="button"
                     onClick={() => onSelectAvatar(avatar.id)}
@@ -390,7 +391,7 @@ export function ChatRolePresetsList({
                     }}
                   >
                     <AssetUriThumb uri={avatar.asset} size={28} tokens={tokens} />
-                    <span
+                    <ChakraSpan
                       style={{
                         display: "flex",
                         flexDirection: "column",
@@ -399,10 +400,10 @@ export function ChatRolePresetsList({
                         flex: 1,
                       }}
                     >
-                      <span style={{ fontWeight: active ? 600 : 400 }}>
+                      <ChakraSpan style={{ fontWeight: active ? 600 : 400 }}>
                         {avatar.id}
-                      </span>
-                      <span
+                      </ChakraSpan>
+                      <ChakraSpan
                         style={{
                           fontSize: 10,
                           color: tokens.textMuted,
@@ -412,19 +413,19 @@ export function ChatRolePresetsList({
                         }}
                       >
                         {avatar.asset || "未填素材"}
-                      </span>
-                    </span>
-                  </button>
+                      </ChakraSpan>
+                    </ChakraSpan>
+                  </ChakraButton>
                 );
               })}
           {items.length === 0 ? (
-            <div style={{ padding: 12, color: tokens.textMuted, fontSize: 12 }}>
+            <ChakraDiv style={{ padding: 12, color: tokens.textMuted, fontSize: 12 }}>
               暂无条目，点击下方添加。
-            </div>
+            </ChakraDiv>
           ) : null}
         </ArrayListShell>
-      </div>
-    </div>
+      </ChakraDiv>
+    </ChakraDiv>
   );
 }
 
@@ -449,7 +450,7 @@ export function ChatRolePresetPropertyPanel({
   return (
     <RightShell title="角色预设" tokens={tokens}>
       <Field label="预设 ID" labelStyle={labelStyle}>
-        <input
+        <ChakraInput
           type="text"
           style={controlStyle}
           value={preset.id}
@@ -479,7 +480,7 @@ export function ChatRolePresetPropertyPanel({
       </Field>
       {preset.avatarSource === "asset" ? (
         <Field label="头像素材 ID" labelStyle={labelStyle}>
-          <input
+          <ChakraInput
             type="text"
             style={controlStyle}
             value={preset.avatarAssetId}
@@ -501,7 +502,7 @@ export function ChatRolePresetPropertyPanel({
         tokens={tokens}
       />
       <Field label="字体大小" labelStyle={labelStyle}>
-        <input
+        <ChakraInput
           type="text"
           style={controlStyle}
           value={preset.fontSize}
@@ -533,7 +534,7 @@ export function ChatRolePresetPropertyPanel({
         />
       </Field>
       <Field label="自定义 CSS" labelStyle={labelStyle}>
-        <textarea
+        <ChakraTextarea
           style={{ ...controlStyle, minHeight: 72, resize: "vertical" }}
           value={preset.customCss}
           onChange={(e) => onChange({ customCss: e.target.value })}
@@ -560,7 +561,7 @@ export function ChatAvatarAssetPropertyPanel({
   return (
     <RightShell title="头像素材" tokens={tokens}>
       <Field label="素材 ID" labelStyle={labelStyle}>
-        <input
+        <ChakraInput
           type="text"
           style={controlStyle}
           value={asset.id}
@@ -598,7 +599,7 @@ function ArrayListShell({
 }): React.ReactElement {
   const { tokens } = useTheme();
   return (
-    <div
+    <ChakraDiv
       style={{
         width: "100%",
         height: "100%",
@@ -613,7 +614,7 @@ function ArrayListShell({
         borderRadius: 6,
       }}
     >
-      <div
+      <ChakraDiv
         style={{
           fontSize: 11,
           fontWeight: 600,
@@ -624,8 +625,8 @@ function ArrayListShell({
         }}
       >
         {title}
-      </div>
-      <div
+      </ChakraDiv>
+      <ChakraDiv
         style={{
           flex: "1 1 auto",
           minHeight: 0,
@@ -636,21 +637,21 @@ function ArrayListShell({
         }}
       >
         {children}
-      </div>
-      <div style={{ display: "flex", gap: 6, padding: "0 4px 4px" }}>
-        <button type="button" onClick={onAdd} style={footerBtn(tokens, false)}>
+      </ChakraDiv>
+      <ChakraDiv style={{ display: "flex", gap: 6, padding: "0 4px 4px" }}>
+        <ChakraButton type="button" onClick={onAdd} style={footerBtn(tokens, false)}>
           <IconLabel icon="plus">添加</IconLabel>
-        </button>
-        <button
+        </ChakraButton>
+        <ChakraButton
           type="button"
           disabled={deleteDisabled}
           onClick={onDelete}
           style={footerBtn(tokens, deleteDisabled)}
         >
           <IconLabel icon="trash">删除</IconLabel>
-        </button>
-      </div>
-    </div>
+        </ChakraButton>
+      </ChakraDiv>
+    </ChakraDiv>
   );
 }
 
@@ -664,7 +665,7 @@ function RightShell({
   children: React.ReactNode;
 }): React.ReactElement {
   return (
-    <div
+    <ChakraDiv
       style={{
         width: "100%",
         height: "100%",
@@ -679,7 +680,7 @@ function RightShell({
         borderRadius: 6,
       }}
     >
-      <div
+      <ChakraDiv
         style={{
           fontSize: FONT_SIZE_TITLE,
           fontWeight: 600,
@@ -687,9 +688,9 @@ function RightShell({
         }}
       >
         {title}
-      </div>
+      </ChakraDiv>
       {children}
-    </div>
+    </ChakraDiv>
   );
 }
 
@@ -701,7 +702,7 @@ function Hint({
   children: React.ReactNode;
 }): React.ReactElement {
   return (
-    <div
+    <ChakraDiv
       style={{
         marginTop: "auto",
         fontSize: 11,
@@ -710,7 +711,7 @@ function Hint({
       }}
     >
       {children}
-    </div>
+    </ChakraDiv>
   );
 }
 
@@ -742,7 +743,7 @@ function BooleanField({
   tokens: ReturnType<typeof useTheme>["tokens"];
 }): React.ReactElement {
   return (
-    <label
+    <ChakraLabel
       style={{
         display: "flex",
         alignItems: "center",
@@ -751,13 +752,13 @@ function BooleanField({
         color: tokens.textPrimary,
       }}
     >
-      <input
+      <ChakraInput
         type="checkbox"
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
       />
-      <span>{label}</span>
-    </label>
+      <ChakraSpan>{label}</ChakraSpan>
+    </ChakraLabel>
   );
 }
 

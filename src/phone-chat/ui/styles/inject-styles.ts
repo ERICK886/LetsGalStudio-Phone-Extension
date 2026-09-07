@@ -187,6 +187,16 @@ const CSS_TEXT = `
   gap: 4px;
 }
 .chat-msg[data-direction="outgoing"] .chat-msg-col { align-items: flex-end; }
+.chat-msg-sender {
+  max-width: 100%;
+  padding: 0 2px;
+  color: #777;
+  font-size: 11px;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .chat-bubble {
   padding: 10px 12px;
   border-radius: 6px;

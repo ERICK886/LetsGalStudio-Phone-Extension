@@ -7,6 +7,7 @@
  */
 
 import React from "react";
+import { isPhoneCloseLocked } from "@ink-zenly/phone-sdk/plugin";
 import { PhoneErrorBoundary } from "./components/phone-error-boundary";
 import type { PhoneUIProps } from "../extension/phone-extension";
 import { PhoneUIContent } from "./phone-ui-content";
@@ -15,8 +16,13 @@ import { PhoneUIContent } from "./phone-ui-content";
  * 对外导出的手机 UI 根组件。
  * 只应由 PhoneExtension.render 传入完整 PhoneUIProps；错误边界会隔离渲染期异常。
  */
-export const PhoneUI: React.FC<PhoneUIProps> = (props) => (
-  <PhoneErrorBoundary closePhone={props.closePhone}>
-    <PhoneUIContent {...props} />
-  </PhoneErrorBoundary>
-);
+export const PhoneUI: React.FC<PhoneUIProps> = (props) => {
+  const closePhone = () => {
+    if (!isPhoneCloseLocked()) props.closePhone();
+  };
+  return (
+    <PhoneErrorBoundary closePhone={closePhone}>
+      <PhoneUIContent {...props} />
+    </PhoneErrorBoundary>
+  );
+};

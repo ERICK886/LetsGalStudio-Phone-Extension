@@ -35,6 +35,7 @@ import { DesktopAppsList } from "./desktop-apps-list";
 import { DesktopAppsPropertyPanel } from "./desktop-apps-property-panel";
 import { PhoneAppearancePreview } from "./phone-appearance-preview";
 import { useTheme, FONT_SIZE_DEFAULT } from "../theme/theme-provider";
+import { ChakraButton, ChakraDiv } from "../shared/chakra-elements";
 
 /** 桌面应用页子模式 */
 export type DesktopCatalogMode = "apps" | "actions";
@@ -252,7 +253,7 @@ export function useDesktopCatalogEditor(
   const previewToken = appearanceRevision + catalogRevision;
 
   const modeTabs = (
-    <div
+    <ChakraDiv
       style={{
         display: "flex",
         gap: 4,
@@ -268,7 +269,7 @@ export function useDesktopCatalogEditor(
       ).map((tab) => {
         const active = mode === tab.id;
         return (
-          <button
+          <ChakraButton
             key={tab.id}
             type="button"
             onClick={() => setMode(tab.id)}
@@ -285,15 +286,15 @@ export function useDesktopCatalogEditor(
             }}
           >
             {tab.label}
-          </button>
+          </ChakraButton>
         );
       })}
-    </div>
+    </ChakraDiv>
   );
 
   const left =
     mode === "apps" ? (
-      <div
+      <ChakraDiv
         style={{
           width: "100%",
           height: "100%",
@@ -304,7 +305,7 @@ export function useDesktopCatalogEditor(
         }}
       >
         {modeTabs}
-        <div style={{ flex: 1, minHeight: 0 }}>
+        <ChakraDiv style={{ flex: 1, minHeight: 0 }}>
           <DesktopAppsList
             apps={catalogApps}
             selectedId={selectedAppId}
@@ -312,10 +313,10 @@ export function useDesktopCatalogEditor(
             onAdd={handleAddApp}
             onDelete={handleDeleteApp}
           />
-        </div>
-      </div>
+        </ChakraDiv>
+      </ChakraDiv>
     ) : (
-      <div
+      <ChakraDiv
         style={{
           width: "100%",
           height: "100%",
@@ -326,7 +327,7 @@ export function useDesktopCatalogEditor(
         }}
       >
         {modeTabs}
-        <div style={{ flex: 1, minHeight: 0 }}>
+        <ChakraDiv style={{ flex: 1, minHeight: 0 }}>
           <DesktopActionsList
             actions={catalogActions}
             selectedId={selectedActionId}
@@ -336,8 +337,8 @@ export function useDesktopCatalogEditor(
             onAdd={handleAddAction}
             onDelete={handleDeleteAction}
           />
-        </div>
-      </div>
+        </ChakraDiv>
+      </ChakraDiv>
     );
 
   const center = (

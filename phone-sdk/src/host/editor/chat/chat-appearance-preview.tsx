@@ -22,9 +22,11 @@ import {
   readPhoneAppearanceValues,
 } from "../phone/phone-settings-bridge";
 import previewOverrideCss from "../phone/phone-editor-preview.css?inline";
+import { PhonePreviewStatusBar } from "../phone/phone-preview-status-bar";
 import chatPreviewCss from "./chat-editor-preview.css?inline";
 import type { EditableChatAttribute } from "./chat-attributes-bridge";
 import type { EditableChatFriend } from "./chat-friends-bridge";
+import type { EditableChatGroup } from "./chat-groups-bridge";
 import type { EditableChatRolePreset } from "./chat-role-presets-bridge";
 import { formatCharacterListLabel } from "./character-label";
 
@@ -44,34 +46,11 @@ export interface ChatAppearancePreviewProps {
   values: Record<string, string>;
   mode: ChatPreviewMode;
   friends?: readonly EditableChatFriend[];
+  groups?: readonly EditableChatGroup[];
   attributes?: readonly EditableChatAttribute[];
   /** 气泡预览用选中预设；无则示意默认样式 */
   selectedPreset?: EditableChatRolePreset | null;
   refreshToken?: number | string;
-}
-
-/**
- * 状态栏图标（与桌面预览一致）。
- */
-function PhoneStatusIcons(): React.ReactElement {
-  return (
-    <span className="phone-status-icons" aria-hidden="true">
-      <svg
-        className="phone-status-icon phone-signal-icon"
-        xmlns="http://www.w3.org/2000/svg"
-        width="1em"
-        height="1em"
-        viewBox="0 0 1024 1024"
-        focusable="false"
-      >
-        <path d="M0 0h1024v1024H0z" fill="none" />
-        <path
-          fill="#fff"
-          d="M584 352H440c-17.7 0-32 14.3-32 32v544c0 17.7 14.3 32 32 32h144c17.7 0 32-14.3 32-32V384c0-17.7-14.3-32-32-32M892 64H748c-17.7 0-32 14.3-32 32v832c0 17.7 14.3 32 32 32h144c17.7 0 32-14.3 32-32V96c0-17.7-14.3-32-32-32M276 640H132c-17.7 0-32 14.3-32 32v256c0 17.7 14.3 32 32 32h144c17.7 0 32-14.3 32-32V672c0-17.7-14.3-32-32-32"
-        />
-      </svg>
-    </span>
-  );
 }
 
 /**
@@ -84,19 +63,14 @@ export function ChatAppearancePreview({
   values,
   mode,
   friends = [],
+  groups = [],
   attributes = [],
   selectedPreset = null,
   refreshToken = 0,
 }: ChatAppearancePreviewProps): React.ReactElement {
   const ctx = useExtensionContext();
   const { tokens } = useTheme();
-  const [clock, setClock] = useState(() => new Date());
   const [previewTab, setPreviewTab] = useState<"chats" | "friends">("chats");
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setClock(new Date()), 30_000);
-    return () => window.clearInterval(timer);
-  }, []);
 
   useEffect(() => {
     if (mode === "home-friends" || mode === "attributes") {
@@ -272,25 +246,42 @@ export function ChatAppearancePreview({
                 );
               })
             )
-          ) : friends.length === 0 ? (
+          ) : friends.length === 0 && groups.length === 0 ? (
             <div className="phone-chat-preview-empty">{emptyChats}</div>
           ) : (
-            friends.map((friend) => {
-              const label = friendLabel(friend.characterId);
-              return (
-              <div key={friend.uid} className="phone-chat-preview-row">
-                <span className="phone-chat-preview-avatar">
-                  {firstGlyph(label)}
-                </span>
-                <div className="phone-chat-preview-row-text">
-                  <div className="phone-chat-preview-row-title">
-                    {label}
+            <>
+              {groups.map((group) => (
+                <div key={group.uid} className="phone-chat-preview-row">
+                  <span className="phone-chat-preview-avatar">
+                    {firstGlyph(group.title || group.groupId)}
+                  </span>
+                  <div className="phone-chat-preview-row-text">
+                    <div className="phone-chat-preview-row-title">
+                      {group.title || group.groupId}
+                    </div>
+                    <div className="phone-chat-preview-row-sub">
+                      群聊 · {group.memberCharacterIds.length} 名成员
+                    </div>
                   </div>
-                  <div className="phone-chat-preview-row-sub">会话示意</div>
                 </div>
-              </div>
-              );
-            })
+              ))}
+              {friends.map((friend) => {
+                const label = friendLabel(friend.characterId);
+                return (
+                  <div key={friend.uid} className="phone-chat-preview-row">
+                    <span className="phone-chat-preview-avatar">
+                      {firstGlyph(label)}
+                    </span>
+                    <div className="phone-chat-preview-row-text">
+                      <div className="phone-chat-preview-row-title">
+                        {label}
+                      </div>
+                      <div className="phone-chat-preview-row-sub">会话示意</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </>
           )}
         </div>
         <div className="phone-chat-preview-tabs">
@@ -348,15 +339,7 @@ export function ChatAppearancePreview({
 
         <section className="phone-shell" aria-label={`${phoneTitle} · 聊天预览`}>
           <div className="phone-screen" style={screenStyle}>
-            <header className="phone-status">
-              <time>
-                {clock.toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </time>
-              <PhoneStatusIcons />
-            </header>
+            <PhonePreviewStatusBar stylePreset={stylePreset} />
             <div className="phone-chat-preview-body">{body}</div>
           </div>
         </section>

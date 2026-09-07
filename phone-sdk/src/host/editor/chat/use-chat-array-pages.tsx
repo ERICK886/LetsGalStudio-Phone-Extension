@@ -1,6 +1,6 @@
 /**
  * @file use-chat-array-pages.tsx
- * @description 聊天分区数组页（好友 / 属性 / 角色预设）的左中右编排。
+ * @description 聊天分区数组页（好友 / 群聊 / 属性 / 角色预设）的左中右编排。
  * @author 池水三两升
  * @date 2026-08-10
  * @version 0.1.0
@@ -36,6 +36,17 @@ import {
   type EditableChatFriend,
 } from "./chat-friends-bridge";
 import {
+  createBlankChatGroup,
+  editableChatGroupUid,
+  readEditableChatGroups,
+  writeEditableChatGroups,
+  type EditableChatGroup,
+} from "./chat-groups-bridge";
+import {
+  ChatGroupPropertyPanel,
+  ChatGroupsList,
+} from "./chat-group-panels";
+import {
   createBlankChatAvatarAsset,
   createBlankChatRolePreset,
   readEditableChatAvatarAssets,
@@ -50,6 +61,7 @@ import { StoryMessageAppearancePreview } from "../phone/story-message-appearance
 /** 聊天 / 消息手机数组页 id（好友·属性属聊天 APP；角色预设属消息手机）。 */
 export const CHAT_ARRAY_PAGE_IDS = new Set([
   "chat-friends",
+  "chat-groups",
   "chat-attributes",
   "story-role-presets",
 ]);
@@ -90,6 +102,7 @@ export function useChatArrayPagePanes(
   const ctx = useExtensionContext();
   const [revision, setRevision] = useState(0);
   const [selectedFriendUid, setSelectedFriendUid] = useState("");
+  const [selectedGroupUid, setSelectedGroupUid] = useState("");
   const [selectedAttrId, setSelectedAttrId] = useState("");
   const [roleMode, setRoleMode] = useState<ChatRoleSubMode>("presets");
   const [selectedPresetId, setSelectedPresetId] = useState("");
@@ -103,6 +116,11 @@ export function useChatArrayPagePanes(
   const attributes = useMemo(() => {
     void revision;
     return readEditableChatAttributes(ctx);
+  }, [ctx, revision]);
+
+  const groups = useMemo(() => {
+    void revision;
+    return readEditableChatGroups(ctx);
   }, [ctx, revision]);
 
   const presets = useMemo(() => {
@@ -124,6 +142,16 @@ export function useChatArrayPagePanes(
       setSelectedFriendUid(friends[0]!.uid);
     }
   }, [friends, selectedFriendUid]);
+
+  useEffect(() => {
+    if (groups.length === 0) {
+      setSelectedGroupUid("");
+      return;
+    }
+    if (!groups.some((group) => group.uid === selectedGroupUid)) {
+      setSelectedGroupUid(groups[0]!.uid);
+    }
+  }, [groups, selectedGroupUid]);
 
   useEffect(() => {
     if (attributes.length === 0) return;
@@ -170,6 +198,14 @@ export function useChatArrayPagePanes(
     [bump, ctx],
   );
 
+  const persistGroups = useCallback(
+    (next: EditableChatGroup[]) => {
+      writeEditableChatGroups(ctx, next);
+      bump();
+    },
+    [bump, ctx],
+  );
+
   const persistPresets = useCallback(
     (next: EditableChatRolePreset[]) => {
       writeEditableChatRolePresets(ctx, next);
@@ -189,6 +225,8 @@ export function useChatArrayPagePanes(
   const previewToken = appearanceRevision + revision;
   const selectedFriend =
     friends.find((f) => f.uid === selectedFriendUid) ?? null;
+  const selectedGroup =
+    groups.find((group) => group.uid === selectedGroupUid) ?? null;
   const selectedAttr =
     attributes.find((a) => a.id === selectedAttrId) ?? null;
   const selectedPreset =
@@ -202,6 +240,7 @@ export function useChatArrayPagePanes(
 
   let previewMode: ChatPreviewMode = "home-chats";
   if (pageId === "chat-friends") previewMode = "home-friends";
+  else if (pageId === "chat-groups") previewMode = "home-chats";
   else if (pageId === "chat-attributes") previewMode = "attributes";
 
   const center =
@@ -217,6 +256,7 @@ export function useChatArrayPagePanes(
         values={copyValues}
         mode={previewMode}
         friends={friends}
+        groups={groups}
         attributes={attributes}
         selectedPreset={selectedPreset}
         refreshToken={previewToken}
@@ -266,6 +306,59 @@ export function useChatArrayPagePanes(
             }
             persistFriends(
               friends.map((f) => (f.uid === selectedFriend.uid ? merged : f)),
+            );
+          }}
+        />
+      ),
+    };
+  }
+
+  if (pageId === "chat-groups") {
+    return {
+      revision,
+      center,
+      left: (
+        <ChatGroupsList
+          groups={groups}
+          selectedUid={selectedGroupUid}
+          onSelect={setSelectedGroupUid}
+          onAdd={() => {
+            const ids = new Set(groups.map((group) => group.groupId));
+            const blank = createBlankChatGroup(ids);
+            persistGroups([...groups, blank]);
+            setSelectedGroupUid(blank.uid);
+          }}
+          onDelete={(uid) => {
+            persistGroups(groups.filter((group) => group.uid !== uid));
+          }}
+        />
+      ),
+      right: (
+        <ChatGroupPropertyPanel
+          group={selectedGroup}
+          onChange={(patch) => {
+            if (!selectedGroup) return;
+            const merged = { ...selectedGroup, ...patch };
+            if (!merged.groupId.trim()) merged.groupId = selectedGroup.groupId;
+            if (!merged.title.trim()) merged.title = merged.groupId;
+            if (
+              patch.groupId !== undefined &&
+              patch.groupId !== selectedGroup.groupId &&
+              groups.some(
+                (group) =>
+                  group.uid !== selectedGroup.uid &&
+                  group.groupId === merged.groupId,
+              )
+            ) {
+              merged.groupId = selectedGroup.groupId;
+            }
+            if (patch.groupId !== undefined) {
+              setSelectedGroupUid(editableChatGroupUid(merged.groupId));
+            }
+            persistGroups(
+              groups.map((group) =>
+                group.uid === selectedGroup.uid ? merged : group,
+              ),
             );
           }}
         />

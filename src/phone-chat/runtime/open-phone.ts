@@ -9,6 +9,26 @@
 import { closePhoneApp, openPhoneApp } from "@ink-zenly/phone-sdk/plugin";
 
 import { PROGRAM_ID } from "../constants";
+import {
+  directConversationId,
+  groupConversationId,
+} from "../domain/conversations";
+
+export async function openChatConversation(options: {
+  conversationId: string;
+  waitUntil: "close" | "none";
+}): Promise<void> {
+  const conversationId = options.conversationId.trim();
+  if (!conversationId) return;
+  const result = await openPhoneApp({
+    appId: PROGRAM_ID,
+    waitUntil: options.waitUntil,
+    payload: { conversationId },
+  });
+  if (result !== "opened") {
+    throw new Error(`无法打开聊天界面（${result}）`);
+  }
+}
 
 /**
  * 打开聊天内页并携带目标好友 ID 作为深链 payload。
@@ -30,10 +50,22 @@ export async function openChatPhoneApp(options: {
 }): Promise<void> {
   const friendCharacterId = options.friendCharacterId.trim();
   if (!friendCharacterId) return;
-  await openPhoneApp({
-    appId: PROGRAM_ID,
+  await openChatConversation({
+    conversationId: directConversationId(friendCharacterId),
     waitUntil: options.waitUntil,
-    payload: { friendCharacterId },
+  });
+}
+
+/** 打开指定群聊。 */
+export async function openGroupChatPhoneApp(options: {
+  groupId: string;
+  waitUntil: "close" | "none";
+}): Promise<void> {
+  const groupId = options.groupId.trim();
+  if (!groupId) return;
+  await openChatConversation({
+    conversationId: groupConversationId(groupId),
+    waitUntil: options.waitUntil,
   });
 }
 

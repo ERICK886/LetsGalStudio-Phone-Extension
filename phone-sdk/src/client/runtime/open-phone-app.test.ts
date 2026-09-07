@@ -16,7 +16,11 @@ describe("openPhoneApp", () => {
   });
 
   it("resolves when navigation host missing", async () => {
-    await openPhoneApp({ appId: "chat" });
+    assert.equal(await openPhoneApp({ appId: "chat" }), "unavailable");
+  });
+
+  it("returns invalid for an empty app id", async () => {
+    assert.equal(await openPhoneApp({ appId: "  " }), "invalid");
   });
 
   it("delegates to slot.navigation", async () => {
@@ -27,7 +31,20 @@ describe("openPhoneApp", () => {
       },
       async closePhoneApp() {},
     };
-    await openPhoneApp({ appId: "chat", waitUntil: "none" });
+    assert.equal(
+      await openPhoneApp({ appId: "chat", waitUntil: "none" }),
+      "opened",
+    );
     assert.deepEqual(calls, [{ appId: "chat", waitUntil: "none" }]);
+  });
+
+  it("preserves a host rejection result", async () => {
+    getPhoneSdkSlot().navigation = {
+      async openPhoneApp() {
+        return "blocked";
+      },
+      async closePhoneApp() {},
+    };
+    assert.equal(await openPhoneApp({ appId: "chat" }), "blocked");
   });
 });

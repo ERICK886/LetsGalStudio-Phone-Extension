@@ -12,18 +12,35 @@
 /** 相册内页主 Tab。 */
 export type AlbumMainTab = "album" | "camera";
 
-let resumeTab: AlbumMainTab = "album";
-let lastShotThumb: string | undefined;
-let lastShotMediaId: string | undefined;
-let captureBusy = false;
+interface CameraSessionRuntime {
+  resumeTab: AlbumMainTab;
+  lastShotThumb: string | undefined;
+  lastShotMediaId: string | undefined;
+  captureBusy: boolean;
+}
+
+const sessionsByRuntime = new WeakMap<object, CameraSessionRuntime>();
+
+function sessionFor(runtimeKey: object): CameraSessionRuntime {
+  const existing = sessionsByRuntime.get(runtimeKey);
+  if (existing) return existing;
+  const created: CameraSessionRuntime = {
+    resumeTab: "album",
+    lastShotThumb: undefined,
+    lastShotMediaId: undefined,
+    captureBusy: false,
+  };
+  sessionsByRuntime.set(runtimeKey, created);
+  return created;
+}
 
 /**
  * 标记重开后应落在哪个 Tab（拍照前设为 `camera`）。
  *
  * @param tab - 主 Tab
  */
-export function setResumeTab(tab: AlbumMainTab): void {
-  resumeTab = tab;
+export function setResumeTab(runtimeKey: object, tab: AlbumMainTab): void {
+  sessionFor(runtimeKey).resumeTab = tab;
 }
 
 /**
@@ -31,9 +48,10 @@ export function setResumeTab(tab: AlbumMainTab): void {
  *
  * @returns 应激活的主 Tab
  */
-export function consumeResumeTab(): AlbumMainTab {
-  const tab = resumeTab;
-  resumeTab = "album";
+export function consumeResumeTab(runtimeKey: object): AlbumMainTab {
+  const session = sessionFor(runtimeKey);
+  const tab = session.resumeTab;
+  session.resumeTab = "album";
   return tab;
 }
 
@@ -43,19 +61,24 @@ export function consumeResumeTab(): AlbumMainTab {
  * @param dataUrl - 图片 Data URL
  * @param mediaId - 媒体 id
  */
-export function rememberLastShot(dataUrl: string, mediaId: string): void {
-  lastShotThumb = dataUrl;
-  lastShotMediaId = mediaId;
+export function rememberLastShot(
+  runtimeKey: object,
+  dataUrl: string,
+  mediaId: string,
+): void {
+  const session = sessionFor(runtimeKey);
+  session.lastShotThumb = dataUrl;
+  session.lastShotMediaId = mediaId;
 }
 
 /** @returns 最近一张拍摄缩略 Data URL */
-export function getLastShotThumb(): string | undefined {
-  return lastShotThumb;
+export function getLastShotThumb(runtimeKey: object): string | undefined {
+  return sessionFor(runtimeKey).lastShotThumb;
 }
 
 /** @returns 最近一张拍摄的媒体 id */
-export function getLastShotMediaId(): string | undefined {
-  return lastShotMediaId;
+export function getLastShotMediaId(runtimeKey: object): string | undefined {
+  return sessionFor(runtimeKey).lastShotMediaId;
 }
 
 /**
@@ -63,16 +86,17 @@ export function getLastShotMediaId(): string | undefined {
  *
  * @param mediaId - 被删媒体 id
  */
-export function clearLastShotIf(mediaId: string): void {
-  if (lastShotMediaId === mediaId) {
-    lastShotMediaId = undefined;
-    lastShotThumb = undefined;
+export function clearLastShotIf(runtimeKey: object, mediaId: string): void {
+  const session = sessionFor(runtimeKey);
+  if (session.lastShotMediaId === mediaId) {
+    session.lastShotMediaId = undefined;
+    session.lastShotThumb = undefined;
   }
 }
 
 /** @returns 是否正在拍照（防连点） */
-export function isCaptureBusy(): boolean {
-  return captureBusy;
+export function isCaptureBusy(runtimeKey: object): boolean {
+  return sessionFor(runtimeKey).captureBusy;
 }
 
 /**
@@ -80,6 +104,11 @@ export function isCaptureBusy(): boolean {
  *
  * @param busy - 是否忙碌
  */
-export function setCaptureBusy(busy: boolean): void {
-  captureBusy = busy;
+export function setCaptureBusy(runtimeKey: object, busy: boolean): void {
+  sessionFor(runtimeKey).captureBusy = busy;
+}
+
+/** 清理一个 Preview 的拍照短会话。 */
+export function disposeCameraSession(runtimeKey: object): void {
+  sessionsByRuntime.delete(runtimeKey);
 }

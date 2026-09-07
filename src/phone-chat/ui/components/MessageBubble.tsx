@@ -1,9 +1,6 @@
 /**
  * @file MessageBubble.tsx
- * @description 单条气泡（对方 / 我方 + 状态）。
- * @author 池水三两升
- * @date 2026-08-05
- * @version 0.1.0
+ * @description 单聊 / 群聊消息气泡与发送者身份。
  */
 
 import { useExtensionContext } from "@avg-studio/sdk";
@@ -18,56 +15,83 @@ import { StatusLabel } from "./StatusLabel";
 
 export interface MessageBubbleProps {
   message: ChatMessage;
-  friendCharacterId: string;
-  /** 是否播放入场动画 */
+  /** 单聊对方；群聊消息优先使用 message.senderCharacterId。 */
+  peerCharacterId?: string;
+  showSenderName?: boolean;
   animate?: boolean;
 }
 
-/**
- * @param props - MessageBubbleProps
- * @returns 气泡节点
- */
-export function MessageBubble(props: MessageBubbleProps) {
+function BubbleContent({ message }: { message: ChatMessage }) {
   const ctx = useExtensionContext();
-  const friendView = useCharacterView(ctx, props.friendCharacterId);
-  const selfView = useSelfCharacterView(ctx);
-  const isOutgoing = props.message.direction === "outgoing";
-  const glyph = isOutgoing ? selfView.glyph : friendView.glyph;
-  const avatarUrl = isOutgoing ? selfView.avatarUrl : friendView.avatarUrl;
-  const isImage = props.message.contentType === "image";
-  const imageUrl = isImage
-    ? resolveAssetUrl(ctx, props.message.imageAsset)
-    : undefined;
+  const isImage = message.contentType === "image";
+  const imageUrl = isImage ? resolveAssetUrl(ctx, message.imageAsset) : undefined;
   const [imageLoadFailed, setImageLoadFailed] = useState(false);
-
   useEffect(() => setImageLoadFailed(false), [imageUrl]);
 
   return (
+    <div className="chat-bubble">
+      {isImage ? (
+        imageLoadFailed || !imageUrl ? (
+          "图片加载失败"
+        ) : (
+          <img
+            className="chat-bubble-img"
+            src={imageUrl}
+            alt=""
+            onError={() => setImageLoadFailed(true)}
+          />
+        )
+      ) : (
+        message.text
+      )}
+    </div>
+  );
+}
+
+function OutgoingMessage(props: MessageBubbleProps) {
+  const ctx = useExtensionContext();
+  const self = useSelfCharacterView(ctx);
+  return (
     <div
       className="chat-msg"
-      data-direction={props.message.direction}
+      data-direction="outgoing"
       data-animate={props.animate ? "true" : "false"}
     >
-      <Avatar url={avatarUrl} glyph={glyph} />
+      <Avatar url={self.avatarUrl} glyph={self.glyph} />
       <div className="chat-msg-col">
-        <div className="chat-bubble">
-          {isImage ? (
-            imageLoadFailed || !imageUrl ? (
-              "图片加载失败"
-            ) : (
-              <img
-                className="chat-bubble-img"
-                src={imageUrl}
-                alt=""
-                onError={() => setImageLoadFailed(true)}
-              />
-            )
-          ) : (
-            props.message.text
-          )}
-        </div>
-        {isOutgoing ? <StatusLabel status={props.message.status} /> : null}
+        <BubbleContent message={props.message} />
+        <StatusLabel status={props.message.status} />
       </div>
     </div>
   );
+}
+
+function IncomingMessage(props: MessageBubbleProps & { characterId: string }) {
+  const ctx = useExtensionContext();
+  const sender = useCharacterView(ctx, props.characterId);
+  return (
+    <div
+      className="chat-msg"
+      data-direction="incoming"
+      data-animate={props.animate ? "true" : "false"}
+    >
+      <Avatar url={sender.avatarUrl} glyph={sender.glyph} />
+      <div className="chat-msg-col">
+        {props.showSenderName ? (
+          <div className="chat-msg-sender">{sender.name}</div>
+        ) : null}
+        <BubbleContent message={props.message} />
+      </div>
+    </div>
+  );
+}
+
+export function MessageBubble(props: MessageBubbleProps) {
+  if (props.message.direction === "outgoing") {
+    return <OutgoingMessage {...props} />;
+  }
+  const characterId =
+    props.message.senderCharacterId?.trim() || props.peerCharacterId?.trim() || "";
+  if (!characterId) return null;
+  return <IncomingMessage {...props} characterId={characterId} />;
 }

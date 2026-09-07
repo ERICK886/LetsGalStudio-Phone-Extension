@@ -26,6 +26,7 @@ import { useExtensionContext } from "@avg-studio/sdk";
 import { resolveAssetUrl } from "../../phone/ui/asset-utils";
 import { useTheme, FONT_SIZE_DEFAULT } from "../theme/theme-provider";
 import type { ThemeTokens } from "../theme/tokens";
+import { ChakraDiv, ChakraImage, ChakraInput } from "./chakra-elements";
 
 /** 属性面板旁大缩略图边长（px） */
 const PREVIEW_SIZE_FIELD = 56;
@@ -121,23 +122,23 @@ export function AssetUriThumb({
 
   if (!trimmed) {
     return (
-      <div style={box} title={title ?? "未填素材"} aria-hidden>
+      <ChakraDiv style={box} title={title ?? "未填素材"} aria-hidden>
         —
-      </div>
+      </ChakraDiv>
     );
   }
 
   if (!url || broken) {
     return (
-      <div style={box} title={title ?? trimmed} aria-hidden>
+      <ChakraDiv style={box} title={title ?? trimmed} aria-hidden>
         ?
-      </div>
+      </ChakraDiv>
     );
   }
 
   return (
-    <div style={box} title={title ?? trimmed}>
-      <img
+    <ChakraDiv style={box} title={title ?? trimmed}>
+      <ChakraImage
         src={url}
         alt=""
         draggable={false}
@@ -149,7 +150,7 @@ export function AssetUriThumb({
           display: "block",
         }}
       />
-    </div>
+    </ChakraDiv>
   );
 }
 
@@ -192,8 +193,8 @@ export function AssetUriField({
       : "左侧为解析后的缩略图；无法解析或加载失败时显示「?」";
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-      <div
+    <ChakraDiv style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      <ChakraDiv
         style={{
           display: "flex",
           alignItems: "stretch",
@@ -207,7 +208,7 @@ export function AssetUriField({
           tokens={tokens}
           rounded={6}
         />
-        <input
+        <ChakraInput
           type="text"
           value={value}
           disabled={disabled}
@@ -216,8 +217,8 @@ export function AssetUriField({
           aria-label={ariaLabel}
           style={{ ...controlStyle, flex: 1, minWidth: 0, alignSelf: "center" }}
         />
-      </div>
-      <div
+      </ChakraDiv>
+      <ChakraDiv
         style={{
           fontSize: 10,
           color: tokens.textMuted,
@@ -225,8 +226,8 @@ export function AssetUriField({
         }}
       >
         {hint}
-      </div>
-    </div>
+      </ChakraDiv>
+    </ChakraDiv>
   );
 }
 

@@ -115,6 +115,7 @@ const FIELD_TYPES = new Set<PhoneEditorFieldType>([
   "asset",
   "shortcut",
   "boolean",
+  "number",
 ]);
 
 /**
@@ -163,6 +164,11 @@ function normalizeEditorContentItems(
         : undefined;
     const allowEmpty = item.allowEmpty === true ? true : undefined;
     const multiline = item.multiline === true ? true : undefined;
+    const min = typeof item.min === "number" && Number.isFinite(item.min) ? item.min : undefined;
+    const max = typeof item.max === "number" && Number.isFinite(item.max) ? item.max : undefined;
+    const step = typeof item.step === "number" && Number.isFinite(item.step) && item.step > 0
+      ? item.step
+      : undefined;
     const settingsModuleId =
       typeof item.settingsModuleId === "string" && item.settingsModuleId.trim()
         ? item.settingsModuleId.trim().slice(0, 64)
@@ -206,6 +212,9 @@ function normalizeEditorContentItems(
       ...(settingKey ? { settingKey } : {}),
       ...(allowEmpty ? { allowEmpty } : {}),
       ...(multiline ? { multiline } : {}),
+      ...(min !== undefined ? { min } : {}),
+      ...(max !== undefined ? { max } : {}),
+      ...(step !== undefined ? { step } : {}),
       ...(settingsModuleId ? { settingsModuleId } : {}),
       ...(dependsOn ? { dependsOn } : {}),
       ...(enumOptions && enumOptions.length > 0 ? { enumOptions } : {}),

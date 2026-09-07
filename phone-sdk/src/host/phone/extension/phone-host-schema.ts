@@ -35,6 +35,17 @@ const PHONE_POPUP_POSITIONS = [
   "center",
 ] as const;
 
+const PHONE_HUD_POSITIONS = [
+  "top-left",
+  "top-center",
+  "top-right",
+  "middle-left",
+  "middle-right",
+  "bottom-left",
+  "bottom-center",
+  "bottom-right",
+] as const;
+
 const CHAT_ROLE_AVATAR_SOURCES = [
   "first-portrait",
   "character-avatar",
@@ -68,6 +79,42 @@ export function buildPhoneHostSettingsFields(
       .describe(
         "普通手机未显示时用于打开手机的默认按键，例如 ArrowUp、KeyP 或 Ctrl+KeyP。消息手机显示时不会触发打开。",
       ),
+    showPhoneHudButton: s
+      .boolean("显示手机 HUD 图标按钮")
+      .default(true)
+      .describe("挂载手机后在游戏画面上显示一个适合触屏操作的按钮；点击后打开手机。"),
+    phoneHudIcon: s
+      .asset("手机 HUD 按钮图标")
+      .accepts("image")
+      .describe("可选。留空时使用内置手机图标。"),
+    phoneHudPosition: s
+      .enum("手机 HUD 按钮位置", PHONE_HUD_POSITIONS)
+      .default("bottom-right")
+      .labels({
+        "top-left": "左上",
+        "top-center": "上中",
+        "top-right": "右上",
+        "middle-left": "左中",
+        "middle-right": "右中",
+        "bottom-left": "左下",
+        "bottom-center": "下中",
+        "bottom-right": "右下",
+      }),
+    phoneHudOffsetX: s
+      .number("手机 HUD 横向微调（像素）")
+      .default(0)
+      .range(-1000, 1000)
+      .step(1),
+    phoneHudOffsetY: s
+      .number("手机 HUD 纵向微调（像素）")
+      .default(0)
+      .range(-1000, 1000)
+      .step(1),
+    phoneHudSize: s
+      .number("手机 HUD 按钮大小（像素）")
+      .default(56)
+      .range(36, 120)
+      .step(1),
     phoneStylePreset: s
       .enum("手机样式预设", ["apple", "android"] as const)
       .default("apple")

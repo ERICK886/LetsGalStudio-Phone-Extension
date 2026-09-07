@@ -40,6 +40,7 @@ import {
   resolveEnumLabel,
   type EnumSelectOption,
 } from "./enum-select-utils";
+import { ChakraButton, ChakraDiv, ChakraInput, ChakraSpan } from "./chakra-elements";
 
 /** 触发器与下拉间距（px） */
 const DROPDOWN_GAP = 6;
@@ -412,7 +413,7 @@ export function EnumSelect({
   const dropdown =
     open && typeof document !== "undefined"
       ? createPortal(
-          <div
+          <ChakraDiv
             ref={dropdownRef}
             style={{
               position: "fixed",
@@ -433,13 +434,13 @@ export function EnumSelect({
             }}
           >
             {filterable ? (
-              <div
+              <ChakraDiv
                 style={{
                   padding: 6,
                   borderBottom: `1px solid ${tokens.border}`,
                 }}
               >
-                <input
+                <ChakraInput
                   ref={filterInputRef}
                   type="text"
                   value={query}
@@ -464,10 +465,10 @@ export function EnumSelect({
                     outline: "none",
                   }}
                 />
-              </div>
+              </ChakraDiv>
             ) : null}
 
-            <div
+            <ChakraDiv
               ref={listRef}
               id={listboxId}
               role="listbox"
@@ -479,7 +480,7 @@ export function EnumSelect({
               }}
             >
               {filtered.length === 0 ? (
-                <div
+                <ChakraDiv
                   role="presentation"
                   style={{
                     padding: "8px 10px",
@@ -488,16 +489,16 @@ export function EnumSelect({
                   }}
                 >
                   无匹配
-                </div>
+                </ChakraDiv>
               ) : (
                 filtered.map((opt, index) => {
                   const selected = opt.value === value;
                   const active = index === activeIndex;
                   return (
-                    <div
+                    <ChakraDiv
                       key={opt.value}
                       id={`${baseId}-option-${index}`}
-                      ref={(el) => {
+                      ref={(el: HTMLDivElement | null) => {
                         optionRefs.current[index] = el;
                       }}
                       role="option"
@@ -522,18 +523,18 @@ export function EnumSelect({
                       }}
                     >
                       {opt.label}
-                    </div>
+                    </ChakraDiv>
                   );
                 })
               )}
-            </div>
-          </div>,
+            </ChakraDiv>
+          </ChakraDiv>,
           document.body,
         )
       : null;
 
   return (
-    <div
+    <ChakraDiv
       ref={rootRef}
       style={{
         position: "relative",
@@ -547,7 +548,7 @@ export function EnumSelect({
         opacity: disabled ? 0.5 : 1,
       }}
     >
-      <button
+      <ChakraButton
         ref={triggerRef}
         id={comboboxId}
         type="button"
@@ -577,7 +578,7 @@ export function EnumSelect({
           textAlign: "left",
         }}
       >
-        <span
+        <ChakraSpan
           style={{
             flex: 1,
             minWidth: 0,
@@ -587,9 +588,9 @@ export function EnumSelect({
           }}
         >
           {displayLabel}
-        </span>
+        </ChakraSpan>
 
-        <span
+        <ChakraSpan
           aria-hidden
           style={{
             flex: "0 0 auto",
@@ -599,11 +600,11 @@ export function EnumSelect({
           }}
         >
           ▼
-        </span>
-      </button>
+        </ChakraSpan>
+      </ChakraButton>
 
       {clearable && hasValue ? (
-        <button
+        <ChakraButton
           type="button"
           aria-label="清除"
           disabled={disabled}
@@ -626,10 +627,10 @@ export function EnumSelect({
           }}
         >
           ×
-        </button>
+        </ChakraButton>
       ) : null}
 
       {dropdown}
-    </div>
+    </ChakraDiv>
   );
 }

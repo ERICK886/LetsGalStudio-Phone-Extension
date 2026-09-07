@@ -92,6 +92,22 @@ describe("phone-nav-bus", () => {
     assert.equal(done, 3);
   });
 
+  it("flow signal 取消等待并移除 waiter", async () => {
+    const controller = new AbortController();
+    const waiting = waitForPhoneClosed(controller.signal);
+    assert.equal(getPhoneSdkSlot().phoneClosedWaiters?.size, 1);
+    controller.abort();
+    await waiting;
+    assert.equal(getPhoneSdkSlot().phoneClosedWaiters?.size, 0);
+  });
+
+  it("已取消的 signal 立即返回且不注册 waiter", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    await waitForPhoneClosed(controller.signal);
+    assert.equal(getPhoneSdkSlot().phoneClosedWaiters?.size ?? 0, 0);
+  });
+
   it("getLatestPhoneNavigate 无 pending 时为 null", () => {
     assert.equal(getLatestPhoneNavigate(), null);
   });

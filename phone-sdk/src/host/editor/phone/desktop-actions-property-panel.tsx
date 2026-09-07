@@ -39,6 +39,7 @@ import {
   type EditableCatalogAction,
 
 } from "./desktop-actions-bridge";
+import { ChakraCode, ChakraDiv, ChakraInput, ChakraLabel, ChakraSpan } from "../shared/chakra-elements";
 
 
 
@@ -150,7 +151,7 @@ export function DesktopActionsPropertyPanel({
 
     return (
 
-      <div
+      <ChakraDiv
 
         style={{
 
@@ -174,7 +175,7 @@ export function DesktopActionsPropertyPanel({
 
         请选择一个动作
 
-      </div>
+      </ChakraDiv>
 
     );
 
@@ -184,7 +185,7 @@ export function DesktopActionsPropertyPanel({
 
   return (
 
-    <div
+    <ChakraDiv
 
       style={{
 
@@ -214,7 +215,7 @@ export function DesktopActionsPropertyPanel({
 
     >
 
-      <div
+      <ChakraDiv
 
         style={{
 
@@ -230,11 +231,11 @@ export function DesktopActionsPropertyPanel({
 
         {action.name || "动作属性"}
 
-      </div>
+      </ChakraDiv>
 
 
 
-      <div
+      <ChakraDiv
 
         style={{
 
@@ -248,13 +249,13 @@ export function DesktopActionsPropertyPanel({
 
         类型 · {ACTION_KIND_LABELS[action.kind]}
 
-      </div>
+      </ChakraDiv>
 
 
 
       <Field label="动作 ID" labelStyle={labelStyle}>
 
-        <input
+        <ChakraInput
 
           type="text"
 
@@ -272,7 +273,7 @@ export function DesktopActionsPropertyPanel({
 
       <Field label="名称" labelStyle={labelStyle}>
 
-        <input
+        <ChakraInput
 
           type="text"
 
@@ -290,7 +291,7 @@ export function DesktopActionsPropertyPanel({
 
       <Field label="说明" labelStyle={labelStyle}>
 
-        <input
+        <ChakraInput
 
           type="text"
 
@@ -312,7 +313,7 @@ export function DesktopActionsPropertyPanel({
 
         <Field label="UI 引用" labelStyle={labelStyle}>
 
-          <input
+          <ChakraInput
 
             type="text"
 
@@ -338,7 +339,7 @@ export function DesktopActionsPropertyPanel({
 
           <Field label="界面名称" labelStyle={labelStyle}>
 
-            <input
+            <ChakraInput
 
               type="text"
 
@@ -436,7 +437,7 @@ export function DesktopActionsPropertyPanel({
 
         <Field label="Phone SDK 应用 ID" labelStyle={labelStyle}>
 
-          <input
+          <ChakraInput
 
             type="text"
 
@@ -456,7 +457,7 @@ export function DesktopActionsPropertyPanel({
 
 
 
-      <div
+      <ChakraDiv
 
         style={{
 
@@ -472,13 +473,13 @@ export function DesktopActionsPropertyPanel({
 
       >
 
-        写入模块 <code>phone</code> · 键{" "}
+        写入模块 <ChakraCode>phone</ChakraCode> · 键{" "}
 
-        <code>{ACTION_KIND_SETTING_KEY[action.kind]}</code>
+        <ChakraCode>{ACTION_KIND_SETTING_KEY[action.kind]}</ChakraCode>
 
-      </div>
+      </ChakraDiv>
 
-    </div>
+    </ChakraDiv>
 
   );
 
@@ -512,13 +513,13 @@ function Field({
 
   return (
 
-    <div>
+    <ChakraDiv>
 
-      <label style={labelStyle}>{label}</label>
+      <ChakraLabel style={labelStyle}>{label}</ChakraLabel>
 
       {children}
 
-    </div>
+    </ChakraDiv>
 
   );
 
@@ -550,7 +551,7 @@ function BooleanField({
 
   return (
 
-    <label
+    <ChakraLabel
 
       style={{
 
@@ -568,7 +569,7 @@ function BooleanField({
 
     >
 
-      <input
+      <ChakraInput
 
         type="checkbox"
 
@@ -578,9 +579,9 @@ function BooleanField({
 
       />
 
-      <span>{label}</span>
+      <ChakraSpan>{label}</ChakraSpan>
 
-    </label>
+    </ChakraLabel>
 
   );
 

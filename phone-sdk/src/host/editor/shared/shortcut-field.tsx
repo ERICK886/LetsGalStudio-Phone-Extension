@@ -18,6 +18,7 @@ import {
   shortcutFromKeyboardEvent,
   shortcutToChips,
 } from "./shortcut-utils";
+import { ChakraButton, ChakraDiv, ChakraSpan } from "./chakra-elements";
 
 export {
   displayKeyLabel,
@@ -131,7 +132,7 @@ export function ShortcutField({
   };
 
   return (
-    <div
+    <ChakraDiv
       ref={rootRef}
       style={{
         display: "flex",
@@ -141,11 +142,11 @@ export function ShortcutField({
       }}
     >
       {label ? (
-        <span style={{ color: tokens.textMuted, fontWeight: 500 }}>{label}</span>
+        <ChakraSpan style={{ color: tokens.textMuted, fontWeight: 500 }}>{label}</ChakraSpan>
       ) : null}
 
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <button
+      <ChakraDiv style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <ChakraButton
           type="button"
           disabled={disabled}
           aria-label={ariaLabel ?? label ?? "录入快捷键"}
@@ -173,18 +174,18 @@ export function ShortcutField({
         >
           {chips.length > 0 ? (
             chips.map((chip, index) => (
-              <span key={`${chip}-${index}`} style={kbdStyle}>
+              <ChakraSpan key={`${chip}-${index}`} style={kbdStyle}>
                 {chip}
-              </span>
+              </ChakraSpan>
             ))
           ) : (
-            <span style={{ color: tokens.textMuted, fontSize: 12 }}>
+            <ChakraSpan style={{ color: tokens.textMuted, fontSize: 12 }}>
               {listening ? "请按下快捷键…" : placeholder}
-            </span>
+            </ChakraSpan>
           )}
-        </button>
+        </ChakraButton>
 
-        <button
+        <ChakraButton
           type="button"
           disabled={disabled || !value.trim()}
           aria-label="清除快捷键"
@@ -209,15 +210,15 @@ export function ShortcutField({
           }}
         >
           ×
-        </button>
-      </div>
+        </ChakraButton>
+      </ChakraDiv>
 
       {listening ? (
-        <div style={{ fontSize: 11, color: tokens.textMuted }}>
+        <ChakraDiv style={{ fontSize: 11, color: tokens.textMuted }}>
           正在监听按键；Esc 取消
-        </div>
+        </ChakraDiv>
       ) : null}
-    </div>
+    </ChakraDiv>
   );
 }
 

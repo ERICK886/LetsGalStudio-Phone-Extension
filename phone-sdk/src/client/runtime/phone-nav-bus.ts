@@ -99,12 +99,25 @@ export function emitPhoneClosed(): void {
  *   顺序；当前实现仅在 emit 时唤醒已注册 waiter，未注册的调用需等到下次 emit）。
  * - 多次调用各自得到独立 waiter，一并唤醒。
  */
-export function waitForPhoneClosed(): Promise<void> {
+export function waitForPhoneClosed(signal?: AbortSignal): Promise<void> {
   const slot = getPhoneSdkSlot();
   return new Promise<void>((resolve) => {
+    if (signal?.aborted) {
+      resolve();
+      return;
+    }
     if (!slot.phoneClosedWaiters) {
       slot.phoneClosedWaiters = new Set();
     }
-    slot.phoneClosedWaiters.add(resolve);
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      slot.phoneClosedWaiters?.delete(finish);
+      signal?.removeEventListener("abort", finish);
+      resolve();
+    };
+    slot.phoneClosedWaiters.add(finish);
+    signal?.addEventListener("abort", finish, { once: true });
   });
 }

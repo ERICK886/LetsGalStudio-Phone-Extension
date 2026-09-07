@@ -50,24 +50,44 @@ export interface CameraSharedState {
 
 type AlbumSaveApi = SaveAPI<AlbumSaveMap>;
 
-let saveApi: AlbumSaveApi | null = null;
+interface AlbumStoreRuntime {
+  saveApi: AlbumSaveApi | null;
+  memorySlot: AlbumSaveState;
+  memoryCamera: CameraSharedState;
+}
 
-/** save 未绑定时的内存兜底（slot 部分）。 */
-let memorySlot: AlbumSaveState = {
-  albumsExtra: [],
-  albumsRemoved: [],
-  albumsMeta: [],
-  media: [],
-  albumMedia: [],
-  mediaRemoved: [],
-};
+const storesByRuntime = new WeakMap<object, AlbumStoreRuntime>();
 
-/** save 未绑定时的内存兜底（相机 shared）。 */
-let memoryCamera: CameraSharedState = {
-  cameraMedia: [],
-  cameraAlbumMedia: [],
-  cameraAlbumsMeta: [],
-};
+function createEmptySlot(): AlbumSaveState {
+  return {
+    albumsExtra: [],
+    albumsRemoved: [],
+    albumsMeta: [],
+    media: [],
+    albumMedia: [],
+    mediaRemoved: [],
+  };
+}
+
+function createEmptyCamera(): CameraSharedState {
+  return {
+    cameraMedia: [],
+    cameraAlbumMedia: [],
+    cameraAlbumsMeta: [],
+  };
+}
+
+function runtimeFor(runtimeKey: object): AlbumStoreRuntime {
+  const existing = storesByRuntime.get(runtimeKey);
+  if (existing) return existing;
+  const created: AlbumStoreRuntime = {
+    saveApi: null,
+    memorySlot: createEmptySlot(),
+    memoryCamera: createEmptyCamera(),
+  };
+  storesByRuntime.set(runtimeKey, created);
+  return created;
+}
 
 /**
  * 绑定本模块 `this.save`。
@@ -77,41 +97,43 @@ let memoryCamera: CameraSharedState = {
  *
  * @example
  * ```ts
- * bindAlbumSave(this.save);
+ * bindAlbumSave(getAlbumRuntimeKey(this.context), this.save);
  * ```
  */
 export function bindAlbumSave(
+  runtimeKey: object,
   api: AlbumSaveApi | SaveAPI<Record<string, unknown>>,
 ): void {
-  saveApi = api as AlbumSaveApi;
-  const fromSlot = readSlotFromApi(saveApi);
-  const fromCamera = readCameraFromApi(saveApi);
+  const runtime = runtimeFor(runtimeKey);
+  runtime.saveApi = api as AlbumSaveApi;
+  const fromSlot = readSlotFromApi(runtime.saveApi);
+  const fromCamera = readCameraFromApi(runtime.saveApi);
   const slotEmpty = isSlotEmpty(fromSlot);
   const cameraEmpty = isCameraEmpty(fromCamera);
-  const memorySlotDirty = !isSlotEmpty(memorySlot);
-  const memoryCameraDirty = !isCameraEmpty(memoryCamera);
+  const memorySlotDirty = !isSlotEmpty(runtime.memorySlot);
+  const memoryCameraDirty = !isCameraEmpty(runtime.memoryCamera);
 
   if (slotEmpty && memorySlotDirty) {
-    writeSlotToApi(saveApi, memorySlot);
+    writeSlotToApi(runtime.saveApi, runtime.memorySlot);
   } else {
-    memorySlot = fromSlot;
+    runtime.memorySlot = fromSlot;
   }
 
   if (cameraEmpty && memoryCameraDirty) {
-    writeCameraToApi(saveApi, memoryCamera);
+    writeCameraToApi(runtime.saveApi, runtime.memoryCamera);
   } else {
-    memoryCamera = fromCamera;
+    runtime.memoryCamera = fromCamera;
   }
 
   console.info("[phone-album] save 已绑定", {
-    slotMedia: memorySlot.media.length,
-    cameraMedia: memoryCamera.cameraMedia.length,
+    slotMedia: runtime.memorySlot.media.length,
+    cameraMedia: runtime.memoryCamera.cameraMedia.length,
   });
 }
 
 /** @returns 是否已绑定 save */
-export function hasAlbumSave(): boolean {
-  return saveApi !== null;
+export function hasAlbumSave(runtimeKey: object): boolean {
+  return runtimeFor(runtimeKey).saveApi !== null;
 }
 
 /**
@@ -119,13 +141,16 @@ export function hasAlbumSave(): boolean {
  *
  * @returns AlbumSaveState
  */
-export function getAlbumSaveState(): AlbumSaveState {
-  const slot = saveApi ? readSlotFromApi(saveApi) : cloneSlot(memorySlot);
-  const camera = saveApi
-    ? readCameraFromApi(saveApi)
-    : cloneCamera(memoryCamera);
-  memorySlot = slot;
-  memoryCamera = camera;
+export function getAlbumSaveState(runtimeKey: object): AlbumSaveState {
+  const runtime = runtimeFor(runtimeKey);
+  const slot = runtime.saveApi
+    ? readSlotFromApi(runtime.saveApi)
+    : cloneSlot(runtime.memorySlot);
+  const camera = runtime.saveApi
+    ? readCameraFromApi(runtime.saveApi)
+    : cloneCamera(runtime.memoryCamera);
+  runtime.memorySlot = slot;
+  runtime.memoryCamera = camera;
   return mergeSlotAndCamera(slot, camera);
 }
 
@@ -135,11 +160,15 @@ export function getAlbumSaveState(): AlbumSaveState {
  * @param next - 通常为突变后的合并视图；相机器材按 id 拆回 shared
  * @returns 写入后的合并视图拷贝
  */
-export function setAlbumSaveState(next: AlbumSaveState): AlbumSaveState {
+export function setAlbumSaveState(
+  runtimeKey: object,
+  next: AlbumSaveState,
+): AlbumSaveState {
+  const runtime = runtimeFor(runtimeKey);
   const cameraIds = new Set(
-    (saveApi
-      ? readCameraFromApi(saveApi).cameraMedia
-      : memoryCamera.cameraMedia
+    (runtime.saveApi
+      ? readCameraFromApi(runtime.saveApi).cameraMedia
+      : runtime.memoryCamera.cameraMedia
     ).map((m) => m.id),
   );
 
@@ -157,9 +186,9 @@ export function setAlbumSaveState(next: AlbumSaveState): AlbumSaveState {
   };
 
   // 相机库：保留仍存在于 next 中的旧相机媒体；被剧情删掉的则从 shared 移除
-  const prevCamera = saveApi
-    ? readCameraFromApi(saveApi)
-    : cloneCamera(memoryCamera);
+  const prevCamera = runtime.saveApi
+    ? readCameraFromApi(runtime.saveApi)
+    : cloneCamera(runtime.memoryCamera);
   const nextCameraMedia = next.media
     .filter((m) => cameraIds.has(m.id))
     .map((m) => ({ ...m }));
@@ -181,19 +210,19 @@ export function setAlbumSaveState(next: AlbumSaveState): AlbumSaveState {
     cameraAlbumsMeta: nextCameraMeta,
   };
 
-  memorySlot = slotPart;
-  memoryCamera = cameraPart;
+  runtime.memorySlot = slotPart;
+  runtime.memoryCamera = cameraPart;
 
-  if (saveApi) {
-    writeSlotToApi(saveApi, slotPart);
-    writeCameraToApi(saveApi, cameraPart);
+  if (runtime.saveApi) {
+    writeSlotToApi(runtime.saveApi, slotPart);
+    writeCameraToApi(runtime.saveApi, cameraPart);
   } else {
     console.warn(
       "[phone-album] save 未绑定：写入仅存在内存，关游戏 / 读档会丢失",
     );
   }
 
-  emitAlbumBus();
+  emitAlbumBus(runtimeKey);
   return mergeSlotAndCamera(slotPart, cameraPart);
 }
 
@@ -203,10 +232,14 @@ export function setAlbumSaveState(next: AlbumSaveState): AlbumSaveState {
  * @param media - 媒体条目
  * @returns 是否已写入真实 save（false = 仅内存）
  */
-export function addCameraPhotoToShared(media: AlbumMedia): boolean {
-  const camera = saveApi
-    ? readCameraFromApi(saveApi)
-    : cloneCamera(memoryCamera);
+export function addCameraPhotoToShared(
+  runtimeKey: object,
+  media: AlbumMedia,
+): boolean {
+  const runtime = runtimeFor(runtimeKey);
+  const camera = runtime.saveApi
+    ? readCameraFromApi(runtime.saveApi)
+    : cloneCamera(runtime.memoryCamera);
 
   const without = camera.cameraMedia.filter((m) => m.id !== media.id);
   const nextMedia = [...without, { ...media }];
@@ -219,17 +252,17 @@ export function addCameraPhotoToShared(media: AlbumMedia): boolean {
     cameraAlbumsMeta: upsertCameraRollMeta(camera.cameraAlbumsMeta),
   };
 
-  memoryCamera = next;
-  if (saveApi) {
-    writeCameraToApi(saveApi, next);
-    emitAlbumBus();
+  runtime.memoryCamera = next;
+  if (runtime.saveApi) {
+    writeCameraToApi(runtime.saveApi, next);
+    emitAlbumBus(runtimeKey);
     return true;
   }
 
   console.warn(
     "[phone-album] save 未绑定：拍照仅写入内存，请确认扩展 autonomous/onInit 已生效",
   );
-  emitAlbumBus();
+  emitAlbumBus(runtimeKey);
   return false;
 }
 
@@ -238,12 +271,13 @@ export function addCameraPhotoToShared(media: AlbumMedia): boolean {
  *
  * @param mediaId - 媒体 id
  */
-export function isCameraMediaId(mediaId: string): boolean {
+export function isCameraMediaId(runtimeKey: object, mediaId: string): boolean {
   const id = mediaId?.trim() ?? "";
   if (id === "") return false;
-  const camera = saveApi
-    ? readCameraFromApi(saveApi)
-    : cloneCamera(memoryCamera);
+  const runtime = runtimeFor(runtimeKey);
+  const camera = runtime.saveApi
+    ? readCameraFromApi(runtime.saveApi)
+    : cloneCamera(runtime.memoryCamera);
   return camera.cameraMedia.some((m) => m.id === id);
 }
 
@@ -253,16 +287,20 @@ export function isCameraMediaId(mediaId: string): boolean {
  * @param mediaId - 媒体 id
  * @returns 是否删除成功（写入了 save 或至少更新了内存）
  */
-export function removeCameraPhotoFromShared(mediaId: string): boolean {
+export function removeCameraPhotoFromShared(
+  runtimeKey: object,
+  mediaId: string,
+): boolean {
   const id = mediaId?.trim() ?? "";
   if (id === "") {
     console.warn("[phone-album] removeCameraPhotoFromShared：空 mediaId");
     return false;
   }
 
-  const camera = saveApi
-    ? readCameraFromApi(saveApi)
-    : cloneCamera(memoryCamera);
+  const runtime = runtimeFor(runtimeKey);
+  const camera = runtime.saveApi
+    ? readCameraFromApi(runtime.saveApi)
+    : cloneCamera(runtime.memoryCamera);
 
   if (!camera.cameraMedia.some((m) => m.id === id)) {
     console.warn("[phone-album] 非相机胶卷媒体，拒绝删除", id);
@@ -280,15 +318,15 @@ export function removeCameraPhotoFromShared(mediaId: string): boolean {
         : camera.cameraAlbumsMeta.filter((m) => m.id !== CAMERA_ALBUM_ID),
   };
 
-  memoryCamera = next;
-  if (saveApi) {
-    writeCameraToApi(saveApi, next);
+  runtime.memoryCamera = next;
+  if (runtime.saveApi) {
+    writeCameraToApi(runtime.saveApi, next);
   } else {
     console.warn(
       "[phone-album] save 未绑定：删除仅作用于内存，关游戏后可能恢复",
     );
   }
-  emitAlbumBus();
+  emitAlbumBus(runtimeKey);
   return true;
 }
 
@@ -298,8 +336,16 @@ export function removeCameraPhotoFromShared(mediaId: string): boolean {
  * @param listener - 无参回调
  * @returns 取消订阅函数
  */
-export function subscribeAlbumStore(listener: () => void): () => void {
-  return subscribeAlbumBus(listener);
+export function subscribeAlbumStore(
+  runtimeKey: object,
+  listener: () => void,
+): () => void {
+  return subscribeAlbumBus(runtimeKey, listener);
+}
+
+/** 清理一个 Preview 的 save 绑定及内存兜底。 */
+export function disposeAlbumStore(runtimeKey: object): void {
+  storesByRuntime.delete(runtimeKey);
 }
 
 /** 合并 slot + 相机 shared 为 UI/突变用视图。 */

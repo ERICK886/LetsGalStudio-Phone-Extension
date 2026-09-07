@@ -40,6 +40,10 @@ export function applyReplyEffects(
   for (const effect of effects) {
     const name = effect.variable.trim();
     if (!name) continue;
-    ctx.variables.set(name, parseEffectValue(effect.value));
+    try {
+      ctx.variables.set(name, parseEffectValue(effect.value));
+    } catch (error) {
+      console.error(`[phone-chat] 写入回复变量 ${name} 失败`, error);
+    }
   }
 }

@@ -1,13 +1,13 @@
 /**
  * @file methods.ts
- * @description 聊天内页四个 Studio 方法的 `method()` 描述，供 `ChatController`
+ * @description 聊天内页单聊、群聊与好友管理 Studio 方法，供 `ChatController`
  *              类体上以静态属性赋值挂载。
  * @author 池水三两升
  * @date 2026-08-10
  * @version 0.2.0
  *
  * @remarks
- * - 只导出四个已构造好的 `method()` 结果（`BrandedExtensionMethod`）。
+ * - 导出已构造好的 `method()` 结果（`BrandedExtensionMethod`）。
  * - `run` / `runImmediately` / `skip` 里的 `this` 是本模块 `ChatController` 实例，
  *   `this.save` 为本模块独立存档（无前缀键名）。
  * - 每个执行体先调用 `bindChatSave(this.save)`。
@@ -28,14 +28,19 @@ import {
 } from "./domain/index";
 import {
   addFriend,
+  awaitGroupReply,
   awaitPlayerReply,
   bindChatSave,
   cacheAuthorSettings,
   closeChatPhoneAppAfter,
+  joinGroupMember,
+  leaveGroupMember,
   openChatPhoneApp,
+  openGroupChatPhoneApp,
   readAuthorSettings,
   removeFriend,
   sendFriendMessages,
+  sendGroupMessages,
 } from "./runtime/index";
 
 /**
@@ -71,9 +76,11 @@ async function executeSendFriendMessages(
 ): Promise<void> {
   prepareRuntime(instanceSave, ctx);
   const friendCharacterId = String(params.friend ?? "");
+  const messages = parseFriendMessagesFromParams(params);
+  if (!friendCharacterId.trim() || messages.length === 0) return;
   await sendFriendMessages({
     friendCharacterId,
-    messages: parseFriendMessagesFromParams(params),
+    messages,
   });
 
   // schema 默认打开；仅当明确为 false（含字符串 "false"）时跳过。
@@ -86,6 +93,30 @@ async function executeSendFriendMessages(
   await openChatPhoneApp({
     friendCharacterId,
     waitUntil: waitUntilClose ? "close" : "none",
+  });
+}
+
+async function executeSendGroupMessages(
+  ctx: ExtensionContext,
+  params: Record<string, unknown>,
+  instanceSave: unknown,
+  options: { openPhoneApp: boolean },
+): Promise<void> {
+  prepareRuntime(instanceSave, ctx);
+  const groupId = String(params.groupId ?? "").trim();
+  const senderCharacterId = String(params.sender ?? "").trim();
+  const messages = parseFriendMessagesFromParams(params);
+  if (!groupId || !senderCharacterId || messages.length === 0) return;
+
+  await sendGroupMessages({ groupId, senderCharacterId, messages });
+  const shouldOpen =
+    options.openPhoneApp && coerceMethodBoolean(params.openPhone, true);
+  if (!shouldOpen) return;
+  await openGroupChatPhoneApp({
+    groupId,
+    waitUntil: coerceMethodBoolean(params.waitUntilClose, false)
+      ? "close"
+      : "none",
   });
 }
 
@@ -113,6 +144,8 @@ async function executeAwaitPlayerReply(
   prepareRuntime(instanceSave, ctx);
   const outgoingStatus = normalizeOutgoingStatus(params.outgoingStatus);
   const friendCharacterId = String(params.friend ?? "");
+  const replies = parseRepliesFromParams(params);
+  if (!friendCharacterId.trim() || replies.length === 0) return;
   const requireReply = coerceMethodBoolean(params.requireReply, true);
   // 正常 run + 必须回复 → 挂起；非必须 → 只写 pending
   const waitForReply = allowWait && requireReply;
@@ -121,7 +154,7 @@ async function executeAwaitPlayerReply(
 
   await awaitPlayerReply(ctx, {
     friendCharacterId,
-    replies: parseRepliesFromParams(params),
+    replies,
     outgoingStatus,
     allowWait,
     waitForReply,
@@ -131,6 +164,40 @@ async function executeAwaitPlayerReply(
   });
 
   // 仅「必须回复且确实挂起过」时才可能关手机
+  if (waitForReply && coerceMethodBoolean(params.closePhoneAfter, false)) {
+    const rawDelay = Number(params.closeDelayMs);
+    const delayMs =
+      Number.isFinite(rawDelay) && rawDelay >= 0 ? rawDelay : 1000;
+    await closeChatPhoneAppAfter(delayMs);
+  }
+}
+
+async function executeAwaitGroupReply(
+  ctx: ExtensionContext,
+  params: Record<string, unknown>,
+  instanceSave: unknown,
+  allowWait: boolean,
+  options: { openPhoneApp: boolean },
+): Promise<void> {
+  prepareRuntime(instanceSave, ctx);
+  const groupId = String(params.groupId ?? "").trim();
+  const replies = parseRepliesFromParams(params);
+  if (!groupId || replies.length === 0) return;
+
+  const requireReply = coerceMethodBoolean(params.requireReply, true);
+  const waitForReply = allowWait && requireReply;
+  const shouldOpenPhone = options.openPhoneApp && waitForReply;
+  await awaitGroupReply(ctx, {
+    groupId,
+    replies,
+    outgoingStatus: normalizeOutgoingStatus(params.outgoingStatus),
+    allowWait,
+    waitForReply,
+    onPendingWritten: shouldOpenPhone
+      ? () => openGroupChatPhoneApp({ groupId, waitUntil: "none" })
+      : undefined,
+  });
+
   if (waitForReply && coerceMethodBoolean(params.closePhoneAfter, false)) {
     const rawDelay = Number(params.closeDelayMs);
     const delayMs =
@@ -275,6 +342,194 @@ export const chatAwaitPlayerReplyMethod = method({
       false,
       { openPhoneApp: false },
     );
+  },
+});
+
+/** 向群聊写入指定成员发送的多条消息。 */
+export const chatSendGroupMessagesMethod = method({
+  id: "send-group-messages",
+  title: "聊天 · 群成员发送消息",
+  description: "向指定群聊写入某位成员发送的多条消息，可打开手机并深链该群。",
+  schema: {
+    openPhone: {
+      type: "boolean",
+      label: "打开手机并进入群聊",
+      default: true,
+    },
+    waitUntilClose: {
+      type: "boolean",
+      label: "等待玩家关闭手机",
+      default: false,
+    },
+    groupId: {
+      type: "string",
+      label: "群 ID",
+      required: true,
+    },
+    sender: {
+      type: "character",
+      label: "发送者",
+      required: true,
+    },
+    ...buildFriendMessageSchemaFields("群成员"),
+  },
+  async run(ctx, params) {
+    await executeSendGroupMessages(
+      ctx,
+      params as Record<string, unknown>,
+      this.save,
+      { openPhoneApp: true },
+    );
+  },
+  async runImmediately(ctx, params) {
+    await executeSendGroupMessages(
+      ctx,
+      params as Record<string, unknown>,
+      this.save,
+      { openPhoneApp: false },
+    );
+  },
+  async skip(ctx, params) {
+    await executeSendGroupMessages(
+      ctx,
+      params as Record<string, unknown>,
+      this.save,
+      { openPhoneApp: false },
+    );
+  },
+});
+
+/** 为群聊写入玩家回复选项。 */
+export const chatAwaitGroupReplyMethod = method({
+  id: "await-group-reply",
+  title: "聊天 · 玩家回复群聊",
+  description: "配置群聊中的玩家回复；必须回复时打开该群并挂起剧情。",
+  schema: {
+    requireReply: {
+      type: "boolean",
+      label: "必须回复",
+      default: true,
+    },
+    outgoingStatus: {
+      type: "enum",
+      label: "我方消息状态",
+      default: "read",
+      options: [
+        { label: "发送中", value: "sending" },
+        { label: "未读", value: "unread" },
+        { label: "已读", value: "read" },
+        { label: "失败", value: "failed" },
+        { label: "被拉黑", value: "blocked" },
+      ],
+    },
+    closePhoneAfter: {
+      type: "boolean",
+      label: "回复后关闭手机",
+      default: false,
+    },
+    closeDelayMs: {
+      type: "number",
+      label: "关闭延迟（毫秒）",
+      default: 1000,
+      min: 0,
+      max: 60_000,
+      step: 100,
+    },
+    groupId: {
+      type: "string",
+      label: "群 ID",
+      required: true,
+    },
+    ...buildReplySchemaFields(),
+  },
+  async run(ctx, params) {
+    await executeAwaitGroupReply(
+      ctx,
+      params as Record<string, unknown>,
+      this.save,
+      true,
+      { openPhoneApp: true },
+    );
+  },
+  async runImmediately(ctx, params) {
+    await executeAwaitGroupReply(
+      ctx,
+      params as Record<string, unknown>,
+      this.save,
+      false,
+      { openPhoneApp: false },
+    );
+  },
+  async skip(ctx, params) {
+    await executeAwaitGroupReply(
+      ctx,
+      params as Record<string, unknown>,
+      this.save,
+      false,
+      { openPhoneApp: false },
+    );
+  },
+});
+
+/** 将指定角色加入群聊；重复加入不会产生额外成员。 */
+export const chatJoinGroupMethod = method({
+  id: "join-group",
+  title: "聊天 · 角色加入群聊",
+  description: "将角色加入作者设置中已定义的群聊，变更随当前存档保存。",
+  schema: {
+    groupId: {
+      type: "string",
+      label: "群 ID",
+      required: true,
+    },
+    member: {
+      type: "character",
+      label: "加入的角色",
+      required: true,
+    },
+  },
+  run(ctx, params) {
+    prepareRuntime(this.save, ctx);
+    joinGroupMember(String(params.groupId ?? ""), String(params.member ?? ""));
+  },
+  runImmediately(ctx, params) {
+    prepareRuntime(this.save, ctx);
+    joinGroupMember(String(params.groupId ?? ""), String(params.member ?? ""));
+  },
+  skip(ctx, params) {
+    prepareRuntime(this.save, ctx);
+    joinGroupMember(String(params.groupId ?? ""), String(params.member ?? ""));
+  },
+});
+
+/** 将指定角色退出群聊；重复退出不会产生额外变更。 */
+export const chatLeaveGroupMethod = method({
+  id: "leave-group",
+  title: "聊天 · 角色退出群聊",
+  description: "将角色从作者设置中已定义的群聊移出，聊天记录保持不变。",
+  schema: {
+    groupId: {
+      type: "string",
+      label: "群 ID",
+      required: true,
+    },
+    member: {
+      type: "character",
+      label: "退出的角色",
+      required: true,
+    },
+  },
+  run(ctx, params) {
+    prepareRuntime(this.save, ctx);
+    leaveGroupMember(String(params.groupId ?? ""), String(params.member ?? ""));
+  },
+  runImmediately(ctx, params) {
+    prepareRuntime(this.save, ctx);
+    leaveGroupMember(String(params.groupId ?? ""), String(params.member ?? ""));
+  },
+  skip(ctx, params) {
+    prepareRuntime(this.save, ctx);
+    leaveGroupMember(String(params.groupId ?? ""), String(params.member ?? ""));
   },
 });
 

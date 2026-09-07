@@ -104,13 +104,13 @@ export function coerceMethodBoolean(
  * // fields.contentType.default === "text"
  * ```
  */
-export function buildFriendMessageSchemaFields(): BlockSchema {
+export function buildFriendMessageSchemaFields(senderLabel = "对方"): BlockSchema {
   const fields: BlockSchema = {};
   for (let i = 1; i <= MAX_MESSAGES_PER_METHOD; i += 1) {
     const suffix = i === 1 ? "" : String(i);
     fields[`contentType${suffix}`] = {
       type: "enum",
-      label: `对方第 ${i} 条 · 类型`,
+      label: `${senderLabel}第 ${i} 条 · 类型`,
       options: [
         { label: "文字", value: "text" },
         { label: "图片", value: "image" },
@@ -119,12 +119,12 @@ export function buildFriendMessageSchemaFields(): BlockSchema {
     };
     fields[`message${suffix}`] = {
       type: "string",
-      label: `对方第 ${i} 条 · 文字`,
+      label: `${senderLabel}第 ${i} 条 · 文字`,
       multiline: true,
     };
     fields[`imageAsset${suffix}`] = {
       type: "asset",
-      label: `对方第 ${i} 条 · 图片`,
+      label: `${senderLabel}第 ${i} 条 · 图片`,
       assetType: "image",
     };
   }

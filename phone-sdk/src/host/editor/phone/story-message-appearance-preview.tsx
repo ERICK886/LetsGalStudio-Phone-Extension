@@ -16,9 +16,7 @@
  */
 
 import React, {
-  useEffect,
   useMemo,
-  useState,
   type CSSProperties,
 } from "react";
 import { useExtensionContext } from "@avg-studio/sdk";
@@ -32,6 +30,7 @@ import type { EditableChatRolePreset } from "../chat/chat-role-presets-bridge";
 import { readEditableChatAvatarAssets } from "../chat/chat-role-presets-bridge";
 import { readPhoneAppearanceValues } from "../phone/phone-settings-bridge";
 import previewOverrideCss from "../phone/phone-editor-preview.css?inline";
+import { PhonePreviewStatusBar } from "../phone/phone-preview-status-bar";
 import { useTheme } from "../theme/theme-provider";
 
 /** 消息手机预览模式。 */
@@ -47,30 +46,6 @@ export interface StoryMessageAppearancePreviewProps {
   /** 当前选中预设（预览只展示这一项） */
   selectedPreset?: EditableChatRolePreset | null;
   refreshToken?: number | string;
-}
-
-/**
- * 状态栏信号图标。
- */
-function PhoneStatusIcons(): React.ReactElement {
-  return (
-    <span className="phone-status-icons" aria-hidden="true">
-      <svg
-        className="phone-status-icon phone-signal-icon"
-        xmlns="http://www.w3.org/2000/svg"
-        width="1em"
-        height="1em"
-        viewBox="0 0 1024 1024"
-        focusable="false"
-      >
-        <path d="M0 0h1024v1024H0z" fill="none" />
-        <path
-          fill="#fff"
-          d="M584 352H440c-17.7 0-32 14.3-32 32v544c0 17.7 14.3 32 32 32h144c17.7 0 32-14.3 32-32V384c0-17.7-14.3-32-32-32M892 64H748c-17.7 0-32 14.3-32 32v832c0 17.7 14.3 32 32 32h144c17.7 0 32-14.3 32-32V96c0-17.7-14.3-32-32-32M276 640H132c-17.7 0-32 14.3-32 32v256c0 17.7 14.3 32 32 32h144c17.7 0 32-14.3 32-32V672c0-17.7-14.3-32-32-32"
-        />
-      </svg>
-    </span>
-  );
 }
 
 /**
@@ -323,13 +298,6 @@ export function StoryMessageAppearancePreview({
 }: StoryMessageAppearancePreviewProps): React.ReactElement {
   const ctx = useExtensionContext();
   const { tokens } = useTheme();
-  const [clock, setClock] = useState(() => new Date());
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setClock(new Date()), 30_000);
-    return () => window.clearInterval(timer);
-  }, []);
-
   const phoneValues = useMemo(() => {
     void refreshToken;
     return readPhoneAppearanceValues(ctx);
@@ -422,15 +390,7 @@ export function StoryMessageAppearancePreview({
 
         <section className="phone-shell" aria-label="消息手机预览">
           <div className="phone-screen" style={screenStyle}>
-            <header className="phone-status">
-              <time>
-                {clock.toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </time>
-              <PhoneStatusIcons />
-            </header>
+            <PhonePreviewStatusBar stylePreset={stylePreset} />
 
             <div className="phone-toolbar">
               <h1 className="phone-title">消息</h1>

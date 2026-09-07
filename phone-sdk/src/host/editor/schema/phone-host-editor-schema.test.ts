@@ -19,8 +19,8 @@ describe("PHONE_HOST_EDITOR_SCHEMA", () => {
   it("declares full section schema fields", () => {
     assert.equal(PHONE_HOST_EDITOR_SCHEMA.sectionId, "phone");
     assert.equal(PHONE_HOST_EDITOR_SCHEMA.settingsModuleId, "phone");
-    assert.equal(PHONE_HOST_EDITOR_SCHEMA.contentItems.length, 13);
-    assert.equal(PHONE_HOST_EDITOR_SCHEMA.pages.length, 6);
+    assert.equal(PHONE_HOST_EDITOR_SCHEMA.contentItems.length, 19);
+    assert.equal(PHONE_HOST_EDITOR_SCHEMA.pages.length, 7);
   });
 
   it("orders home-style first as ready desktop", () => {
@@ -64,6 +64,23 @@ describe("PHONE_HOST_EDITOR_SCHEMA", () => {
     );
     assert.equal(byId.get("desktop-apps")?.status, "ready");
     assert.equal(byId.get("desktop-apps")?.preview, "desktop");
+  });
+
+  it("phone-hud page exposes all touch entry controls", () => {
+    const page = PHONE_HOST_EDITOR_SCHEMA.pages.find((p) => p.id === "phone-hud");
+    const items = resolvePageContentItems(PHONE_HOST_EDITOR_SCHEMA, page?.contentItemIds);
+    assert.equal(page?.status, "ready");
+    assert.equal(page?.preview, "desktop");
+    assert.deepEqual(items.map((item) => item.id), [
+      "showPhoneHudButton",
+      "phoneHudIcon",
+      "phoneHudPosition",
+      "phoneHudOffsetX",
+      "phoneHudOffsetY",
+      "phoneHudSize",
+    ]);
+    assert.equal(items.find((item) => item.id === "phoneHudPosition")?.enumOptions?.length, 8);
+    assert.ok(items.filter((item) => item.fieldType === "number").length === 3);
   });
 
   it("player-permissions page covers three boolean flags", () => {

@@ -13,6 +13,7 @@ import { ALL_ALBUM_ID, CAMERA_ALBUM_ID } from "../../constants";
 import type { AlbumCatalog } from "../../domain/index";
 import { executeRemoveCameraPhoto } from "../../runtime/actions";
 import { isCameraMediaId } from "../../runtime/store";
+import { getAlbumRuntimeKey } from "../../runtime/runtime-key";
 import type { AlbumAuthorSettings, MediaView } from "../../types";
 import { AppHeader, EmptyHint, MediaThumb } from "../components/index";
 
@@ -36,6 +37,7 @@ export interface GridScreenProps {
 export function GridScreen(props: GridScreenProps) {
   const { albumId, settings, catalog, onBack, onOpenViewer } = props;
   const ctx = useExtensionContext();
+  const runtimeKey = getAlbumRuntimeKey(ctx);
 
   const mediaList = useMemo<MediaView[]>(() => {
     if (albumId === ALL_ALBUM_ID) return catalog.allMedia;
@@ -52,17 +54,17 @@ export function GridScreen(props: GridScreenProps) {
 
   const onDelete = useCallback(
     async (mediaId: string) => {
-      if (!isCameraMediaId(mediaId)) return;
+      if (!isCameraMediaId(runtimeKey, mediaId)) return;
       const ok = window.confirm("删除这张照片？删除后无法恢复。");
       if (!ok) return;
-      if (!executeRemoveCameraPhoto(mediaId)) return;
+      if (!executeRemoveCameraPhoto(runtimeKey, mediaId)) return;
       try {
         await ctx.archive.flushShared();
       } catch (error) {
         console.warn("[phone-album] 删除后 flushShared 失败", error);
       }
     },
-    [ctx],
+    [ctx, runtimeKey],
   );
 
   return (
@@ -79,7 +81,7 @@ export function GridScreen(props: GridScreenProps) {
                 media={media}
                 onOpen={(id) => onOpenViewer(albumId, id)}
                 onDelete={
-                  allowDeleteInAlbum && isCameraMediaId(media.id)
+                  allowDeleteInAlbum && isCameraMediaId(runtimeKey, media.id)
                     ? onDelete
                     : undefined
                 }

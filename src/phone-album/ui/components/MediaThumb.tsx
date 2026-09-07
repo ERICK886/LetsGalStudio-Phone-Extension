@@ -14,6 +14,7 @@ import { useExtensionContext } from "@avg-studio/sdk";
 import React, { useEffect, useMemo, useState } from "react";
 
 import type { MediaView } from "../../types";
+import { AlbumIcon } from "./AlbumIcon";
 
 export interface MediaThumbProps {
   /** 媒体视图（来自 catalog） */
@@ -210,7 +211,7 @@ export function MediaThumb(props: MediaThumbProps) {
             onDelete(media.id);
           }}
         >
-          <i className="fa-solid fa-trash-can" aria-hidden="true" />
+          <AlbumIcon name="trash" size={14} />
         </button>
       ) : null}
     </div>

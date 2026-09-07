@@ -45,6 +45,16 @@ function runtimeFor(ctx: ExtensionContext): ToastRuntime {
   }
   const runtime: ToastRuntime = { nextId: 1, items: [], listeners: new Set(), timers: new Map() };
   keys.forEach((key) => runtimes.set(key, runtime));
+  const signal = ctx.flow.signal;
+  const cleanup = () => {
+    for (const timer of runtime.timers.values()) globalThis.clearTimeout(timer);
+    runtime.timers.clear();
+    runtime.items = [];
+    runtime.listeners.clear();
+    keys.forEach((key) => runtimes.delete(key));
+    signal.removeEventListener("abort", cleanup);
+  };
+  signal.addEventListener("abort", cleanup, { once: true });
   return runtime;
 }
 

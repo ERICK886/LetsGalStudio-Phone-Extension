@@ -12,6 +12,7 @@
  */
 
 import type { PhoneAppRenderProps } from "@ink-zenly/phone-sdk/plugin";
+import { useExtensionContext } from "@avg-studio/sdk";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 
 import { CAMERA_ALBUM_ID } from "../constants";
@@ -20,6 +21,7 @@ import {
   type AlbumMainTab,
 } from "../runtime/camera-session";
 import { hasAlbumSave } from "../runtime/store";
+import { getAlbumRuntimeKey } from "../runtime/runtime-key";
 import { PageTransition } from "./components/PageTransition";
 import { TabBar } from "./components/TabBar";
 import { useAlbumSession } from "./hooks/useAlbumSession";
@@ -30,7 +32,6 @@ import {
   HomeScreen,
   ViewerScreen,
 } from "./screens/index";
-import { ensureFontAwesome } from "./styles/font-awesome";
 import { ensureAlbumStyles } from "./styles/inject-styles";
 import {
   buildAlbumSkinCssVars,
@@ -46,21 +47,24 @@ import {
  */
 export function AlbumApp(props: PhoneAppRenderProps) {
   ensureAlbumStyles();
-  ensureFontAwesome();
 
   const { closeApp, closePhone, safeAreaInsets } = props;
+  const ctx = useExtensionContext();
+  const runtimeKey = getAlbumRuntimeKey(ctx);
   const session = useAlbumSession(closeApp);
   const rootStyle = useSafeAreaStyle(safeAreaInsets, { includeBottom: false });
 
-  const [tab, setTab] = useState<AlbumMainTab>(() => consumeResumeTab());
+  const [tab, setTab] = useState<AlbumMainTab>(() =>
+    consumeResumeTab(runtimeKey),
+  );
 
   useEffect(() => {
-    if (!hasAlbumSave()) {
+    if (!hasAlbumSave(runtimeKey)) {
       console.warn(
         "[phone-album] 内页打开时 save 尚未绑定；若拍照后变量仍为空，请确认扩展已 autonomous 并重载",
       );
     }
-  }, []);
+  }, [runtimeKey]);
 
   const {
     nav,

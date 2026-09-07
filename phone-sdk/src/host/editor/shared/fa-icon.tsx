@@ -15,6 +15,7 @@ import {
   ensureFontAwesomeCss,
   normalizeFaIconName,
 } from "./font-awesome";
+import { ChakraIcon, ChakraSpan } from "./chakra-elements";
 
 /** 图标样式族 */
 export type FaIconStyle = "solid" | "regular" | "brands";
@@ -81,7 +82,7 @@ export function FaIcon({
   }
 
   return (
-    <i
+    <ChakraIcon
       className={classes.join(" ")}
       style={css}
       title={title}
@@ -125,7 +126,7 @@ export function IconLabel({
     <>
       <FaIcon name={icon} css={{ fontSize: iconSize, lineHeight: 1 }} />
       {children !== undefined && children !== null && children !== "" ? (
-        <span>{children}</span>
+        <ChakraSpan>{children}</ChakraSpan>
       ) : null}
     </>
   );

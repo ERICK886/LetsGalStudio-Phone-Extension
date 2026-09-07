@@ -17,18 +17,21 @@ import {
 import type { ChatScreen, ChatTab } from "../../types/index";
 import { PROGRAM_ID } from "../../constants";
 import {
+  directConversationId,
+  parseConversationId,
+} from "../../domain/conversations";
+import {
   listVisibleFriendIds,
-  markChatOpened,
-  resolveReplyWaitsForFriend,
-  setOpenChatFriendId,
+  markConversationOpened,
+  setOpenConversationId,
   subscribeChatBus,
   readChatState,
   type ChatBusEvent,
 } from "../../runtime/index";
-import { subscribePhoneNavigate } from "@ink-zenly/phone-sdk/plugin";
-
-/** 已消费的最新 navigate seq；用于抑制导航总线的旧 pending 回放。 */
-let lastConsumedNavigateSeq = 0;
+import {
+  clearPhoneNavigatePending,
+  subscribePhoneNavigate,
+} from "@ink-zenly/phone-sdk/plugin";
 
 /**
  * 内页会话会话状态与导航。
@@ -50,14 +53,23 @@ export function useChatSession() {
     () => new Set(),
   );
   const logRef = useRef<HTMLDivElement>(null!);
+  const animationTimersRef = useRef<Set<number>>(new Set());
 
   const refresh = useCallback(() => {
     setTick((value) => value + 1);
   }, []);
 
-  const openChat = useCallback((friendCharacterId: string) => {
-    setScreen({ kind: "chat", friendCharacterId });
+  const openConversation = useCallback((conversationId: string) => {
+    if (!parseConversationId(conversationId)) return;
+    setScreen({ kind: "chat", conversationId });
   }, []);
+
+  const openChat = useCallback(
+    (friendCharacterId: string) => {
+      openConversation(directConversationId(friendCharacterId));
+    },
+    [openConversation],
+  );
 
   const openFriendDetail = useCallback((friendCharacterId: string) => {
     setScreen({ kind: "friend-detail", friendCharacterId });
@@ -68,26 +80,35 @@ export function useChatSession() {
   }, []);
 
   // 深链：宿主 openPhoneApp({ appId: "phone-chat", payload: { friendCharacterId } }) 后，
-  // 导航总线会发布/回放最新一条 navigate 请求。仅处理本应用且 seq 新于已消费的请求，
-  // 避免手动从桌面打开聊天时被旧 pending 反复拉进某会话。
+  // 导航总线会发布/回放最新请求；消费后立即清理，避免下次手动打开时回放旧深链。
   useEffect(() => {
     return subscribePhoneNavigate((req) => {
       if (req.appId !== PROGRAM_ID) return;
-      if (req.seq <= lastConsumedNavigateSeq) return;
-      lastConsumedNavigateSeq = req.seq;
-      const payload = req.payload as { friendCharacterId?: unknown } | undefined;
+      const payload = req.payload as
+        | { conversationId?: unknown; friendCharacterId?: unknown }
+        | undefined;
+      const explicitConversationId =
+        typeof payload?.conversationId === "string"
+          ? payload.conversationId.trim()
+          : "";
+      if (parseConversationId(explicitConversationId)) {
+        openConversation(explicitConversationId);
+        clearPhoneNavigatePending();
+        return;
+      }
       const friendId =
         typeof payload?.friendCharacterId === "string"
           ? payload.friendCharacterId.trim()
           : "";
       if (friendId) openChat(friendId);
+      clearPhoneNavigatePending();
     });
-  }, [openChat]);
+  }, [openChat, openConversation]);
 
   useEffect(() => {
     return () => {
-      resolveReplyWaitsForFriend();
-      setOpenChatFriendId(null);
+      // 返回桌面 / 关闭手机不能解除「必须回复」；只在扩展真正卸载时释放等待。
+      setOpenConversationId(null);
     };
   }, []);
 
@@ -96,20 +117,22 @@ export function useChatSession() {
       if (event.type === "messages-appended") {
         if (
           screen.kind === "chat" &&
-          screen.friendCharacterId === event.friendCharacterId
+          screen.conversationId === event.conversationId
         ) {
           setAnimatingIds((prev) => {
             const next = new Set(prev);
             for (const message of event.messages) next.add(message.id);
             return next;
           });
-          window.setTimeout(() => {
+          const timer = window.setTimeout(() => {
             setAnimatingIds((prev) => {
               const next = new Set(prev);
               for (const message of event.messages) next.delete(message.id);
               return next;
             });
+            animationTimersRef.current.delete(timer);
           }, 280);
+          animationTimersRef.current.add(timer);
         }
       }
       refresh();
@@ -117,15 +140,23 @@ export function useChatSession() {
   }, [refresh, screen]);
 
   useEffect(() => {
+    const timers = animationTimersRef.current;
+    return () => {
+      for (const timer of timers) window.clearTimeout(timer);
+      timers.clear();
+    };
+  }, []);
+
+  useEffect(() => {
     if (screen.kind === "chat") {
-      setOpenChatFriendId(screen.friendCharacterId);
-      markChatOpened(screen.friendCharacterId);
+      setOpenConversationId(screen.conversationId);
+      markConversationOpened(screen.conversationId);
       refresh();
       return () => {
-        setOpenChatFriendId(null);
+        setOpenConversationId(null);
       };
     }
-    setOpenChatFriendId(null);
+    setOpenConversationId(null);
     return undefined;
   }, [screen, refresh]);
 
@@ -147,6 +178,7 @@ export function useChatSession() {
     logRef,
     refresh,
     openChat,
+    openConversation,
     openFriendDetail,
     goTabs,
   };

@@ -12,6 +12,7 @@ import type { PhoneEditorPageSchema } from "../../../client/runtime/types";
 import { FaIcon } from "../shared/fa-icon";
 import { useTheme } from "../theme/theme-provider";
 import { sortEditorPages } from "../schema/phone-host-editor-schema";
+import { ChakraButton, ChakraNav, ChakraSpan } from "../shared/chakra-elements";
 
 /**
  * PhonePageNav 属性。
@@ -44,7 +45,7 @@ export function PhonePageNav({
   const sorted = useMemo(() => sortEditorPages(pages), [pages]);
 
   return (
-    <nav
+    <ChakraNav
       aria-label="编辑页面"
       style={{
         width: "100%",
@@ -66,7 +67,7 @@ export function PhonePageNav({
         const soon = (page.status ?? "ready") === "comingSoon";
 
         return (
-          <button
+          <ChakraButton
             key={page.id}
             type="button"
             title={soon ? `${page.label}（即将推出）` : page.label}
@@ -93,7 +94,7 @@ export function PhonePageNav({
             {page.icon ? (
               <FaIcon name={page.icon} css={{ fontSize: 14 }} />
             ) : null}
-            <span
+            <ChakraSpan
               style={{
                 fontSize: 10,
                 lineHeight: 1.25,
@@ -103,11 +104,11 @@ export function PhonePageNav({
               }}
             >
               {page.label}
-            </span>
-          </button>
+            </ChakraSpan>
+          </ChakraButton>
         );
       })}
-    </nav>
+    </ChakraNav>
   );
 }
 

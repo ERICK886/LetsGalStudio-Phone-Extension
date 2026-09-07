@@ -18,6 +18,9 @@ const AUTHOR_CSS_SELECTOR = 'style[data-pa-author-css="phone-album"]';
 const RADIUS_PX = { sm: 8, md: 12, lg: 16 } as const;
 const GAP_PX = { sm: 6, md: 10, lg: 14 } as const;
 
+export type AlbumSkinCssVars = React.CSSProperties &
+  Record<`--pa-${string}`, string>;
+
 /** 圆角档 → px。 */
 export function mapRadiusPx(v: "sm" | "md" | "lg"): number {
   return RADIUS_PX[v];
@@ -47,7 +50,7 @@ export function wrapAuthorCss(sanitized: string): string {
 /** 根节点 inline CSS 变量。 */
 export function buildAlbumSkinCssVars(
   appearance: AlbumAppearanceSettings,
-): React.CSSProperties {
+): AlbumSkinCssVars {
   return {
     "--pa-bg": appearance.styleBg,
     "--pa-fg": appearance.styleFg,
@@ -63,7 +66,7 @@ export function buildAlbumSkinCssVars(
     "--pa-grid-columns": appearance.styleGridColumns,
     "--pa-radius": `${mapRadiusPx(appearance.styleRadius)}px`,
     "--pa-gap": `${mapGapPx(appearance.styleCardGap)}px`,
-  } as React.CSSProperties;
+  } as AlbumSkinCssVars;
 }
 
 /** 根节点 data 属性（Tab 文案 / 作者 skin 标记）。 */

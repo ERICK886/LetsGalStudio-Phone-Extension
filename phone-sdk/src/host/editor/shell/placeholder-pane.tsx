@@ -13,6 +13,7 @@
 
 import React from "react";
 import { useTheme, FONT_SIZE_TITLE } from "../theme/theme-provider";
+import { ChakraDiv } from "../shared/chakra-elements";
 
 /**
  * PlaceholderPane 组件属性。
@@ -43,7 +44,7 @@ export function PlaceholderPane({
   const { tokens } = useTheme();
 
   return (
-    <div
+    <ChakraDiv
       style={{
         width: "100%",
         height: "100%",
@@ -60,7 +61,7 @@ export function PlaceholderPane({
         overflow: "hidden",
       }}
     >
-      <div
+      <ChakraDiv
         style={{
           fontSize: FONT_SIZE_TITLE,
           color: tokens.textSecondary,
@@ -70,9 +71,9 @@ export function PlaceholderPane({
         }}
       >
         {title}
-      </div>
+      </ChakraDiv>
       {description ? (
-        <div
+        <ChakraDiv
           style={{
             fontSize: 12,
             color: tokens.textMuted,
@@ -82,9 +83,9 @@ export function PlaceholderPane({
           }}
         >
           {description}
-        </div>
+        </ChakraDiv>
       ) : null}
-    </div>
+    </ChakraDiv>
   );
 }
 

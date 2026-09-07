@@ -11,21 +11,21 @@ import type { ChatMessage, ChatSaveState } from "../types/index";
 export type ChatBusEvent =
   | {
       type: "messages-appended";
-      friendCharacterId: string;
+      conversationId: string;
       messages: readonly ChatMessage[];
     }
   | { type: "state-changed"; reason: string }
   | {
       type: "replies-changed";
-      friendCharacterId: string | null;
+      conversationId: string | null;
     };
 
 type Listener = (event: ChatBusEvent) => void;
 
 const listeners = new Set<Listener>();
 
-/** 当前 UI 打开的聊天好友（用于判断是否 bump 未读 / 播动画）。 */
-let openChatFriendId: string | null = null;
+/** 当前 UI 打开的统一会话键（用于判断是否 bump 未读 / 播动画）。 */
+let openConversationId: string | null = null;
 
 /**
  * 订阅总线事件。
@@ -60,15 +60,15 @@ export function emitChatBus(event: ChatBusEvent): void {
  *
  * @param friendCharacterId - 好友 ID 或 null
  */
-export function setOpenChatFriendId(friendCharacterId: string | null): void {
-  openChatFriendId = friendCharacterId?.trim() || null;
+export function setOpenConversationId(conversationId: string | null): void {
+  openConversationId = conversationId?.trim() || null;
 }
 
 /**
  * @returns 当前打开的聊天好友 ID
  */
-export function getOpenChatFriendId(): string | null {
-  return openChatFriendId;
+export function getOpenConversationId(): string | null {
+  return openConversationId;
 }
 
 /**
@@ -76,8 +76,8 @@ export function getOpenChatFriendId(): string | null {
  *
  * @param friendCharacterId - 好友 ID
  */
-export function isViewingChat(friendCharacterId: string): boolean {
-  return openChatFriendId === friendCharacterId.trim();
+export function isViewingConversation(conversationId: string): boolean {
+  return openConversationId === conversationId.trim();
 }
 
 /** 供类型导出，避免未使用告警。 */

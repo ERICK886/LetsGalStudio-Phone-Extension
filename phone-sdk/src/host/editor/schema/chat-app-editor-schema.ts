@@ -109,6 +109,14 @@ export const CHAT_APP_EDITOR_PAGES: readonly PhoneEditorPageSchema[] = [
     preview: "chat",
   },
   {
+    id: "chat-groups",
+    label: "默认群聊",
+    icon: "user-group",
+    order: 25,
+    status: "ready",
+    preview: "chat",
+  },
+  {
     id: "chat-attributes",
     label: "好友属性槽",
     icon: "list",

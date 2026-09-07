@@ -135,6 +135,7 @@ export type PhoneEditorFieldType =
   | "asset"
   | "shortcut"
   | "boolean"
+  | "number"
   | "character";
 
 /**
@@ -187,6 +188,10 @@ export interface PhoneEditorContentItemSchema {
   };
   /** 为 true 且 fieldType 为 string 时，属性面板渲染多行 textarea。 */
   multiline?: boolean;
+  /** number 控件的可选边界与步长。 */
+  min?: number;
+  max?: number;
+  step?: number;
 }
 
 /**
@@ -207,7 +212,7 @@ export interface PhoneEditorPageSchema {
   order?: number;
   status?: "ready" | "comingSoon";
   contentItemIds?: string[];
-  preview?: "desktop" | "chat" | "placeholder";
+  preview?: "desktop" | "chat" | "phone-call" | "placeholder";
 }
 
 /**
@@ -230,15 +235,35 @@ export interface PhoneEditorSectionSchema {
 /** `openPhoneApp` 的等待策略：关闭应用后返回，或不等待。 */
 export type OpenPhoneAppWaitUntil = "close" | "none";
 
+/** 程序化打开手机时可临时覆盖的屏幕方位。 */
+export type OpenPhoneAppPosition =
+  | "top-left"
+  | "top-center"
+  | "top-right"
+  | "bottom-left"
+  | "bottom-center"
+  | "bottom-right"
+  | "center";
+
 /** 打开手机内页应用的选项。 */
 export interface OpenPhoneAppOptions {
   /** 目标应用 id（Studio 程序 ID） */
   appId: string;
   /** 等待策略；默认 `"close"` */
   waitUntil?: OpenPhoneAppWaitUntil;
+  /** 本次打开使用的手机方位；省略时沿用手机编辑器的全局设置。 */
+  position?: OpenPhoneAppPosition;
   /** 可选启动参数，透传给宿主 */
   payload?: Record<string, unknown>;
 }
+
+/** 手机宿主处理程序化打开请求后的可判定结果。 */
+export type OpenPhoneAppResult =
+  | "opened"
+  | "blocked"
+  | "unavailable"
+  | "invalid"
+  | "failed";
 
 /**
  * 手机导航控制器（由宿主安装）。
@@ -250,7 +275,9 @@ export interface PhoneNavigationController {
    *
    * @param options 目标应用与等待策略
    */
-  openPhoneApp(options: OpenPhoneAppOptions): Promise<void>;
+  openPhoneApp(
+    options: OpenPhoneAppOptions,
+  ): Promise<OpenPhoneAppResult | void>;
 
   /**
    * 关闭整部手机 UI（优先走关闭动画）。
@@ -330,6 +357,14 @@ export interface PhoneSdkGlobalSlot {
    * `closePhoneApp` 优先调用此回调以复用关闭动画。
    */
   requestAnimatedClosePhone?: () => Promise<void>;
+  /** 内页设置后，宿主忽略关闭手机及返回桌面请求（例如必须处理的来电）。 */
+  phoneCloseLocked?: boolean;
+  /** 关闭锁的持有令牌；用于多个阻塞交互并存时的引用计数。 */
+  phoneCloseLockTokens?: Set<symbol>;
+  /** 关闭锁变化订阅；宿主据此同步禁用返回桌面的控件。 */
+  phoneCloseLockListeners?: Set<() => void>;
+  /** 当前程序化打开请求对手机方位的临时覆盖。 */
+  phonePositionOverride?: OpenPhoneAppPosition;
   /**
    * 导航总线：当前 pending 的 navigate 请求（仅保留最新一条）。
    * 由 `publishPhoneNavigate` 写入，`subscribePhoneNavigate` 订阅时回放。

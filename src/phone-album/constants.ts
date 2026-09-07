@@ -40,13 +40,9 @@ export const CAMERA_ALBUM_NAME = "相机胶卷";
 /** 字符串字段默认最大长度。 */
 export const MAX_LABEL_LEN = 40;
 
-/** Font Awesome 6 CSS CDN（cdnjs）。 */
-export const FONT_AWESOME_CDN =
-  "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css";
-
 /**
- * 临时借存档槽读取官方截图缓存时使用的槽位（用完即删）。
- * 选用冷门大号，避免误伤玩家常用档位。
+ * 临时借存档槽读取官方截图缓存时使用的起始槽位。
+ * 运行时会先读取已有槽位并向上寻找空位，绝不覆盖玩家存档；用完在 finally 中删除。
  */
 export const CAPTURE_TEMP_SLOT = 987_651;
 

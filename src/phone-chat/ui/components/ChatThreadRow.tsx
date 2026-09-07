@@ -1,55 +1,103 @@
 /**
  * @file ChatThreadRow.tsx
- * @description 会话列表单行（头像 / 名字 / 摘要 / 未读）。
- * @author 池水三两升
- * @date 2026-08-05
- * @version 0.1.0
+ * @description 单聊 / 群聊会话列表行。
  */
 
 import { useExtensionContext } from "@avg-studio/sdk";
 import React from "react";
 
+import { resolveAssetUrl } from "../../domain/character";
+import {
+  conversationIdForThread,
+  parseConversationId,
+} from "../../domain/conversations";
+import { findGroupDefinition } from "../../domain/groups";
 import { threadPreviewText } from "../../domain/threads";
-import type { ChatThread } from "../../types/index";
+import type { ChatGroupDefinition, ChatThread } from "../../types/index";
 import { useCharacterView } from "../hooks/useCharacterView";
 import { useSelfCharacterView } from "../hooks/useSelfCharacterView";
 import { Avatar } from "./Avatar";
 
 export interface ChatThreadRowProps {
   thread: ChatThread;
-  onOpen: (friendCharacterId: string) => void;
+  groups: readonly ChatGroupDefinition[];
+  onOpen: (conversationId: string) => void;
 }
 
-/**
- * @param props - ChatThreadRowProps
- * @returns 可点击行
- */
-export function ChatThreadRow(props: ChatThreadRowProps) {
-  const ctx = useExtensionContext();
-  const view = useCharacterView(ctx, props.thread.friendCharacterId);
-  const selfView = useSelfCharacterView(ctx);
-  const preview = threadPreviewText(props.thread, selfView.displayName);
+function UnreadBadge({ count }: { count: number }) {
+  if (count <= 0) return null;
+  return <span className="chat-badge">{count > 99 ? "99+" : count}</span>;
+}
 
+function DirectThreadRow(props: ChatThreadRowProps & { friendCharacterId: string }) {
+  const ctx = useExtensionContext();
+  const view = useCharacterView(ctx, props.friendCharacterId);
+  const selfView = useSelfCharacterView(ctx);
+  const conversationId = conversationIdForThread(props.thread);
   return (
-    <button
-      type="button"
-      className="chat-row"
-      onClick={() => props.onOpen(props.thread.friendCharacterId)}
-    >
+    <button type="button" className="chat-row" onClick={() => props.onOpen(conversationId)}>
       <Avatar url={view.avatarUrl} glyph={view.glyph} />
       <div className="chat-row-main">
         <div className="chat-row-title">
           <span>{view.name}</span>
-          {props.thread.unreadCount > 0 ? (
-            <span className="chat-badge">
-              {props.thread.unreadCount > 99
-                ? "99+"
-                : props.thread.unreadCount}
-            </span>
-          ) : null}
+          <UnreadBadge count={props.thread.unreadCount} />
         </div>
-        <div className="chat-row-sub">{preview || " "}</div>
+        <div className="chat-row-sub">
+          {threadPreviewText(props.thread, selfView.displayName) || " "}
+        </div>
       </div>
     </button>
+  );
+}
+
+function IncomingGroupPreview(props: {
+  senderCharacterId: string;
+  preview: string;
+}) {
+  const ctx = useExtensionContext();
+  const sender = useCharacterView(ctx, props.senderCharacterId);
+  return <>{`${sender.name}: ${props.preview}`}</>;
+}
+
+function GroupThreadRow(props: ChatThreadRowProps & { groupId: string }) {
+  const ctx = useExtensionContext();
+  const selfView = useSelfCharacterView(ctx);
+  const group = findGroupDefinition(props.groups, props.groupId);
+  const title = group?.title || props.groupId;
+  const avatarUrl = resolveAssetUrl(ctx, group?.avatarAsset);
+  const conversationId = conversationIdForThread(props.thread);
+  const preview = threadPreviewText(props.thread, selfView.displayName);
+  const last = props.thread.messages[props.thread.messages.length - 1];
+
+  return (
+    <button type="button" className="chat-row" onClick={() => props.onOpen(conversationId)}>
+      <Avatar url={avatarUrl} glyph={title.trim().slice(0, 1) || "群"} />
+      <div className="chat-row-main">
+        <div className="chat-row-title">
+          <span>{title}</span>
+          <UnreadBadge count={props.thread.unreadCount} />
+        </div>
+        <div className="chat-row-sub">
+          {last?.direction === "incoming" && last.senderCharacterId ? (
+            <IncomingGroupPreview
+              senderCharacterId={last.senderCharacterId}
+              preview={preview}
+            />
+          ) : (
+            preview || " "
+          )}
+        </div>
+      </div>
+    </button>
+  );
+}
+
+export function ChatThreadRow(props: ChatThreadRowProps) {
+  const target = parseConversationId(conversationIdForThread(props.thread));
+  if (!target) return null;
+  return target.kind === "group" ? (
+    <GroupThreadRow {...props} groupId={target.groupId} />
+  ) : (
+    <DirectThreadRow {...props} friendCharacterId={target.friendCharacterId} />
   );
 }

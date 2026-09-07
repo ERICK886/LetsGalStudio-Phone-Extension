@@ -13,3 +13,5 @@ export * from "./store";
 export * from "./actions";
 export * from "./camera-session";
 export * from "./capture";
+export * from "./capture-slot";
+export * from "./runtime-key";

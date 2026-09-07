@@ -13,6 +13,7 @@ import React, {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type CSSProperties,
   type KeyboardEvent,
   type PointerEvent,
@@ -27,6 +28,7 @@ import { getPhoneHostExtensionId } from "../../host-extension-id";
 import { InPhoneAppBoundary } from "./components/in-phone-app-boundary";
 import { PhoneStoryMessageItem } from "./components/story-message-item";
 import { firstGlyph, readImage, resolveAssetUrl } from "./asset-utils";
+import { computePhoneViewportFit } from "./phone-viewport-fit";
 import {
   catalogFromSettingsRows,
   emptyPreferences,
@@ -54,15 +56,16 @@ import {
   EMPTY_PHONE_SAFE_AREA,
   clearPhoneAppBadge,
   diagnosePhoneAppLookup,
-  clearPhoneNavigatePending,
   formatPhoneAppBadgeLabel,
   getPhoneAppBadge,
   getPhoneSdkSlot,
+  isPhoneCloseLocked,
   phoneSdkDebug,
   phoneSdkDiag,
   phoneSdkDiagWarn,
   publishPhoneSafeAreaInsets,
   subscribePhoneAppBadges,
+  subscribePhoneCloseLock,
   subscribePhoneNavigate,
   toPhoneAppId,
   type PhoneAppBadge,
@@ -140,6 +143,27 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
   advanceStoryMessage,
 }) => {
   const ctx = useExtensionContext();
+  const phoneCloseLocked = useSyncExternalStore(
+    subscribePhoneCloseLock,
+    isPhoneCloseLocked,
+    isPhoneCloseLocked,
+  );
+  useEffect(() => {
+    // 手机出现时必须退出已有快进，并在事件到达 AVG 全局快捷键前截断 Ctrl。
+    ctx.dialogue.setSkipMode(false);
+    const blockCtrlFastForward = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== "Control" && !event.ctrlKey) return;
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+    };
+    globalThis.window.addEventListener("keydown", blockCtrlFastForward, true);
+    globalThis.window.addEventListener("keyup", blockCtrlFastForward, true);
+    return () => {
+      globalThis.window.removeEventListener("keydown", blockCtrlFastForward, true);
+      globalThis.window.removeEventListener("keyup", blockCtrlFastForward, true);
+    };
+  }, [ctx]);
   const [displayStoryMessages, setDisplayStoryMessages] = useState<readonly PhoneStoryMessage[]>(
     () => storyMessages ?? [],
   );
@@ -161,7 +185,8 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
     ? "android"
     : "apple";
   const popupPosition = normalizePhonePopupPosition(
-    ctx.settings.get<string>("popupPosition"),
+    getPhoneSdkSlot().phonePositionOverride
+      ?? ctx.settings.get<string>("popupPosition"),
   );
   const programUiActionRows = ctx.settings.get<unknown[]>("programUiActions");
   const visualUiActionRows = ctx.settings.get<unknown[]>("visualUiActions");
@@ -236,6 +261,14 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
   const statusBarRef = useRef<HTMLElement | null>(null);
   const homeButtonRef = useRef<HTMLButtonElement | null>(null);
   const phoneScreenRef = useRef<HTMLDivElement | null>(null);
+  const phoneRootRef = useRef<HTMLDivElement | null>(null);
+  const [viewportFit, setViewportFit] = useState(() =>
+    computePhoneViewportFit(
+      phoneStylePreset,
+      Number.POSITIVE_INFINITY,
+      Number.POSITIVE_INFINITY,
+    ),
+  );
   const [draggedAppId, setDraggedAppId] = useState<string>();
   const [appDropTarget, setAppDropTarget] = useState<AppDropTarget>();
   const [message, setMessage] = useState("");
@@ -317,6 +350,52 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
   }, []);
 
   /**
+   * 手机始终按 390×780 / 400×760 的设计画布渲染，再整体缩放到根容器。
+   * 这样文字、圆角、内页和安全区不会在矮视口中被单独纵向压缩。
+   */
+  useLayoutEffect(() => {
+    const root = phoneRootRef.current;
+    if (!root) return undefined;
+
+    const measure = () => {
+      const computed = window.getComputedStyle(root);
+      const horizontalPadding =
+        (Number.parseFloat(computed.paddingLeft) || 0) +
+        (Number.parseFloat(computed.paddingRight) || 0);
+      const verticalPadding =
+        (Number.parseFloat(computed.paddingTop) || 0) +
+        (Number.parseFloat(computed.paddingBottom) || 0);
+      const next = computePhoneViewportFit(
+        phoneStylePreset,
+        root.clientWidth - horizontalPadding,
+        root.clientHeight - verticalPadding,
+      );
+
+      setViewportFit((previous) =>
+        Math.abs(previous.scale - next.scale) < 0.0001 &&
+        previous.designWidth === next.designWidth &&
+        previous.designHeight === next.designHeight
+          ? previous
+          : next,
+      );
+    };
+
+    measure();
+    const observer = typeof ResizeObserver !== "undefined"
+      ? new ResizeObserver(measure)
+      : null;
+    observer?.observe(root);
+    window.addEventListener("resize", measure);
+    window.visualViewport?.addEventListener("resize", measure);
+
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", measure);
+      window.visualViewport?.removeEventListener("resize", measure);
+    };
+  }, [phoneStylePreset]);
+
+  /**
    * 测量状态栏 / Home 布局高度，作为 safeAreaInsets。
    * top === 状态栏 offsetHeight（刘海/灵动岛已含在状态栏占位里）。
    * 应用层仍 absolute 铺满全屏；第三方用 insets 排布文字与按钮，背景可全屏覆盖。
@@ -390,13 +469,13 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
   }, []);
 
   // 订阅导航总线：收到 openPhoneApp 请求时打开对应内页。
-  // subscribePhoneNavigate 在订阅时会立即回放最新 pending，因此挂载即消费 getLatestPhoneNavigate()，
-  // 不会漏掉 UI 挂载前发布的请求。messageMode / closing 期间忽略，避免覆盖剧情模式或关闭动画。
+  // 此处只切换 APP，不清 pending：目标 APP 可能要到下一次 React 渲染才挂载，
+  // 需由目标 APP 在读完 payload 后清理。关闭手机时仍会统一兜底清理。
+  // messageMode / closing 期间忽略，避免覆盖剧情模式或关闭动画。
   useEffect(() => {
     return subscribePhoneNavigate((req) => {
       if (messageModeRef.current || closingRef.current) return;
       openInPhoneAppByIdRef.current(req.appId);
-      clearPhoneNavigatePending();
     });
   }, []);
 
@@ -925,6 +1004,7 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
    * 多次调用会返回同一个 Promise，防止动画期间重复隐藏 UI 或重复启动应用；系统启用“减少动态效果”时立即完成。
    */
   const closeWithAnimation = useCallback((): Promise<void> => {
+    if (isPhoneCloseLocked()) return Promise.resolve();
     if (closePromise.current) return closePromise.current;
 
     setActiveInPhoneAppId(null);
@@ -987,6 +1067,7 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
    * 从手机内部应用返回桌面：先播放缩回动画，再卸载内页。
    */
   const goHomeFromInPhoneApp = useCallback(() => {
+    if (isPhoneCloseLocked()) return;
     setInAppPhase((phase) => {
       if (phase === "leaving" || phase === "idle") return phase;
       return "leaving";
@@ -1385,6 +1466,7 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
 
   return (
     <div
+      ref={phoneRootRef}
       data-phone-root={getPhoneHostExtensionId()}
       data-phone-style-preset={phoneStylePreset}
       data-phone-position={messageMode ? displayStoryPopupPosition : popupPosition}
@@ -1402,13 +1484,26 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
       onPointerDown={messageMode ? undefined : handleOutsidePointerDown}
     >
       <style>{phoneCss}</style>
-      <section
-        className="phone-shell"
-        role={messageMode ? "status" : "dialog"}
-        aria-modal={messageMode ? undefined : true}
-        aria-label={messageMode ? "手机剧情消息" : phoneTitle ?? "手机"}
+      <div
+        className="phone-viewport-fit"
+        data-phone-viewport-scale={viewportFit.scale.toFixed(4)}
+        style={{ width: viewportFit.width, height: viewportFit.height }}
       >
-        <div className="phone-screen" ref={phoneScreenRef} style={screenStyle}>
+        <div
+          className="phone-viewport-scale"
+          style={{
+            width: viewportFit.designWidth,
+            height: viewportFit.designHeight,
+            transform: `scale(${viewportFit.scale})`,
+          }}
+        >
+          <section
+            className="phone-shell"
+            role={messageMode ? "status" : "dialog"}
+            aria-modal={messageMode ? undefined : true}
+            aria-label={messageMode ? "手机剧情消息" : phoneTitle ?? "手机"}
+          >
+            <div className="phone-screen" ref={phoneScreenRef} style={screenStyle}>
           <header className="phone-status" ref={statusBarRef}>
             <time>{clock.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time>
             <span className="phone-status-icons" aria-hidden="true">
@@ -1615,8 +1710,13 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
               type="button"
               className="phone-home-button"
               aria-label="返回桌面"
-              title="返回桌面"
-              disabled={!activeInPhoneAppId || closing || inAppPhase === "leaving"}
+              title={phoneCloseLocked ? "请先完成当前操作" : "返回桌面"}
+              disabled={
+                phoneCloseLocked ||
+                !activeInPhoneAppId ||
+                closing ||
+                inAppPhase === "leaving"
+              }
               onClick={goHomeFromInPhoneApp}
             >
               <span className="phone-home-indicator" aria-hidden="true" />
@@ -1996,9 +2096,11 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
             </div>
           )}
 
-          {message && <div className="phone-message" role="status" aria-live="polite">{message}</div>}
+              {message && <div className="phone-message" role="status" aria-live="polite">{message}</div>}
+            </div>
+          </section>
         </div>
-      </section>
+      </div>
     </div>
   );
 };

@@ -20,6 +20,7 @@ import { installPhoneExtensionSdkHost } from "../runtime/install-host";
 import { bindPhoneNavigationController } from "../runtime/phone-navigation";
 import { emitPhoneClosed } from "@ink-zenly/phone-sdk/plugin";
 import { PhoneUI } from "../ui/phone-ui";
+import { resolveAssetUrl } from "../ui/asset-utils";
 import { enqueueToast } from "../../toast/core/toast-runtime";
 import {
   PHONE_TOAST_ANIMATIONS_IN,
@@ -739,6 +740,7 @@ interface PhoneRuntime {
   phoneMounted: boolean;
   phoneMountEpoch: number;
   opening: boolean;
+  openPhoneFromHud: (() => void) | undefined;
   toastSequence: number;
   toastTimer: number | undefined;
   /**
@@ -753,6 +755,7 @@ interface PhoneRuntime {
  * 不能保存在模块级变量中，否则一个 Preview 的 pending Promise 会阻塞另一个 Preview。
  */
 const phoneRuntimes = new WeakMap<object, PhoneRuntime>();
+const phoneRegistrationCleanups = new WeakMap<object, () => void>();
 let nextPhoneRuntimeDebugScopeId = 1;
 
 type RuntimeKeySource =
@@ -838,6 +841,7 @@ export function getPhoneRuntime(ctx: ExtensionContext): PhoneRuntime {
     phoneMounted: false,
     phoneMountEpoch: 0,
     opening: false,
+    openPhoneFromHud: undefined,
     toastSequence: 0,
     toastTimer: undefined,
     recallTimers: new Map(),
@@ -1020,9 +1024,34 @@ function schedulePendingRecalls(runtime: PhoneRuntime): void {
 }
 
 /** 启用一个 Preview 的手机能力；不自动打开 UI，也不改动任何存档数据。 */
-export function activatePhoneRuntime(runtime: PhoneRuntime): void {
+function boundedSetting(ctx: ExtensionContext, key: string, fallback: number, min: number, max: number): number {
+  const value = Number(ctx.settings.get(key));
+  return Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : fallback;
+}
+
+function showPhoneHudUi(ctx: ExtensionContext, runtime: PhoneRuntime): void {
+  if (!runtime.phoneMounted || ctx.settings.get<boolean>("showPhoneHudButton") === false || !runtime.openPhoneFromHud) return;
+  const icon = ctx.settings.get<string>("phoneHudIcon");
+  void ctx.ui.show("phone-hud", {
+    visible: true,
+    iconUrl: resolveAssetUrl(ctx, icon),
+    position: ctx.settings.get<string>("phoneHudPosition") || "bottom-right",
+    offsetX: boundedSetting(ctx, "phoneHudOffsetX", 0, -1000, 1000),
+    offsetY: boundedSetting(ctx, "phoneHudOffsetY", 0, -1000, 1000),
+    size: boundedSetting(ctx, "phoneHudSize", 56, 36, 120),
+    onOpen: runtime.openPhoneFromHud,
+  }, {
+    size: "(100%, 100%)",
+    position: "(0, 0)",
+    interactable: true,
+    pointerEventsPassthrough: true,
+  });
+}
+
+export function activatePhoneRuntime(ctx: ExtensionContext, runtime: PhoneRuntime): void {
   if (runtime.phoneMounted) return;
   runtime.phoneMounted = true;
+  showPhoneHudUi(ctx, runtime);
   runtime.phoneMountEpoch += 1;
   runtimeDebug(runtime, "phone-mounted", { epoch: runtime.phoneMountEpoch });
 }
@@ -1051,6 +1080,7 @@ async function deactivatePhoneRuntime(
   runtime: PhoneRuntime,
 ): Promise<void> {
   runtime.phoneMounted = false;
+  void ctx.ui.hide("phone-hud");
   runtime.phoneMountEpoch += 1;
   runtime.opening = false;
   runtime.toastSequence += 1;
@@ -1809,13 +1839,13 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
     description:
       "启用手机功能。挂载后可通过快捷键打开手机或调用“显示手机消息”。不会自动打开手机。",
     run(ctx) {
-      activatePhoneRuntime(getPhoneRuntime(ctx));
+      activatePhoneRuntime(ctx, getPhoneRuntime(ctx));
     },
     runImmediately(ctx) {
-      activatePhoneRuntime(getPhoneRuntime(ctx));
+      activatePhoneRuntime(ctx, getPhoneRuntime(ctx));
     },
     skip(ctx) {
-      activatePhoneRuntime(getPhoneRuntime(ctx));
+      activatePhoneRuntime(ctx, getPhoneRuntime(ctx));
     },
   });
 
@@ -1983,6 +2013,10 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
    * 保险计时器会释放 `opening` 锁，避免一次异常显示永久阻塞之后的打开动作。
    */
   static onRegister(ctx: ExtensionContext): void {
+    const registrationKey = ctx.flow.signal;
+    phoneRegistrationCleanups.get(registrationKey)?.();
+    const unsubscribers: Array<() => void> = [];
+
     // 尽早安装 Phone SDK 宿主，便于第三方扩展在其后（或排队在其前）完成 registerPhoneApp。
     installPhoneExtensionSdkHost();
     // 闭包住手机扩展的 ctx，供插件侧 openPhoneApp 委托 ui.show("phone")。
@@ -2001,15 +2035,18 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
     registerOpenPhoneAction(registeredShortcut);
 
     // `registerAction` 会覆盖同 ID 的默认键但保留已订阅的语义动作；借此让作者在设置面板改键后立即生效。
-    ctx.settings.subscribe<unknown>("openPhoneShortcut", (value) => {
-      const nextShortcut = normalizeOpenPhoneShortcut(value);
-      if (nextShortcut === registeredShortcut) return;
-      registeredShortcut = nextShortcut;
-      registerOpenPhoneAction(nextShortcut);
-      phoneDebug("open-shortcut-updated", { shortcut: nextShortcut });
-    });
+    unsubscribers.push(
+      ctx.settings.subscribe<unknown>("openPhoneShortcut", (value) => {
+        if (ctx.flow.signal.aborted) return;
+        const nextShortcut = normalizeOpenPhoneShortcut(value);
+        if (nextShortcut === registeredShortcut) return;
+        registeredShortcut = nextShortcut;
+        registerOpenPhoneAction(nextShortcut);
+        phoneDebug("open-shortcut-updated", { shortcut: nextShortcut });
+      }),
+    );
 
-    ctx.input.onAction(OPEN_PHONE_ACTION, () => {
+    const openPhone = () => {
       const runtime = getPhoneRuntime(ctx);
       const uiVisible = ctx.ui.isVisible("phone");
       runtimeDebug(runtime, "open-action-received", {
@@ -2057,6 +2094,7 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
       };
 
       runtime.opening = true;
+      void ctx.ui.hide("phone-hud");
       try {
         runtimeDebug(runtime, "open-show-start", { mountEpoch });
         const shown = ctx.ui.show("phone", undefined, {
@@ -2084,13 +2122,52 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
           })
           .catch((error: unknown) => {
             console.error("[phone] 打开手机失败", error);
+            showPhoneHudUi(ctx, runtime);
             releaseOpening("error");
           });
       } catch (error) {
         console.error("[phone] 打开手机失败", error);
+        showPhoneHudUi(ctx, runtime);
         releaseOpening("error");
       }
-    });
+    };
+
+    unsubscribers.push(ctx.input.onAction(OPEN_PHONE_ACTION, openPhone));
+    const runtime = getPhoneRuntime(ctx);
+    runtime.openPhoneFromHud = openPhone;
+    if (runtime.phoneMounted) showPhoneHudUi(ctx, runtime);
+    for (const key of [
+      "showPhoneHudButton",
+      "phoneHudIcon",
+      "phoneHudPosition",
+      "phoneHudOffsetX",
+      "phoneHudOffsetY",
+      "phoneHudSize",
+    ]) {
+      unsubscribers.push(
+        ctx.settings.subscribe(key, () => {
+          if (ctx.flow.signal.aborted) return;
+          if (ctx.settings.get<boolean>("showPhoneHudButton") === false) {
+            void ctx.ui.hide("phone-hud");
+          } else {
+            showPhoneHudUi(ctx, runtime);
+          }
+        }),
+      );
+    }
+
+    const cleanup = () => {
+      for (const unsubscribe of unsubscribers.splice(0)) unsubscribe();
+      ctx.flow.signal.removeEventListener("abort", cleanup);
+      if (runtime.openPhoneFromHud === openPhone) {
+        runtime.openPhoneFromHud = undefined;
+      }
+      if (phoneRegistrationCleanups.get(registrationKey) === cleanup) {
+        phoneRegistrationCleanups.delete(registrationKey);
+      }
+    };
+    phoneRegistrationCleanups.set(registrationKey, cleanup);
+    ctx.flow.signal.addEventListener("abort", cleanup, { once: true });
   }
 
   /**
@@ -2214,6 +2291,7 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
           // 关闭动画已由 UI 播放完毕（closeWithAnimation）；此处释放 phone 容器，
           // 再唤醒等待中的 openPhoneApp 调用方。hide 与 emit 串行，避免在 UI 仍可见时提前返回。
           void hidePhoneUi(this.context).finally(() => emitPhoneClosed());
+          showPhoneHudUi(this.context, runtime);
         },
         // 不依赖 ctx.ui.show() 的初始 data：首次 render 若尚未拿到消息快照，UI 也能订阅并回放当前会话。
         subscribeStoryMessages: (listener) =>

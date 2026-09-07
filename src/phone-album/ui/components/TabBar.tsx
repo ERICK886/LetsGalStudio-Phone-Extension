@@ -1,6 +1,6 @@
 /**
  * @file TabBar.tsx
- * @description 相册内页底部 Tab：相册 / 拍照（Font Awesome 图标）。
+ * @description 相册内页底部 Tab：相册 / 拍照（本地内联 SVG 图标）。
  * @author 池水三两升
  * @date 2026-08-10
  * @version 0.1.0
@@ -9,6 +9,7 @@
 import React from "react";
 
 import type { AlbumMainTab } from "../../runtime/camera-session";
+import { AlbumIcon } from "./AlbumIcon";
 
 export interface TabBarProps {
   /** 当前主 Tab */
@@ -32,7 +33,7 @@ export function TabBar(props: TabBarProps) {
         onClick={() => onChange("album")}
         aria-current={active === "album" ? "page" : undefined}
       >
-        <i className="fa-solid fa-images" aria-hidden="true" />
+        <AlbumIcon name="albums" />
         <span>相册</span>
       </button>
       <button
@@ -41,7 +42,7 @@ export function TabBar(props: TabBarProps) {
         onClick={() => onChange("camera")}
         aria-current={active === "camera" ? "page" : undefined}
       >
-        <i className="fa-solid fa-camera" aria-hidden="true" />
+        <AlbumIcon name="camera" />
         <span>拍照</span>
       </button>
     </nav>

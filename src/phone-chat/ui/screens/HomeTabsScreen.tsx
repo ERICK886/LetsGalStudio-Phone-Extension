@@ -9,7 +9,16 @@
 import React from "react";
 
 import type { ChatAuthorSettings } from "../../runtime/settings";
-import type { ChatTab, ChatThread } from "../../types/index";
+import {
+  conversationIdForThread,
+  groupConversationId,
+  parseConversationId,
+} from "../../domain/conversations";
+import type {
+  ChatGroupDefinition,
+  ChatTab,
+  ChatThread,
+} from "../../types/index";
 import {
   AppHeader,
   ChatThreadRow,
@@ -26,6 +35,7 @@ export interface HomeTabsScreenProps {
   settings: ChatAuthorSettings;
   /** 全部会话线程 */
   threads: ChatThread[];
+  groups: readonly ChatGroupDefinition[];
   /** 好友角色 ID 列表 */
   friendIds: string[];
   /**
@@ -38,8 +48,8 @@ export interface HomeTabsScreenProps {
   onCloseApp: () => void;
   /** 切换底部 Tab */
   onChangeTab: (tab: ChatTab) => void;
-  /** 打开与指定好友的聊天页 */
-  onOpenChat: (friendCharacterId: string) => void;
+  /** 打开单聊或群聊会话。 */
+  onOpenConversation: (conversationId: string) => void;
   /** 打开指定好友详情页 */
   onOpenFriendDetail: (friendCharacterId: string) => void;
 }
@@ -49,8 +59,25 @@ export interface HomeTabsScreenProps {
  * @returns 首页节点
  */
 export function HomeTabsScreen(props: HomeTabsScreenProps) {
-  const visibleThreads = props.threads.filter((thread) =>
-    props.friendIds.includes(thread.friendCharacterId),
+  const existingConversationIds = new Set(
+    props.threads.map(conversationIdForThread),
+  );
+  const groupPlaceholders: ChatThread[] = props.groups
+    .filter(
+      (group) => !existingConversationIds.has(groupConversationId(group.id)),
+    )
+    .map((group) => ({
+      kind: "group",
+      friendCharacterId: "",
+      groupId: group.id,
+      messages: [],
+      updatedAt: 0,
+      unreadCount: 0,
+    }));
+  const visibleThreads = [...props.threads, ...groupPlaceholders].filter((thread) =>
+    parseConversationId(conversationIdForThread(thread))?.kind === "group"
+      ? true
+      : props.friendIds.includes(thread.friendCharacterId),
   );
 
   return (
@@ -65,9 +92,10 @@ export function HomeTabsScreen(props: HomeTabsScreenProps) {
             <div>
               {visibleThreads.map((thread) => (
                 <ChatThreadRow
-                  key={thread.friendCharacterId}
+                  key={conversationIdForThread(thread)}
                   thread={thread}
-                  onOpen={props.onOpenChat}
+                  groups={props.groups}
+                  onOpen={props.onOpenConversation}
                 />
               ))}
             </div>

@@ -11,7 +11,8 @@
  */
 
 import type { ExtensionContext } from "@avg-studio/sdk";
-import type { ChatAttributeField } from "../types/index";
+import { normalizeGroupDefinitions } from "../domain/groups";
+import type { ChatAttributeField, ChatGroupDefinition } from "../types/index";
 
 /**
  * 作者设置快照（运行时规范化后）。
@@ -19,6 +20,7 @@ import type { ChatAttributeField } from "../types/index";
 export interface ChatAuthorSettings {
   selfCharacterId: string;
   defaultFriends: string[];
+  defaultGroups: ChatGroupDefinition[];
   attributeFields: ChatAttributeField[];
   chatsTabLabel: string;
   friendsTabLabel: string;
@@ -30,6 +32,7 @@ export interface ChatAuthorSettings {
 const DEFAULTS: ChatAuthorSettings = {
   selfCharacterId: "",
   defaultFriends: [],
+  defaultGroups: [],
   attributeFields: [],
   chatsTabLabel: "聊天",
   friendsTabLabel: "好友",
@@ -42,6 +45,7 @@ const DEFAULTS: ChatAuthorSettings = {
 export const CHAT_SETTINGS_KEYS = [
   "selfCharacterId",
   "defaultFriends",
+  "defaultGroups",
   "attributeFields",
   "appTitle",
   "chatsTabLabel",
@@ -92,6 +96,9 @@ export function readAuthorSettings(ctx: ExtensionContext): ChatAuthorSettings {
   return {
     selfCharacterId: String(ctx.settings.get("selfCharacterId") ?? "").trim(),
     defaultFriends,
+    defaultGroups: normalizeGroupDefinitions(
+      ctx.settings.get<unknown[]>("defaultGroups") ?? [],
+    ),
     attributeFields,
     chatsTabLabel: nonEmpty(
       ctx.settings.get("chatsTabLabel"),
@@ -126,6 +133,10 @@ export function cacheAuthorSettings(settings: ChatAuthorSettings): void {
   cachedSettings = {
     ...settings,
     defaultFriends: [...settings.defaultFriends],
+    defaultGroups: settings.defaultGroups.map((group) => ({
+      ...group,
+      memberCharacterIds: [...group.memberCharacterIds],
+    })),
     attributeFields: settings.attributeFields.map((field) => ({ ...field })),
   };
 }
@@ -139,6 +150,10 @@ export function getCachedAuthorSettings(): ChatAuthorSettings {
   return {
     ...cachedSettings,
     defaultFriends: [...cachedSettings.defaultFriends],
+    defaultGroups: cachedSettings.defaultGroups.map((group) => ({
+      ...group,
+      memberCharacterIds: [...group.memberCharacterIds],
+    })),
     attributeFields: cachedSettings.attributeFields.map((field) => ({
       ...field,
     })),

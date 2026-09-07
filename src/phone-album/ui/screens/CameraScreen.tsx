@@ -15,6 +15,8 @@ import {
   getLastShotThumb,
   isCaptureBusy,
 } from "../../runtime/camera-session";
+import { getAlbumRuntimeKey } from "../../runtime/runtime-key";
+import { AlbumIcon } from "../components/AlbumIcon";
 
 export interface CameraScreenProps {
   /** 关闭整部手机（截图前必须关壳，避免 UI 入画） */
@@ -30,15 +32,16 @@ export interface CameraScreenProps {
 export function CameraScreen(props: CameraScreenProps) {
   const { closePhone, onOpenCameraRoll } = props;
   const ctx = useExtensionContext();
+  const runtimeKey = getAlbumRuntimeKey(ctx);
   const [busy, setBusy] = useState(false);
   const [flash, setFlash] = useState(false);
   const [hint, setHint] = useState("点击快门拍摄当前游戏画面");
   const [thumb, setThumb] = useState<string | undefined>(() =>
-    getLastShotThumb(),
+    getLastShotThumb(runtimeKey),
   );
 
   const onShutter = useCallback(async () => {
-    if (busy || isCaptureBusy()) return;
+    if (busy || isCaptureBusy(runtimeKey)) return;
     setBusy(true);
     setHint("正在拍照…");
     setFlash(true);
@@ -55,13 +58,13 @@ export function CameraScreen(props: CameraScreenProps) {
       console.warn("[phone-album] 拍照失败", result.error);
     }
     setBusy(false);
-  }, [busy, closePhone, ctx]);
+  }, [busy, closePhone, ctx, runtimeKey]);
 
   return (
     <div className="pa-camera">
       <header className="pa-camera-top">
         <div className="pa-camera-top-title">
-          <i className="fa-solid fa-camera" aria-hidden="true" />
+          <AlbumIcon name="camera" />
           <span>拍照</span>
         </div>
         <p className="pa-camera-hint">{hint}</p>
@@ -89,7 +92,7 @@ export function CameraScreen(props: CameraScreenProps) {
           {thumb ? (
             <img src={thumb} alt="" />
           ) : (
-            <i className="fa-regular fa-image" aria-hidden="true" />
+            <AlbumIcon name="image" />
           )}
         </button>
 

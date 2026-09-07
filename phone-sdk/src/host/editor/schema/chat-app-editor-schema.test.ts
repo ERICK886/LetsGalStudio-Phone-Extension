@@ -10,9 +10,15 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 describe("CHAT_APP_EDITOR_SCHEMA shape", () => {
-  it("expects three chat-app pages without story-phone fields", () => {
-    const pageIds = ["chat-copy", "chat-friends", "chat-attributes"];
-    assert.equal(pageIds.length, 3);
+  it("expects chat copy, friend, group and attribute pages", async () => {
+    const { CHAT_APP_EDITOR_SCHEMA } = await import("./chat-app-editor-schema.ts");
+    const pageIds = CHAT_APP_EDITOR_SCHEMA.pages.map((page) => page.id);
+    assert.deepEqual(pageIds, [
+      "chat-copy",
+      "chat-friends",
+      "chat-groups",
+      "chat-attributes",
+    ]);
     assert.ok(!pageIds.includes("story-role-presets"));
     assert.ok(!pageIds.includes("chat-role-presets"));
   });

@@ -36,7 +36,7 @@ import { clearLastShotIf } from "./camera-session";
  * @param input.coverMediaId - 可选，封面媒体 id
  * @param input.coverAsset - 可选，封面 asset
  */
-export function executeAddAlbum(input: {
+export function executeAddAlbum(runtimeKey: object, input: {
   albumId: string;
   name: string;
   coverMediaId?: string;
@@ -47,9 +47,9 @@ export function executeAddAlbum(input: {
     console.warn("[phone-album] executeAddAlbum：空 albumId");
     return;
   }
-  const settings = getCachedAuthorSettings();
-  const next = applyAddAlbum(getAlbumSaveState(), settings, input);
-  setAlbumSaveState(next);
+  const settings = getCachedAuthorSettings(runtimeKey);
+  const next = applyAddAlbum(getAlbumSaveState(runtimeKey), settings, input);
+  setAlbumSaveState(runtimeKey, next);
 }
 
 /**
@@ -57,15 +57,15 @@ export function executeAddAlbum(input: {
  *
  * @param albumId - 相册 id（空 / `__all__` 则 warn + return）
  */
-export function executeRemoveAlbum(albumId: string): void {
+export function executeRemoveAlbum(runtimeKey: object, albumId: string): void {
   const id = albumId?.trim() ?? "";
   if (id === "") {
     console.warn("[phone-album] executeRemoveAlbum：空 albumId");
     return;
   }
-  const settings = getCachedAuthorSettings();
-  const next = applyRemoveAlbum(getAlbumSaveState(), settings, id);
-  setAlbumSaveState(next);
+  const settings = getCachedAuthorSettings(runtimeKey);
+  const next = applyRemoveAlbum(getAlbumSaveState(runtimeKey), settings, id);
+  setAlbumSaveState(runtimeKey, next);
 }
 
 /**
@@ -78,7 +78,7 @@ export function executeRemoveAlbum(albumId: string): void {
  * @param input.durationSec - 可选时长（视频）
  * @param input.posterAsset - 可选视频封面图
  */
-export function executeAddMedia(input: {
+export function executeAddMedia(runtimeKey: object, input: {
   mediaId: string;
   type: MediaType;
   asset: string;
@@ -91,9 +91,9 @@ export function executeAddMedia(input: {
     console.warn("[phone-album] executeAddMedia：空 mediaId");
     return;
   }
-  const settings = getCachedAuthorSettings();
-  const next = applyAddMedia(getAlbumSaveState(), settings, input);
-  setAlbumSaveState(next);
+  const settings = getCachedAuthorSettings(runtimeKey);
+  const next = applyAddMedia(getAlbumSaveState(runtimeKey), settings, input);
+  setAlbumSaveState(runtimeKey, next);
 }
 
 /**
@@ -101,15 +101,15 @@ export function executeAddMedia(input: {
  *
  * @param mediaId - 媒体 id（空则 warn + return）
  */
-export function executeRemoveMedia(mediaId: string): void {
+export function executeRemoveMedia(runtimeKey: object, mediaId: string): void {
   const id = mediaId?.trim() ?? "";
   if (id === "") {
     console.warn("[phone-album] executeRemoveMedia：空 mediaId");
     return;
   }
-  const settings = getCachedAuthorSettings();
-  const next = applyRemoveMedia(getAlbumSaveState(), settings, id);
-  setAlbumSaveState(next);
+  const settings = getCachedAuthorSettings(runtimeKey);
+  const next = applyRemoveMedia(getAlbumSaveState(runtimeKey), settings, id);
+  setAlbumSaveState(runtimeKey, next);
 }
 
 /**
@@ -119,6 +119,7 @@ export function executeRemoveMedia(mediaId: string): void {
  * @param albumIds - 新归属相册 id 列表
  */
 export function executeSetMediaAlbums(
+  runtimeKey: object,
   mediaId: string,
   albumIds: string[],
 ): void {
@@ -127,14 +128,14 @@ export function executeSetMediaAlbums(
     console.warn("[phone-album] executeSetMediaAlbums：空 mediaId");
     return;
   }
-  const settings = getCachedAuthorSettings();
+  const settings = getCachedAuthorSettings(runtimeKey);
   const next = applySetMediaAlbums(
-    getAlbumSaveState(),
+    getAlbumSaveState(runtimeKey),
     settings,
     id,
     albumIds,
   );
-  setAlbumSaveState(next);
+  setAlbumSaveState(runtimeKey, next);
 }
 
 /**
@@ -143,13 +144,16 @@ export function executeSetMediaAlbums(
  * @param media - 已构造好的媒体条目（含 data URL asset）
  * @returns 是否写入了真实 save
  */
-export function executeAddCameraPhoto(media: AlbumMedia): boolean {
+export function executeAddCameraPhoto(
+  runtimeKey: object,
+  media: AlbumMedia,
+): boolean {
   const mediaId = media.id?.trim() ?? "";
   if (mediaId === "" || !media.asset) {
     console.warn("[phone-album] executeAddCameraPhoto：无效媒体");
     return false;
   }
-  return addCameraPhotoToShared({
+  return addCameraPhotoToShared(runtimeKey, {
     ...media,
     id: mediaId,
     type: media.type === "video" ? "video" : "image",
@@ -162,8 +166,11 @@ export function executeAddCameraPhoto(media: AlbumMedia): boolean {
  * @param mediaId - 媒体 id
  * @returns 是否删除成功
  */
-export function executeRemoveCameraPhoto(mediaId: string): boolean {
-  const ok = removeCameraPhotoFromShared(mediaId);
-  if (ok) clearLastShotIf(mediaId);
+export function executeRemoveCameraPhoto(
+  runtimeKey: object,
+  mediaId: string,
+): boolean {
+  const ok = removeCameraPhotoFromShared(runtimeKey, mediaId);
+  if (ok) clearLastShotIf(runtimeKey, mediaId);
   return ok;
 }

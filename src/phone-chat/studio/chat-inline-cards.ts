@@ -36,15 +36,6 @@ const STYLE_ATTRIBUTE = "data-chat-inline-card-style";
 const RUNTIME_KEY = "__inkZenlyChatInlineCards";
 
 /**
- * 聊天内页方法 ID（与 `ChatController` 静态 method 的 `id` 一致）。
- */
-type ChatMethodId =
-  | "send-friend-messages"
-  | "await-player-reply"
-  | "add-friend"
-  | "remove-friend";
-
-/**
  * Studio `callExtensionFunction` 块的最小结构（仅读 props，不写回）。
  */
 interface ExtensionBlock {
@@ -80,12 +71,22 @@ interface InlineCardRuntime {
  * @remarks
  * `label` 需与方法 `title` 一致，便于 Fiber 失败时按文本兜底识别。
  */
-const METHOD_META: Record<ChatMethodId, { label: string; icon: string }> = {
+export const CHAT_INLINE_CARD_METHOD_META = {
   "send-friend-messages": { label: "聊天 · 对方发送消息", icon: "◀" },
   "await-player-reply": { label: "聊天 · 玩家回复一句", icon: "▶" },
+  "send-group-messages": { label: "聊天 · 群成员发送消息", icon: "◀" },
+  "await-group-reply": { label: "聊天 · 玩家回复群聊", icon: "▶" },
+  "join-group": { label: "聊天 · 角色加入群聊", icon: "↘" },
+  "leave-group": { label: "聊天 · 角色退出群聊", icon: "↗" },
   "add-friend": { label: "聊天 · 添加好友", icon: "＋" },
   "remove-friend": { label: "聊天 · 移除好友", icon: "−" },
-};
+} as const satisfies Record<string, { label: string; icon: string }>;
+
+/** 聊天内页方法 ID（与 `ChatController` 静态 method 的 `id` 一致）。 */
+export type ChatInlineCardMethodId = keyof typeof CHAT_INLINE_CARD_METHOD_META;
+
+type ChatMethodId = ChatInlineCardMethodId;
+const METHOD_META = CHAT_INLINE_CARD_METHOD_META;
 
 /**
  * 判断值是否为普通对象。
@@ -762,15 +763,15 @@ function appendChip(parent: HTMLElement, value: string): void {
  *
  * @param methodId - 聊天方法 ID
  * @param params - 解包后的字面量参数
- * @param friendLabel - 已解析的好友显示名（角色名优先）
+ * @param characterLabel - 已解析的好友、群成员或入群角色显示名
  * @returns summary 与 chips
  */
-function renderDetails(
+export function buildChatInlineCardDetails(
   methodId: ChatMethodId,
   params: Record<string, unknown>,
-  friendLabel: string,
+  characterLabel: string,
 ): { summary: string; chips: string[] } {
-  const friend = friendLabel;
+  const friend = characterLabel;
 
   switch (methodId) {
     case "send-friend-messages": {
@@ -807,6 +808,74 @@ function renderDetails(
           `状态：${status}`,
           closeAfter ? "回复后关手机" : undefined,
         ].filter((chip): chip is string => Boolean(chip)),
+      };
+    }
+    case "send-group-messages": {
+      const groupId = displayValue(params.groupId, 32);
+      const messageCount = countFriendMessages(params);
+      const firstMessage = firstFriendMessageSummary(params);
+      const openPhone = asBoolean(params.openPhone, true);
+      const waitClose = asBoolean(params.waitUntilClose, false);
+      return {
+        summary:
+          friend && groupId
+            ? `${friend} 在群聊 ${groupId} 发送 ${messageCount} 条消息${firstMessage ? `：${firstMessage}` : ""}`
+            : "请在 Inspector 填写群 ID、选择发送者并填写消息。",
+        chips: [
+          groupId ? `群：${groupId}` : "缺群 ID",
+          friend ? `发送者：${friend}` : "缺发送者",
+          messageCount > 0 ? `${messageCount} 条消息` : "无消息",
+          openPhone ? "打开手机" : "不打开手机",
+          waitClose ? "等待关手机" : undefined,
+        ].filter((chip): chip is string => Boolean(chip)),
+      };
+    }
+    case "await-group-reply": {
+      const groupId = displayValue(params.groupId, 32);
+      const replyCount = countReplyOptions(params);
+      const firstReply = firstReplySummary(params);
+      const requireReply = asBoolean(params.requireReply, true);
+      const closeAfter = asBoolean(params.closePhoneAfter, false);
+      const status = displayValue(params.outgoingStatus, 16) || "read";
+      return {
+        summary: groupId
+          ? `${requireReply ? "等待" : "可选"}回复群聊 ${groupId}${firstReply ? `：${firstReply}` : ""}${replyCount > 1 ? ` 等 ${replyCount} 项` : ""}`
+          : "请在 Inspector 填写群 ID 并配置回复选项。",
+        chips: [
+          groupId ? `群：${groupId}` : "缺群 ID",
+          replyCount > 0 ? `${replyCount} 个选项` : "无选项",
+          requireReply ? "必须回复" : "非必须",
+          `状态：${status}`,
+          closeAfter ? "回复后关手机" : undefined,
+        ].filter((chip): chip is string => Boolean(chip)),
+      };
+    }
+    case "join-group": {
+      const groupId = displayValue(params.groupId, 32);
+      return {
+        summary:
+          friend && groupId
+            ? `${friend} 加入群聊 ${groupId}`
+            : "请在 Inspector 填写群 ID 并选择加入的角色。",
+        chips: [
+          "加入群聊",
+          groupId ? `群：${groupId}` : "缺群 ID",
+          friend ? `角色：${friend}` : "缺角色",
+        ],
+      };
+    }
+    case "leave-group": {
+      const groupId = displayValue(params.groupId, 32);
+      return {
+        summary:
+          friend && groupId
+            ? `${friend} 退出群聊 ${groupId}（保留聊天记录）`
+            : "请在 Inspector 填写群 ID 并选择退出的角色。",
+        chips: [
+          "退出群聊",
+          groupId ? `群：${groupId}` : "缺群 ID",
+          friend ? `角色：${friend}` : "缺角色",
+        ],
       };
     }
     case "add-friend": {
@@ -866,12 +935,26 @@ function renderCard(
   const rawParams = parseRawParams(block?.props?.paramsJson);
   const params = literalParams(block?.props?.paramsJson);
   const names = collectCharacterNameMap(content);
-  seedCharacterFromRawParam(rawParams.friend, names);
-  const friendLabel = displayCharacter(
-    params.friend ?? rawParams.friend,
-    names,
+  const characterParam =
+    methodId === "join-group" || methodId === "leave-group"
+      ? "member"
+      : methodId === "send-group-messages"
+        ? "sender"
+        : methodId === "await-group-reply"
+          ? undefined
+          : "friend";
+  if (characterParam) seedCharacterFromRawParam(rawParams[characterParam], names);
+  const characterLabel = characterParam
+    ? displayCharacter(
+        params[characterParam] ?? rawParams[characterParam],
+        names,
+      )
+    : "";
+  const { summary, chips } = buildChatInlineCardDetails(
+    methodId,
+    params,
+    characterLabel,
   );
-  const { summary, chips } = renderDetails(methodId, params, friendLabel);
   const signature = `${methodId}\0${summary}\0${chips.join("\0")}`;
   if (card.dataset.signature === signature) return;
   card.dataset.signature = signature;

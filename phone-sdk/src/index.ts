@@ -24,10 +24,11 @@
 import "./host/studio/phone-inline-cards";
 
 import { PhoneExtension } from "./host/phone/extension/phone-extension";
+import { PhoneHudExtension } from "./host/phone/extension/phone-hud-extension";
 import { ToastExtension } from "./host/toast/extension/toast-extension";
 import { PhoneEditorExtension } from "./host/editor/phone-editor-extension";
 
-export { PhoneExtension, ToastExtension, PhoneEditorExtension };
+export { PhoneExtension, PhoneHudExtension, ToastExtension, PhoneEditorExtension };
 export {
   buildPhoneHostSettingsFields,
   phoneHostSaveSchema,
@@ -55,6 +56,7 @@ export {
 } from "./host/editor/schema/resolve-editor-section-schema";
 export { buildSectionSchemaFromStyleEditor } from "./host/editor/schema/build-section-schema-from-style-editor";
 export { AssetUriField, AssetUriThumb } from "./host/editor/shared/asset-uri-field";
+export { CharacterAssetSelect } from "./host/editor/shared/character-select";
 export {
   EnumSelect,
   type EnumSelectProps,
@@ -73,6 +75,16 @@ export {
 export type { ThemeContextValue } from "./host/editor/theme/theme-provider";
 export { PhoneContentList } from "./host/editor/phone/phone-content-list";
 export { PhonePropertyPanel } from "./host/editor/phone/phone-property-panel";
+export {
+  PhoneCallPreview,
+  type PhoneCallPreviewProps,
+} from "./host/editor/phone/phone-call-preview";
+export {
+  PhonePreviewStatusBar,
+  PhonePreviewStatusIcons,
+  type PhonePreviewStatusBarProps,
+  type PhonePreviewStylePreset,
+} from "./host/editor/phone/phone-preview-status-bar";
 export {
   readModuleSetting,
   writeModuleSetting,

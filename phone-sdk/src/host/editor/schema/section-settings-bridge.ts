@@ -160,6 +160,10 @@ export function writeSectionContentItem(
 
   if (item.fieldType === "boolean") {
     payload = value === "true";
+  } else if (item.fieldType === "number") {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return false;
+    payload = Math.min(item.max ?? parsed, Math.max(item.min ?? parsed, parsed));
   }
 
   return writeModuleSetting(

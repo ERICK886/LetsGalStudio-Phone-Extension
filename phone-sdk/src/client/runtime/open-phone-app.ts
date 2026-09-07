@@ -7,32 +7,36 @@
  */
 
 import { getPhoneSdkSlot } from "./slot";
-import type { OpenPhoneAppOptions } from "./types";
+import type { OpenPhoneAppOptions, OpenPhoneAppResult } from "./types";
 
 /**
  * 打开指定手机内页应用。
  *
  * @param options 目标应用 id、等待策略与可选 payload
- * @returns 无宿主或空 appId 时立即 resolve；有宿主时委托 `slot.navigation.openPhoneApp`
+ * @returns 可判定的打开结果；旧版宿主返回 `void` 时按成功打开处理
  *
  * @remarks
  * - 空 `appId`：打印 warn 并忽略
  * - 未安装导航宿主：打印 warn 并忽略，避免插件脚本卡死
  */
-export async function openPhoneApp(options: OpenPhoneAppOptions): Promise<void> {
+export async function openPhoneApp(
+  options: OpenPhoneAppOptions,
+): Promise<OpenPhoneAppResult> {
   const appId = String(options.appId ?? "").trim();
   if (!appId) {
     console.warn("[phone-sdk] openPhoneApp: 空 appId，已忽略");
-    return;
+    return "invalid";
   }
   const nav = getPhoneSdkSlot().navigation;
   if (!nav) {
     console.warn("[phone-sdk] openPhoneApp: 手机宿主未安装，已忽略", { appId });
-    return;
+    return "unavailable";
   }
-  await nav.openPhoneApp({
+  const result = await nav.openPhoneApp({
     appId,
     waitUntil: options.waitUntil === "none" ? "none" : "close",
+    ...(options.position ? { position: options.position } : {}),
     ...(options.payload ? { payload: options.payload } : {}),
   });
+  return result ?? "opened";
 }

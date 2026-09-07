@@ -10,6 +10,7 @@
  * - 不依赖 Font Awesome 或场景交互共享模块，供 phone-editor shell 独立使用。
  */
 
+import { Box, ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import React, {
   createContext,
   useContext,
@@ -123,21 +124,22 @@ export function ThemeProvider({
   );
 
   return (
-    <ThemeContext.Provider value={value}>
-      <div
-        style={{
-          ...rootTypographyStyle,
-          width: "100%",
-          height: "100%",
-          display: "flex",
-          flexDirection: "column",
-          background: tokens.bgBase,
-          color: tokens.textPrimary,
-        }}
-      >
-        {children}
-      </div>
-    </ThemeContext.Provider>
+    <ChakraProvider value={defaultSystem}>
+      <ThemeContext.Provider value={value}>
+        <Box
+          data-theme={mode}
+          style={rootTypographyStyle}
+          width="100%"
+          height="100%"
+          display="flex"
+          flexDirection="column"
+          background={tokens.bgBase}
+          color={tokens.textPrimary}
+        >
+          {children}
+        </Box>
+      </ThemeContext.Provider>
+    </ChakraProvider>
   );
 }
 

@@ -13,6 +13,7 @@ import { firstGlyph, resolveAssetUrl } from "../../phone/ui/asset-utils";
 import { IconLabel } from "../shared/fa-icon";
 import { useTheme, FONT_SIZE_DEFAULT } from "../theme/theme-provider";
 import type { EditableCatalogApp } from "./desktop-apps-bridge";
+import { ChakraButton, ChakraDiv, ChakraImage, ChakraSpan } from "../shared/chakra-elements";
 
 /**
  * DesktopAppsList 属性。
@@ -42,7 +43,7 @@ export function DesktopAppsList({
   const { tokens } = useTheme();
 
   return (
-    <div
+    <ChakraDiv
       style={{
         width: "100%",
         height: "100%",
@@ -57,7 +58,7 @@ export function DesktopAppsList({
         borderRadius: 6,
       }}
     >
-      <div
+      <ChakraDiv
         style={{
           fontSize: 11,
           fontWeight: 600,
@@ -68,9 +69,9 @@ export function DesktopAppsList({
         }}
       >
         桌面应用
-      </div>
+      </ChakraDiv>
 
-      <div
+      <ChakraDiv
         style={{
           flex: "1 1 auto",
           minHeight: 0,
@@ -85,7 +86,7 @@ export function DesktopAppsList({
           const iconUrl = resolveAssetUrl(ctx, app.icon || undefined);
 
           return (
-            <button
+            <ChakraButton
               key={app.id}
               type="button"
               onClick={() => onSelect(app.id)}
@@ -105,7 +106,7 @@ export function DesktopAppsList({
                 opacity: app.enabled ? 1 : 0.55,
               }}
             >
-              <span
+              <ChakraSpan
                 style={{
                   width: 28,
                   height: 28,
@@ -122,7 +123,7 @@ export function DesktopAppsList({
                 }}
               >
                 {iconUrl ? (
-                  <img
+                  <ChakraImage
                     src={iconUrl}
                     alt=""
                     style={{ width: "100%", height: "100%", objectFit: "cover" }}
@@ -130,9 +131,9 @@ export function DesktopAppsList({
                 ) : (
                   firstGlyph(app.name)
                 )}
-              </span>
-              <span style={{ flex: 1, minWidth: 0 }}>
-                <span
+              </ChakraSpan>
+              <ChakraSpan style={{ flex: 1, minWidth: 0 }}>
+                <ChakraSpan
                   style={{
                     display: "block",
                     overflow: "hidden",
@@ -142,8 +143,8 @@ export function DesktopAppsList({
                   }}
                 >
                   {app.name}
-                </span>
-                <span
+                </ChakraSpan>
+                <ChakraSpan
                   style={{
                     display: "block",
                     fontSize: 10,
@@ -154,15 +155,15 @@ export function DesktopAppsList({
                   }}
                 >
                   {app.id} · order {app.order}
-                </span>
-              </span>
-            </button>
+                </ChakraSpan>
+              </ChakraSpan>
+            </ChakraButton>
           );
         })}
-      </div>
+      </ChakraDiv>
 
-      <div style={{ display: "flex", gap: 6, padding: "0 4px 4px" }}>
-        <button
+      <ChakraDiv style={{ display: "flex", gap: 6, padding: "0 4px 4px" }}>
+        <ChakraButton
           type="button"
           onClick={onAdd}
           style={{
@@ -177,8 +178,8 @@ export function DesktopAppsList({
           }}
         >
           <IconLabel icon="plus">添加</IconLabel>
-        </button>
-        <button
+        </ChakraButton>
+        <ChakraButton
           type="button"
           disabled={!selectedId || apps.length <= 1}
           title={apps.length <= 1 ? "至少保留一个应用" : "删除选中应用"}
@@ -198,9 +199,9 @@ export function DesktopAppsList({
           }}
         >
           <IconLabel icon="trash">删除</IconLabel>
-        </button>
-      </div>
-    </div>
+        </ChakraButton>
+      </ChakraDiv>
+    </ChakraDiv>
   );
 }
 
