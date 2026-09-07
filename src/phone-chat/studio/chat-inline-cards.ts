@@ -814,19 +814,30 @@ export function buildChatInlineCardDetails(
       const groupId = displayValue(params.groupId, 32);
       const messageCount = countFriendMessages(params);
       const firstMessage = firstFriendMessageSummary(params);
+      const replyCount = countReplyOptions(params);
+      const firstReply = firstReplySummary(params);
+      const requireReply =
+        replyCount > 0 && asBoolean(params.requireReply, true);
+      const closeAfter =
+        requireReply && asBoolean(params.closePhoneAfter, false);
+      const status = displayValue(params.outgoingStatus, 16) || "read";
       const openPhone = asBoolean(params.openPhone, true);
       const waitClose = asBoolean(params.waitUntilClose, false);
       return {
         summary:
           friend && groupId
-            ? `${friend} 在群聊 ${groupId} 发送 ${messageCount} 条消息${firstMessage ? `：${firstMessage}` : ""}`
+            ? `${friend} 在群聊 ${groupId} 发送 ${messageCount} 条消息${firstMessage ? `：${firstMessage}` : ""}${replyCount > 0 ? `；${requireReply ? "等待" : "提供可选"}回复${firstReply ? `：${firstReply}` : ""}${replyCount > 1 ? ` 等 ${replyCount} 项` : ""}` : ""}`
             : "请在 Inspector 填写群 ID、选择发送者并填写消息。",
         chips: [
           groupId ? `群：${groupId}` : "缺群 ID",
           friend ? `发送者：${friend}` : "缺发送者",
           messageCount > 0 ? `${messageCount} 条消息` : "无消息",
-          openPhone ? "打开手机" : "不打开手机",
-          waitClose ? "等待关手机" : undefined,
+          replyCount > 0 ? `${replyCount} 个回复选项` : undefined,
+          replyCount > 0 ? (requireReply ? "必须回复" : "非必须") : undefined,
+          replyCount > 0 ? `状态：${status}` : undefined,
+          openPhone || requireReply ? "打开手机" : "不打开手机",
+          waitClose && !closeAfter ? "等待关手机" : undefined,
+          closeAfter ? "回复后关手机" : undefined,
         ].filter((chip): chip is string => Boolean(chip)),
       };
     }

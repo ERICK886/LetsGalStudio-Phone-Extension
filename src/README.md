@@ -756,7 +756,7 @@ npm view @ink-zenly/create-phone-app version --registry https://registry.npmjs.o
 ### 聊天 APP 群聊
 
 - 在「聊天APP → 默认群聊」配置稳定的群 ID、群名称、群头像和最多 8 名成员；群 ID 写入存档后不要随意修改。
-- `send-group-messages` 让指定成员向群里发送文字或图片；`await-group-reply` 提供玩家群聊回复并可挂起剧情。
+- `send-group-messages` 让指定成员向群里发送文字或图片，也可在同一方法中附带玩家回复；勾选必须回复后会强制打开对应群聊、锁定手机并挂起剧情。`await-group-reply` 仍可用于单独插入一轮群聊回复。
 - `join-group` / `leave-group` 让指定角色加入或退出已有群聊；成员变更随当前存档保存，重复执行不会重复变更，退出不会删除历史消息。
 - 单聊与群聊分别使用 `direct:<角色ID>`、`group:<群ID>` 作为内部会话键；旧单聊存档会继续按角色 ID 读取。
 - 群消息发送者必须使用角色资产 ID。发送者未列入群成员时仍会显示，但控制台会给出配置警告。

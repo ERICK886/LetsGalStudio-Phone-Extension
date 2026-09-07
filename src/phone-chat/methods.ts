@@ -33,6 +33,7 @@ import {
   bindChatSave,
   cacheAuthorSettings,
   closeChatPhoneAppAfter,
+  executeGroupMemberMessage,
   joinGroupMember,
   leaveGroupMember,
   openChatPhoneApp,
@@ -40,7 +41,6 @@ import {
   readAuthorSettings,
   removeFriend,
   sendFriendMessages,
-  sendGroupMessages,
 } from "./runtime/index";
 
 /**
@@ -100,24 +100,11 @@ async function executeSendGroupMessages(
   ctx: ExtensionContext,
   params: Record<string, unknown>,
   instanceSave: unknown,
+  allowWait: boolean,
   options: { openPhoneApp: boolean },
 ): Promise<void> {
   prepareRuntime(instanceSave, ctx);
-  const groupId = String(params.groupId ?? "").trim();
-  const senderCharacterId = String(params.sender ?? "").trim();
-  const messages = parseFriendMessagesFromParams(params);
-  if (!groupId || !senderCharacterId || messages.length === 0) return;
-
-  await sendGroupMessages({ groupId, senderCharacterId, messages });
-  const shouldOpen =
-    options.openPhoneApp && coerceMethodBoolean(params.openPhone, true);
-  if (!shouldOpen) return;
-  await openGroupChatPhoneApp({
-    groupId,
-    waitUntil: coerceMethodBoolean(params.waitUntilClose, false)
-      ? "close"
-      : "none",
-  });
+  await executeGroupMemberMessage(ctx, params, allowWait, options);
 }
 
 /**
@@ -345,11 +332,12 @@ export const chatAwaitPlayerReplyMethod = method({
   },
 });
 
-/** 向群聊写入指定成员发送的多条消息。 */
+/** 向群聊写入指定成员发送的多条消息，并可在同一方法中配置玩家回复。 */
 export const chatSendGroupMessagesMethod = method({
   id: "send-group-messages",
   title: "聊天 · 群成员发送消息",
-  description: "向指定群聊写入某位成员发送的多条消息，可打开手机并深链该群。",
+  description:
+    "向指定群聊写入成员消息，并可附带玩家回复选项；必须回复时强制打开群聊、锁定手机并挂起剧情。",
   schema: {
     openPhone: {
       type: "boolean",
@@ -358,8 +346,38 @@ export const chatSendGroupMessagesMethod = method({
     },
     waitUntilClose: {
       type: "boolean",
-      label: "等待玩家关闭手机",
+      label: "等待玩家关闭手机（回复后自动关闭时忽略）",
       default: false,
+    },
+    requireReply: {
+      type: "boolean",
+      label: "有回复选项时必须回复",
+      default: true,
+    },
+    outgoingStatus: {
+      type: "enum",
+      label: "我方回复消息状态",
+      default: "read",
+      options: [
+        { label: "发送中", value: "sending" },
+        { label: "未读", value: "unread" },
+        { label: "已读", value: "read" },
+        { label: "失败", value: "failed" },
+        { label: "被拉黑", value: "blocked" },
+      ],
+    },
+    closePhoneAfter: {
+      type: "boolean",
+      label: "回复后关闭手机（仅必须回复时生效）",
+      default: false,
+    },
+    closeDelayMs: {
+      type: "number",
+      label: "关闭延迟（毫秒）",
+      default: 1000,
+      min: 0,
+      max: 60_000,
+      step: 100,
     },
     groupId: {
       type: "string",
@@ -372,12 +390,14 @@ export const chatSendGroupMessagesMethod = method({
       required: true,
     },
     ...buildFriendMessageSchemaFields("群成员"),
+    ...buildReplySchemaFields(),
   },
   async run(ctx, params) {
     await executeSendGroupMessages(
       ctx,
       params as Record<string, unknown>,
       this.save,
+      true,
       { openPhoneApp: true },
     );
   },
@@ -386,6 +406,7 @@ export const chatSendGroupMessagesMethod = method({
       ctx,
       params as Record<string, unknown>,
       this.save,
+      false,
       { openPhoneApp: false },
     );
   },
@@ -394,6 +415,7 @@ export const chatSendGroupMessagesMethod = method({
       ctx,
       params as Record<string, unknown>,
       this.save,
+      false,
       { openPhoneApp: false },
     );
   },

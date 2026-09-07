@@ -62,4 +62,35 @@ describe("chat group inline cards", () => {
       "回复后关手机",
     ]);
   });
+
+  it("renders replies attached to a group member message", () => {
+    const details = buildChatInlineCardDetails(
+      "send-group-messages",
+      {
+        groupId: "club",
+        message: "今晚开会",
+        reply1: "收到",
+        requireReply: true,
+        outgoingStatus: "read",
+        openPhone: false,
+        closePhoneAfter: true,
+      },
+      "林夏",
+    );
+
+    assert.equal(
+      details.summary,
+      "林夏 在群聊 club 发送 1 条消息：今晚开会；等待回复：收到",
+    );
+    assert.deepEqual(details.chips, [
+      "群：club",
+      "发送者：林夏",
+      "1 条消息",
+      "1 个回复选项",
+      "必须回复",
+      "状态：read",
+      "打开手机",
+      "回复后关手机",
+    ]);
+  });
 });
