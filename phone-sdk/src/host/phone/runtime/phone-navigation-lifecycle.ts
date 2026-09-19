@@ -29,3 +29,10 @@ export async function resolvePhoneOpenLifecycle(
 export function shouldAnimatePhoneClose(animated: boolean | undefined): boolean {
   return animated !== false;
 }
+
+/** 普通打开或关闭手机时，清除仅属于上一次程序化打开的临时方位。 */
+export function clearPhonePositionOverride(slot: {
+  phonePositionOverride?: unknown;
+}): void {
+  delete slot.phonePositionOverride;
+}

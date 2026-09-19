@@ -35,6 +35,7 @@ import {
   hidePhoneUi,
 } from "../extension/phone-extension";
 import {
+  clearPhonePositionOverride,
   resolvePhoneOpenLifecycle,
   shouldAnimatePhoneClose,
 } from "./phone-navigation-lifecycle";
@@ -63,7 +64,7 @@ export function createPhoneNavigationController(
       const runtime = getPhoneRuntime(ctx);
       const slot = getPhoneSdkSlot();
       if (options.position) slot.phonePositionOverride = options.position;
-      else delete slot.phonePositionOverride;
+      else clearPhonePositionOverride(slot);
       phoneSdkDebug("宿主收到打开内页请求", {
         event: "host-navigation-enter",
         appId: options.appId,
@@ -142,7 +143,7 @@ export function createPhoneNavigationController(
 
     async closePhoneApp(options: ClosePhoneAppOptions = {}): Promise<void> {
       if (!options.force && isPhoneCloseLocked()) return;
-      delete getPhoneSdkSlot().phonePositionOverride;
+      clearPhonePositionOverride(getPhoneSdkSlot());
       const animated = getPhoneSdkSlot().requestAnimatedClosePhone;
       if (animated && shouldAnimatePhoneClose(options.animated)) {
         await animated(options);

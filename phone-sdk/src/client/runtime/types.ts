@@ -270,7 +270,7 @@ export interface ClosePhoneAppOptions {
   /** 是否播放宿主手机的关闭动画；默认 `true`。 */
   animated?: boolean;
   /**
-   * 已完成不可跳过的交互后，允许忽略遗留关闭锁。
+   * 已完成不可跳过的交互后，清除遗留关闭锁并强制关闭。
    * 普通内页和玩家操作不得设置此项。
    */
   force?: boolean;

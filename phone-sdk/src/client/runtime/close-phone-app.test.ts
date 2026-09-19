@@ -50,7 +50,7 @@ describe("closePhoneApp", () => {
     assert.equal(called, 1);
   });
 
-  it("allows a completed mandatory flow to bypass a stale close lock", async () => {
+  it("clears a stale close lock after a completed mandatory flow forces close", async () => {
     const received: Array<{ animated?: boolean; force?: boolean } | undefined> = [];
     getPhoneSdkSlot().navigation = {
       async openPhoneApp() {},
@@ -63,6 +63,25 @@ describe("closePhoneApp", () => {
     await closePhoneApp({ force: true });
 
     assert.deepEqual(received, [{ force: true }]);
+
+    await closePhoneApp();
+    assert.deepEqual(received, [{ force: true }, {}]);
+  });
+
+  it("clears a stale close lock even when the navigation host is missing", async () => {
+    acquirePhoneCloseLock();
+
+    await closePhoneApp({ force: true });
+
+    let called = 0;
+    getPhoneSdkSlot().navigation = {
+      async openPhoneApp() {},
+      async closePhoneApp() {
+        called += 1;
+      },
+    };
+    await closePhoneApp();
+    assert.equal(called, 1);
   });
 
   it("forwards the caller's no-animation close preference to the host", async () => {

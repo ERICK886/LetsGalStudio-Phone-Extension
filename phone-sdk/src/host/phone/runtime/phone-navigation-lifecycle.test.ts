@@ -5,11 +5,24 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  clearPhonePositionOverride,
   resolvePhoneOpenLifecycle,
   shouldAnimatePhoneClose,
 } from "./phone-navigation-lifecycle.ts";
 
 describe("phone-navigation lifecycle", () => {
+  it("普通手机打开前会清除上一次程序化打开的临时方位", () => {
+    const slot: { phonePositionOverride?: unknown; retained: boolean } = {
+      phonePositionOverride: "center",
+      retained: true,
+    };
+
+    clearPhonePositionOverride(slot);
+
+    assert.equal(slot.phonePositionOverride, undefined);
+    assert.equal(slot.retained, true);
+  });
+
   it("手机关闭动画默认开启，并允许调用方显式关闭", () => {
     assert.equal(shouldAnimatePhoneClose(undefined), true);
     assert.equal(shouldAnimatePhoneClose(true), true);

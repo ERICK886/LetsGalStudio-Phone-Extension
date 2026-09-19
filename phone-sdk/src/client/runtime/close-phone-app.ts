@@ -7,7 +7,10 @@
  */
 
 import { getPhoneSdkSlot } from "./slot";
-import { isPhoneCloseLocked } from "./phone-close-lock";
+import {
+  clearPhoneCloseLocks,
+  isPhoneCloseLocked,
+} from "./phone-close-lock";
 import type { ClosePhoneAppOptions } from "./types";
 
 /**
@@ -30,7 +33,13 @@ export async function closePhoneApp(
   options: ClosePhoneAppOptions = {},
 ): Promise<void> {
   const slot = getPhoneSdkSlot();
-  if (!options.force && isPhoneCloseLocked()) return;
+  if (options.force) {
+    // force 表示强制交互已经完成。这里既要绕过锁，也要释放遗留令牌，
+    // 否则下一次普通打开仍会被旧来电的关闭锁拦住。
+    clearPhoneCloseLocks();
+  } else if (isPhoneCloseLocked()) {
+    return;
+  }
   const nav = slot.navigation;
   if (!nav?.closePhoneApp) {
     console.warn("[phone-sdk] closePhoneApp: 手机宿主未安装，已忽略");

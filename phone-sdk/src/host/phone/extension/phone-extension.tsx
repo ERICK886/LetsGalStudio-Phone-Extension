@@ -18,7 +18,8 @@ import {
 } from "../catalog";
 import { installPhoneExtensionSdkHost } from "../runtime/install-host";
 import { bindPhoneNavigationController } from "../runtime/phone-navigation";
-import { emitPhoneClosed } from "@ink-zenly/phone-sdk/plugin";
+import { emitPhoneClosed, getPhoneSdkSlot } from "@ink-zenly/phone-sdk/plugin";
+import { clearPhonePositionOverride } from "../runtime/phone-navigation-lifecycle";
 import { PhoneUI } from "../ui/phone-ui";
 import { resolveAssetUrl } from "../ui/asset-utils";
 import { enqueueToast } from "../../toast/core/toast-runtime";
@@ -2077,6 +2078,10 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
         });
         return;
       }
+
+      // 普通快捷键 / HUD 打开必须使用作者设置的方位，不能沿用来电等
+      // `openPhoneApp({ position })` 留下的单次临时覆盖。
+      clearPhonePositionOverride(getPhoneSdkSlot());
 
       const mountEpoch = runtime.phoneMountEpoch;
       let settled = false;
