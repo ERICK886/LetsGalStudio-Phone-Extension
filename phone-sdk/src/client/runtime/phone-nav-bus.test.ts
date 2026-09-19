@@ -122,6 +122,14 @@ describe("phone-nav-bus", () => {
     unsub();
   });
 
+  it("按序号清理时不会误删更新的导航请求", () => {
+    publishPhoneNavigate({ appId: "chat", seq: 2 });
+    assert.equal(clearPhoneNavigatePending(1), false);
+    assert.deepEqual(getLatestPhoneNavigate(), { appId: "chat", seq: 2 });
+    assert.equal(clearPhoneNavigatePending(2), true);
+    assert.equal(getLatestPhoneNavigate(), null);
+  });
+
   it("emitPhoneClosed 清除 pending navigate", () => {
     publishPhoneNavigate({ appId: "chat", seq: 1 });
     emitPhoneClosed();

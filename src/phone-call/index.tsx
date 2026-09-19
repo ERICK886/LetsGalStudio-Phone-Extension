@@ -4,6 +4,7 @@ import { addPhoneContactMethod, defineOutgoingCallMethod, incomingCallMethod, re
 import { phoneCallSaveFields } from "./save-fields";
 import { bindPhoneCallSave, releaseIncomingCall } from "./runtime";
 import { buildPhoneCallSettings, cachePhoneCallSettings, phoneCallRuntimeScope, PHONE_CALL_SETTINGS_KEYS, readPhoneCallSettings } from "./settings";
+import "./studio/call-inline-cards";
 
 const registrationCleanups = new WeakMap<object, () => void>();
 

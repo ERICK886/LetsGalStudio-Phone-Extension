@@ -8,6 +8,7 @@
 
 import { getPhoneSdkSlot } from "./slot";
 import { isPhoneCloseLocked } from "./phone-close-lock";
+import type { ClosePhoneAppOptions } from "./types";
 
 /**
  * 关闭整部手机 UI。
@@ -16,20 +17,24 @@ import { isPhoneCloseLocked } from "./phone-close-lock";
  *
  * @remarks
  * - 未安装导航宿主：打印 warn 并忽略，避免插件脚本卡死
- * - 宿主优先走 UI 关闭动画；未挂载 UI 时回退为直接 hide
+ * - `animated` 默认 `true`，复用宿主 UI 的关闭动画
+ * - `animated: false` 时由宿主立即隐藏手机 UI
  *
  * @example
  * ```ts
  * await closePhoneApp();
+ * await closePhoneApp({ animated: false });
  * ```
  */
-export async function closePhoneApp(): Promise<void> {
+export async function closePhoneApp(
+  options: ClosePhoneAppOptions = {},
+): Promise<void> {
   const slot = getPhoneSdkSlot();
-  if (isPhoneCloseLocked()) return;
+  if (!options.force && isPhoneCloseLocked()) return;
   const nav = slot.navigation;
   if (!nav?.closePhoneApp) {
     console.warn("[phone-sdk] closePhoneApp: 手机宿主未安装，已忽略");
     return;
   }
-  await nav.closePhoneApp();
+  await nav.closePhoneApp(options);
 }

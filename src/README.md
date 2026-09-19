@@ -660,7 +660,8 @@ clearPhoneAppBadge("chat");
 
 | 版本 | 要点 |
 |------|------|
-| **1.3.1**（当前） | 聊天 / 相册同包多模块；新增 `PhoneEditorExtension`（phone-sdk `host/editor`，强调色 `#DB2777`，第一版仅外壳）。 |
+| **1.3.2**（当前） | 强制来电跨上下文桥接与首次点击链路修复；接听/挂断后无动画关闭手机并调用对应片段；新增电话方法内联卡片；优化 Phone SDK 首帧内页导航和按需诊断。 |
+| **1.3.1** | 聊天 / 相册同包多模块；新增 `PhoneEditorExtension`（phone-sdk `host/editor`，强调色 `#DB2777`，第一版仅外壳）。 |
 | **1.3.0** | 内置 `phone-chat` / `phone-album`（曾合并进 `StudioPhoneExtension`）；Phone SDK 应用 ID 填程序 ID。 |
 | **1.2.7** | phone-sdk `0.5.5`：Phone SDK 应用 ID 必须填「扩展ID/程序ID」；CLI `0.3.7`。 |
 | **1.2.6** | 相册迁出为独立扩展 `ink.zenly.app-cd6ad3`；phone-sdk `0.5.4` 桌面 APP 角标。 |
@@ -682,6 +683,7 @@ clearPhoneAppBadge("chat");
 
 | 版本 | npm | 要点 |
 |------|-----|------|
+| **0.5.26** | 本地 | `closePhoneApp({ animated })` 支持调用方选择动画或立即关闭；修复 `waitUntil: "none"` 被 `ui.show()` 阻塞；首次挂载可直接进入目标内页；重型调试与诊断改为显式开启。 |
 | **0.5.6** | 本地 | 宿主内置内页 Phone SDK 应用 ID 恢复为可只填程序 ID；跨扩展仍支持 `扩展ID/程序ID`。 |
 | **0.5.5** | ✅ npm | 曾强制「扩展ID/程序ID」；桌面角标 API 并入。 |
 | **0.5.4** | （未单独发 npm，并入 0.5.5） | 桌面 APP 角标 API：`setPhoneAppBadge` / `clearPhoneAppBadge`（`dot` \| `count`）。 |
@@ -740,6 +742,13 @@ clearPhoneAppBadge("chat");
 ```powershell
 npm view @ink-zenly/phone-sdk version --registry https://registry.npmjs.org/
 npm view @ink-zenly/create-phone-app version --registry https://registry.npmjs.org/
+```
+
+Phone SDK 的逐帧内页探测与注册表诊断默认关闭，避免影响手机/APP 首帧。需要排查时可在 Preview 控制台临时执行：
+
+```js
+globalThis.__LetsGalPhoneSdkDebug__ = true;
+globalThis.__LetsGalPhoneSdkDiag__ = true;
 ```
 
 ## 7. 内置内页：phone-chat 与 phone-album

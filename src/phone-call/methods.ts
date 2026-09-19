@@ -1,11 +1,16 @@
 import { method, type ExtensionContext } from "@avg-studio/sdk";
-import { closePhoneApp } from "@ink-zenly/phone-sdk/plugin";
 import { addContact, beginIncomingCall, bindPhoneCallSave, defineOutgoingStory, phoneCallDebug, removeContact } from "./runtime";
 import { cachePhoneCallSettings, readPhoneCallSettings } from "./settings";
-import type { StoryFragmentRef } from "./types";
 import type { PhoneCallPosition } from "./types";
+import {
+  PHONE_CALL_FRAGMENT_TRACE_VERSION,
+  completeIncomingCallChoice,
+  fragmentRawDetails,
+  resolveStoryFragmentRef,
+} from "./fragment-flow";
 
 const PHONE_POSITIONS = new Set<PhoneCallPosition>(["top-left", "top-center", "top-right", "bottom-left", "bottom-center", "bottom-right", "center"]);
+
 function position(value: unknown): PhoneCallPosition | undefined {
   const normalized = String(value ?? "").trim() as PhoneCallPosition;
   return PHONE_POSITIONS.has(normalized) ? normalized : undefined;
@@ -17,18 +22,19 @@ function prepare(self: unknown, ctx: ExtensionContext) {
   cachePhoneCallSettings(ctx, readPhoneCallSettings(ctx));
   phoneCallDebug("prepare-complete");
 }
-function ref(params: Record<string, unknown>, key: string): StoryFragmentRef | undefined { const fragmentId = String(params[key] ?? "").trim(); if (!fragmentId) return; const chapterId = String(params[`${key}Chapter`] ?? "").trim(); return { fragmentId, ...(chapterId ? { chapterId } : {}) }; }
-async function play(ctx: ExtensionContext, value?: StoryFragmentRef) { if (value) await ctx.flow.callFragment(value.fragmentId, value.chapterId ? { chapterId: value.chapterId } : undefined); }
 
-async function executeIncomingCall(
+export async function executeIncomingCall(
   ctx: ExtensionContext,
   params: Record<string, unknown>,
   instanceSave: unknown,
 ): Promise<void> {
   phoneCallDebug("method-execute", {
+    traceVersion: PHONE_CALL_FRAGMENT_TRACE_VERSION,
     callerRawType: typeof params.caller,
     callerRaw: typeof params.caller === "string" ? params.caller : String(params.caller ?? ""),
     requireAnswerRaw: String(params.requireAnswer ?? ""),
+    ...fragmentRawDetails(params, "answerStory"),
+    ...fragmentRawDetails(params, "declineStory"),
   });
   prepare(instanceSave, ctx);
   const session = {
@@ -39,25 +45,28 @@ async function executeIncomingCall(
     requireAnswer:
       params.requireAnswer === true || params.requireAnswer === "true",
     position: position(params.position),
-    answerStory: ref(params, "answerStory"),
-    declineStory: ref(params, "declineStory"),
+    answerStory: resolveStoryFragmentRef(params, "answerStory"),
+    declineStory: resolveStoryFragmentRef(params, "declineStory"),
   };
   phoneCallDebug("method-session-normalized", {
     sessionId: session.id,
     characterId: session.characterId,
     requireAnswer: session.requireAnswer,
     position: session.position ?? null,
+    answerFragmentId: session.answerStory?.fragmentId ?? null,
+    answerChapterId: session.answerStory?.chapterId ?? null,
+    declineFragmentId: session.declineStory?.fragmentId ?? null,
+    declineChapterId: session.declineStory?.chapterId ?? null,
   });
   const choice = await beginIncomingCall(ctx, session);
   phoneCallDebug("method-choice-resolved", { sessionId: session.id, choice });
   if (choice === "cancelled") return;
-  if (choice === "decline") {
-    await closePhoneApp();
-    await play(ctx, session.declineStory);
-    return;
-  }
-  await closePhoneApp();
-  await play(ctx, session.answerStory);
+  await completeIncomingCallChoice(
+    ctx,
+    choice,
+    choice === "decline" ? session.declineStory : session.answerStory,
+    session.id,
+  );
 }
 
 export const incomingCallMethod = method({ id: "incoming-call", title: "电话 · 发起强制来电", description: "显示来电界面并等待玩家接听或挂断；可分别执行可返回的剧情片段。", schema: {
@@ -96,6 +105,6 @@ export const incomingCallMethod = method({ id: "incoming-call", title: "电话 �
   }
 });
 
-export const defineOutgoingCallMethod = method({ id: "define-outgoing-call", title: "电话 · 定义自主拨号剧情", description: "为联系人定义玩家自主拨号时执行的可返回片段；同一联系人仅保留最近一次定义。", schema: { contact: { type: "character", label: "联系人", required: true }, story: { type: "fragment", label: "拨号剧情片段", required: true, chapterField: "storyChapter" } }, run(ctx,p){ prepare(this.save,ctx); const x=p as Record<string,unknown>; const value=ref(x,"story"); const characterId=String(x.contact??"").trim(); if(value&&characterId) defineOutgoingStory(ctx,{characterId,...value,definedAt:Date.now()}); }, runImmediately(ctx,p){ prepare(this.save,ctx); const x=p as Record<string,unknown>; const value=ref(x,"story"); const characterId=String(x.contact??"").trim(); if(value&&characterId) defineOutgoingStory(ctx,{characterId,...value,definedAt:Date.now()}); }, skip(ctx,p){ prepare(this.save,ctx); const x=p as Record<string,unknown>; const value=ref(x,"story"); const characterId=String(x.contact??"").trim(); if(value&&characterId) defineOutgoingStory(ctx,{characterId,...value,definedAt:Date.now()}); } });
+export const defineOutgoingCallMethod = method({ id: "define-outgoing-call", title: "电话 · 定义自主拨号剧情", description: "为联系人定义玩家自主拨号时执行的可返回片段；同一联系人仅保留最近一次定义。", schema: { contact: { type: "character", label: "联系人", required: true }, story: { type: "fragment", label: "拨号剧情片段", required: true, chapterField: "storyChapter" } }, run(ctx,p){ prepare(this.save,ctx); const x=p as Record<string,unknown>; const value=resolveStoryFragmentRef(x,"story"); const characterId=String(x.contact??"").trim(); if(value&&characterId) defineOutgoingStory(ctx,{characterId,...value,definedAt:Date.now()}); }, runImmediately(ctx,p){ prepare(this.save,ctx); const x=p as Record<string,unknown>; const value=resolveStoryFragmentRef(x,"story"); const characterId=String(x.contact??"").trim(); if(value&&characterId) defineOutgoingStory(ctx,{characterId,...value,definedAt:Date.now()}); }, skip(ctx,p){ prepare(this.save,ctx); const x=p as Record<string,unknown>; const value=resolveStoryFragmentRef(x,"story"); const characterId=String(x.contact??"").trim(); if(value&&characterId) defineOutgoingStory(ctx,{characterId,...value,definedAt:Date.now()}); } });
 export const addPhoneContactMethod = method({ id:"add-contact", title:"电话 · 添加联系人", schema:{contact:{type:"character",label:"联系人",required:true}}, run(ctx,p){prepare(this.save,ctx);addContact(ctx,String(p.contact??""));},runImmediately(ctx,p){prepare(this.save,ctx);addContact(ctx,String(p.contact??""));},skip(ctx,p){prepare(this.save,ctx);addContact(ctx,String(p.contact??""));} });
 export const removePhoneContactMethod = method({ id:"remove-contact", title:"电话 · 移除联系人", schema:{contact:{type:"character",label:"联系人",required:true}}, run(ctx,p){prepare(this.save,ctx);removeContact(ctx,String(p.contact??""));},runImmediately(ctx,p){prepare(this.save,ctx);removeContact(ctx,String(p.contact??""));},skip(ctx,p){prepare(this.save,ctx);removeContact(ctx,String(p.contact??""));} });

@@ -10,11 +10,15 @@ import {
   beginIncomingCall,
   bindPhoneCallSave,
   getIncomingCall,
+  getActiveIncomingCall,
   listContacts,
   readPhoneCallState,
   releaseIncomingCall,
   resolveDialTarget,
   resolveIncomingCall,
+  resolveActiveIncomingCall,
+  subscribeActiveIncomingCall,
+  subscribePhoneCall,
 } from "./runtime.ts";
 import {
   cachePhoneCallSettings,
@@ -81,6 +85,95 @@ describe("phone-call runtime", () => {
     assert.equal(await waiting, "answer");
     assert.equal(readPhoneCallState(ctx).records[0]?.status, "answered");
     assert.equal(getPhoneSdkSlot().phoneCloseLocked, false);
+  });
+
+  it("bridges an incoming call from the method context to the phone app context", async () => {
+    const methodCtx = createContext({ role: "phone-call-method" });
+    const phoneAppCtx = createContext({ role: "phone-host-app" });
+    bindPhoneCallSave(methodCtx, createSave());
+    getPhoneSdkSlot().navigation = {
+      async openPhoneApp() {
+        return "opened";
+      },
+      async closePhoneApp() {},
+    };
+
+    const waiting = beginIncomingCall(methodCtx, session);
+    assert.equal(getIncomingCall(phoneAppCtx), null);
+    assert.equal(getActiveIncomingCall()?.characterId, "alice");
+    assert.equal(resolveActiveIncomingCall("answer"), true);
+
+    assert.equal(await waiting, "answer");
+    assert.equal(getActiveIncomingCall(), null);
+    assert.equal(readPhoneCallState(methodCtx).records[0]?.status, "answered");
+  });
+
+  it("keeps the runtime stable when getHost returns a new wrapper each time", async () => {
+    const application = {};
+    const ctx = {
+      getHost: () => ({ application, mode: "engine" }),
+      settings: { get: () => undefined },
+    } as unknown as ExtensionContext;
+    bindPhoneCallSave(ctx, createSave());
+    getPhoneSdkSlot().navigation = {
+      async openPhoneApp() {
+        return "opened";
+      },
+      async closePhoneApp() {},
+    };
+
+    const waiting = beginIncomingCall(ctx, session);
+    assert.equal(getIncomingCall(ctx)?.id, session.id);
+    assert.equal(resolveActiveIncomingCall("answer"), true);
+
+    assert.equal(await waiting, "answer");
+    assert.equal(readPhoneCallState(ctx).records[0]?.status, "answered");
+  });
+
+  it("does not accept decline when the incoming call requires an answer", async () => {
+    const ctx = createContext({});
+    getPhoneSdkSlot().navigation = {
+      async openPhoneApp() {
+        return "opened";
+      },
+      async closePhoneApp() {},
+    };
+
+    const waiting = beginIncomingCall(ctx, { ...session, requireAnswer: true });
+    assert.equal(resolveActiveIncomingCall("decline"), false);
+    assert.equal(getActiveIncomingCall()?.id, session.id);
+    assert.equal(resolveActiveIncomingCall("answer"), true);
+    assert.equal(await waiting, "answer");
+  });
+
+  it("resolves the story gate even when stale listeners and save writes fail", async () => {
+    const ctx = createContext({});
+    const failingSave = createSave();
+    failingSave.set = () => {
+      throw new Error("stale save context");
+    };
+    bindPhoneCallSave(ctx, failingSave);
+    getPhoneSdkSlot().navigation = {
+      async openPhoneApp() {
+        return "opened";
+      },
+      async closePhoneApp() {},
+    };
+    const unsubscribeRuntime = subscribePhoneCall(ctx, () => {
+      throw new Error("stale runtime listener");
+    });
+    const unsubscribeBridge = subscribeActiveIncomingCall(() => {
+      throw new Error("stale bridge listener");
+    });
+
+    const waiting = beginIncomingCall(ctx, session);
+    assert.equal(resolveActiveIncomingCall("answer"), true);
+    assert.equal(await waiting, "answer");
+    assert.equal(getActiveIncomingCall(), null);
+    assert.equal(getPhoneSdkSlot().phoneCloseLocked, false);
+
+    unsubscribeRuntime();
+    unsubscribeBridge();
   });
 
   it("cancels reset cleanup without recording a declined call", async () => {

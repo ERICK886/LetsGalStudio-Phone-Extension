@@ -11,7 +11,7 @@ import type { PhoneAppRenderProps, PhoneSafeAreaInsets } from "../runtime/types"
 /** 控制台统一前缀，便于过滤。 */
 export const PHONE_SDK_DEBUG_PREFIX = "[phone-sdk-debug]";
 
-/** 全局开关键；设为 `false` 可关闭，其余情况默认开启。 */
+/** 全局开关键；仅显式设为 `true` 时开启，避免生产环境承担调试开销。 */
 export const PHONE_SDK_DEBUG_FLAG_KEY = "__LetsGalPhoneSdkDebug__" as const;
 
 type GlobalWithDebugFlag = typeof globalThis & {
@@ -21,15 +21,14 @@ type GlobalWithDebugFlag = typeof globalThis & {
 /**
  * 是否输出 Phone SDK 调试日志。
  *
- * 默认开启。在控制台执行以下语句可关闭：
- * `globalThis.__LetsGalPhoneSdkDebug__ = false`
+ * 默认关闭。在控制台执行以下语句可临时开启：
+ * `globalThis.__LetsGalPhoneSdkDebug__ = true`
  *
  * @returns 当前是否启用调试
  */
 export function isPhoneSdkDebugEnabled(): boolean {
   const flag = (globalThis as GlobalWithDebugFlag)[PHONE_SDK_DEBUG_FLAG_KEY];
-  if (flag === false) return false;
-  return true;
+  return flag === true;
 }
 
 /**
@@ -105,6 +104,22 @@ export function createDebugPhoneAppRenderProps(props: PhoneAppRenderProps): {
   props: PhoneAppRenderProps;
   flushReport: () => PhoneSdkRenderPropsAccessReport;
 } {
+  if (!isPhoneSdkDebugEnabled()) {
+    return {
+      props,
+      flushReport: () => ({
+        accessedProps: [],
+        accessedInsetFields: [],
+        usedSafeAreaInsets: false,
+        usedSafeAreaInsetValues: false,
+        usedCloseApp: false,
+        usedClosePhone: false,
+        safeAreaInsets: { ...props.safeAreaInsets },
+        appId: props.appId,
+      }),
+    };
+  }
+
   const accessedProps = new Set<string>();
   const accessedInsetFields = new Set<string>();
 

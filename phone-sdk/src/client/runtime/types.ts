@@ -265,6 +265,17 @@ export type OpenPhoneAppResult =
   | "invalid"
   | "failed";
 
+/** 关闭手机 UI 的选项。 */
+export interface ClosePhoneAppOptions {
+  /** 是否播放宿主手机的关闭动画；默认 `true`。 */
+  animated?: boolean;
+  /**
+   * 已完成不可跳过的交互后，允许忽略遗留关闭锁。
+   * 普通内页和玩家操作不得设置此项。
+   */
+  force?: boolean;
+}
+
 /**
  * 手机导航控制器（由宿主安装）。
  * 插件侧通过 `openPhoneApp` / `closePhoneApp` 调用，不直接操作 DOM。
@@ -284,7 +295,7 @@ export interface PhoneNavigationController {
    *
    * @returns 动画结束并释放容器后 resolve；未显示时立即 resolve
    */
-  closePhoneApp(): Promise<void>;
+  closePhoneApp(options?: ClosePhoneAppOptions): Promise<void>;
 }
 
 /**
@@ -356,7 +367,7 @@ export interface PhoneSdkGlobalSlot {
    * 由手机 UI 挂载时注册的动画关闭回调；卸载时清除。
    * `closePhoneApp` 优先调用此回调以复用关闭动画。
    */
-  requestAnimatedClosePhone?: () => Promise<void>;
+  requestAnimatedClosePhone?: (options?: ClosePhoneAppOptions) => Promise<void>;
   /** 内页设置后，宿主忽略关闭手机及返回桌面请求（例如必须处理的来电）。 */
   phoneCloseLocked?: boolean;
   /** 关闭锁的持有令牌；用于多个阻塞交互并存时的引用计数。 */

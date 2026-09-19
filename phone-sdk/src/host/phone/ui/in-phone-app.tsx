@@ -9,6 +9,7 @@
 import React, { useEffect, useMemo } from "react";
 import {
   createDebugPhoneAppRenderProps,
+  isPhoneSdkDebugEnabled,
   phoneSdkDebug,
   type PhoneAppRegistration,
   type PhoneSafeAreaInsets,
@@ -24,7 +25,7 @@ import { getPhoneHostExtensionId } from "../../host-extension-id";
  * @param props.onClosePhone 关手机
  * @param props.safeAreaInsets 刘海/状态栏与底部 Home 安全区（CSS 像素）
  */
-export function InPhoneAppContent(props: {
+export const InPhoneAppContent = React.memo(function InPhoneAppContent(props: {
   phoneAppId: string;
   registration: PhoneAppRegistration | undefined;
   onGoHome: () => void;
@@ -53,7 +54,7 @@ export function InPhoneAppContent(props: {
       safeAreaInsets={safeAreaInsets}
     />
   );
-}
+});
 
 /**
  * 已确认有注册对象时渲染内页，并挂调试：检测是否读取安全区等 SDK props。
@@ -96,9 +97,13 @@ export function InPhoneAppContentReady(props: {
     [phoneAppId, onGoHome, onClosePhone, safeAreaInsets],
   );
 
-  const rendered = registration.render(debugBundle.props);
+  const rendered = useMemo(
+    () => registration.render(debugBundle.props),
+    [registration, debugBundle],
+  );
 
   useEffect(() => {
+    if (!isPhoneSdkDebugEnabled()) return undefined;
     phoneSdkDebug("宿主调用 registration.render", {
       phoneAppId,
       title: registration.title,

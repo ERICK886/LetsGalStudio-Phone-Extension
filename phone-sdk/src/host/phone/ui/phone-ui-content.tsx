@@ -57,9 +57,11 @@ import {
   clearPhoneAppBadge,
   diagnosePhoneAppLookup,
   formatPhoneAppBadgeLabel,
+  getLatestPhoneNavigate,
   getPhoneAppBadge,
   getPhoneSdkSlot,
   isPhoneCloseLocked,
+  isPhoneSdkDiagEnabled,
   phoneSdkDebug,
   phoneSdkDiag,
   phoneSdkDiagWarn,
@@ -178,6 +180,23 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
   );
   // 首次 render 可能尚未接收到 ctx.ui.show 的 data；订阅回放到达后仍必须切换到消息模式。
   const messageMode = storyMessages !== undefined || awaitingStoryAdvance || displayStoryMessages.length > 0;
+  /**
+   * 程序化打开会在 Host 挂载前发布导航。首次 render 直接读取 pending，
+   * 让目标 APP 与手机外壳同帧出现，避免桌面闪现和额外一次完整渲染。
+   */
+  const initialPhoneAppRef = useRef<{
+    appId: string;
+    seq: number;
+  } | null | undefined>(undefined);
+  if (initialPhoneAppRef.current === undefined) {
+    const pending = messageMode ? null : getLatestPhoneNavigate();
+    const appId = pending ? (toPhoneAppId(pending.appId) ?? pending.appId) : "";
+    initialPhoneAppRef.current =
+      pending && appId && lookupPhoneSdkApp(appId)
+        ? { appId, seq: pending.seq }
+        : null;
+  }
+  const initialPhoneApp = initialPhoneAppRef.current;
   const [storedPreferences, setStoredPreferences] = useState<readonly PlayerPhonePreferences[]>([]);
   const [appAvailability, setAppAvailability] = useState<readonly PhoneAppAvailabilityOverride[]>([]);
   const phoneTitle = ctx.settings.get<string>("phoneTitle");
@@ -245,7 +264,9 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
   const [busy, setBusy] = useState(false);
   const [closing, setClosing] = useState(false);
   /** 当前在手机屏幕内打开的 Phone SDK 应用；`null` 表示桌面。 */
-  const [activeInPhoneAppId, setActiveInPhoneAppId] = useState<string | null>(null);
+  const [activeInPhoneAppId, setActiveInPhoneAppId] = useState<string | null>(
+    () => initialPhoneApp?.appId ?? null,
+  );
   /**
    * 内页开合动画相位。
    * - `idle`：桌面
@@ -253,11 +274,26 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
    * - `open`：内页已稳定
    * - `leaving`：缩回图标后卸载
    */
-  const [inAppPhase, setInAppPhase] = useState<"idle" | "entering" | "open" | "leaving">("idle");
+  const [inAppPhase, setInAppPhase] = useState<"idle" | "entering" | "open" | "leaving">(
+    () => initialPhoneApp ? "entering" : "idle",
+  );
   /** 开合动画的 transform-origin（相对 phone-screen，百分比），默认屏幕中部偏上。 */
-  const [inAppOrigin, setInAppOrigin] = useState<{ x: string; y: string }>({ x: "50%", y: "42%" });
+  const [inAppOrigin, setInAppOrigin] = useState<{ x: string; y: string }>(() =>
+    initialPhoneApp && phoneStylePreset === "android"
+      ? { x: "50%", y: "100%" }
+      : { x: "50%", y: "42%" },
+  );
   /** 刘海/状态栏与底部 Home 的实测安全区（CSS 像素）。 */
-  const [safeAreaInsets, setSafeAreaInsets] = useState<PhoneSafeAreaInsets>(EMPTY_PHONE_SAFE_AREA);
+  const [safeAreaInsets, setSafeAreaInsets] = useState<PhoneSafeAreaInsets>(() =>
+    initialPhoneApp
+      ? {
+          top: phoneStylePreset === "apple" ? 52 : 46,
+          right: 0,
+          bottom: 44,
+          left: 0,
+        }
+      : EMPTY_PHONE_SAFE_AREA,
+  );
   const statusBarRef = useRef<HTMLElement | null>(null);
   const homeButtonRef = useRef<HTMLButtonElement | null>(null);
   const phoneScreenRef = useRef<HTMLDivElement | null>(null);
@@ -282,6 +318,10 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
   const closePromise = useRef<Promise<void> | null>(null);
   /** 最新 openInPhoneAppById，供订阅回调读取而无需重新订阅。 */
   const openInPhoneAppByIdRef = useRef<(phoneAppId: string, originAppId?: string) => void>(() => {});
+  /** 首帧已消费的导航序号，防止 subscribe 的 pending 回放重复启动同一 APP。 */
+  const lastHandledPhoneNavigateSeqRef = useRef<number | null>(
+    initialPhoneApp?.seq ?? null,
+  );
   /** 最新 messageMode，供订阅回调读取。 */
   const messageModeRef = useRef(false);
   /** 最新 closing，供订阅回调读取。 */
@@ -309,6 +349,11 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
   const apps = useMemo(
     () => resolvePhoneApps(catalog, activePreferences, appAvailability),
     [catalog, activePreferences, appAvailability],
+  );
+  /** 素材 URI 解析可能触及宿主资源层；只在应用目录变化时做一次。 */
+  const appIconUrls = useMemo(
+    () => new Map(apps.map((app) => [app.id, resolveAssetUrl(ctx, app.iconSource)])),
+    [apps, ctx],
   );
   const selectedApp = apps.find((app) => app.id === selectedAppId) ?? apps[0];
   const selectedAction = catalog.actions.find((action) => action.id === selectedActionId)
@@ -468,6 +513,10 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
     });
   }, []);
 
+  useEffect(() => {
+    if (initialPhoneApp) clearPhoneAppBadge(initialPhoneApp.appId);
+  }, [initialPhoneApp]);
+
   // 订阅导航总线：收到 openPhoneApp 请求时打开对应内页。
   // 此处只切换 APP，不清 pending：目标 APP 可能要到下一次 React 渲染才挂载，
   // 需由目标 APP 在读完 payload 后清理。关闭手机时仍会统一兜底清理。
@@ -475,6 +524,8 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
   useEffect(() => {
     return subscribePhoneNavigate((req) => {
       if (messageModeRef.current || closingRef.current) return;
+      if (lastHandledPhoneNavigateSeqRef.current === req.seq) return;
+      lastHandledPhoneNavigateSeqRef.current = req.seq;
       openInPhoneAppByIdRef.current(req.appId);
     });
   }, []);
@@ -1003,8 +1054,8 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
    * 播放一次关闭动画并在结束后调用宿主关闭回调。
    * 多次调用会返回同一个 Promise，防止动画期间重复隐藏 UI 或重复启动应用；系统启用“减少动态效果”时立即完成。
    */
-  const closeWithAnimation = useCallback((): Promise<void> => {
-    if (isPhoneCloseLocked()) return Promise.resolve();
+  const closeWithAnimation = useCallback((force = false): Promise<void> => {
+    if (!force && isPhoneCloseLocked()) return Promise.resolve();
     if (closePromise.current) return closePromise.current;
 
     setActiveInPhoneAppId(null);
@@ -1023,13 +1074,19 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
     return closePromise.current;
   }, [closePhone]);
 
+  /** 给内页传入稳定引用，避免手机父状态变化导致第三方 APP 无意义重渲染。 */
+  const closePhoneFromInApp = useCallback(() => {
+    void closeWithAnimation();
+  }, [closeWithAnimation]);
+
   /**
    * 把带动画的关闭回调挂到全局槽位，供插件侧 `closePhoneApp` 调用。
    * 卸载时清除，避免指向已卸载组件。
    */
   useEffect(() => {
     const slot = getPhoneSdkSlot();
-    const request = (): Promise<void> => closeWithAnimation();
+    const request = (options?: { force?: boolean }): Promise<void> =>
+      closeWithAnimation(options?.force === true);
     slot.requestAnimatedClosePhone = request;
     return () => {
       if (slot.requestAnimatedClosePhone === request) {
@@ -1099,8 +1156,8 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
     if (inAppPhase !== "entering" && inAppPhase !== "leaving") return undefined;
     const apple = phoneStylePreset === "apple";
     const delayMs = inAppPhase === "entering"
-      ? (apple ? 560 : 420)
-      : (apple ? 400 : 340);
+      ? (apple ? 400 : 360)
+      : (apple ? 320 : 300);
     const timer = window.setTimeout(() => {
       if (inAppPhase === "entering") {
         setInAppPhase((phase) => (phase === "entering" ? "open" : phase));
@@ -1138,16 +1195,18 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
  *   未提供（如导航总线驱动）时回退屏幕中部偏上。
  */
   const openInPhoneAppById = (phoneAppId: string, originAppId?: string) => {
-    const lookupDiag = diagnosePhoneAppLookup(phoneAppId);
+    const lookupDiag = isPhoneSdkDiagEnabled()
+      ? diagnosePhoneAppLookup(phoneAppId)
+      : undefined;
     const registered = lookupPhoneSdkApp(phoneAppId);
     // 注册表按程序 ID 索引；作者填写的是「扩展ID/程序ID」时规约为程序 ID。
-    const resolvedAppId = lookupDiag.normalizedId ?? phoneAppId;
+    const resolvedAppId = lookupDiag?.normalizedId ?? toPhoneAppId(phoneAppId) ?? phoneAppId;
     if (!registered) {
       phoneSdkDiagWarn("打开内页失败：注册表未命中", {
         phase: "open-in-phone-app-miss",
         phoneAppId,
         resolvedAppId,
-        ...lookupDiag,
+        ...(lookupDiag ?? {}),
       });
       showMessage(
         `应用不可用：未找到「${phoneAppId}」。`
@@ -1637,7 +1696,7 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
                 data-phone-desktop-layer={activeInPhoneAppId ? "behind" : "active"}
               >
                 {apps.map((app) => {
-                  const iconUrl = resolveAssetUrl(ctx, app.iconSource);
+                  const iconUrl = appIconUrls.get(app.id);
                   const badgeAppId = resolveDesktopBadgeAppId(app);
                   const badge = badgeAppId ? getPhoneAppBadge(badgeAppId) : null;
                   return (
@@ -1695,7 +1754,7 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
                       phoneAppId={activeInPhoneAppId}
                       registration={lookupPhoneSdkApp(activeInPhoneAppId)}
                       onGoHome={goHomeFromInPhoneApp}
-                      onClosePhone={() => void closeWithAnimation()}
+                      onClosePhone={closePhoneFromInApp}
                       safeAreaInsets={safeAreaInsets}
                     />
                   </InPhoneAppBoundary>

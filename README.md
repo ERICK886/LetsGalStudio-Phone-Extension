@@ -1,8 +1,8 @@
 # LetsGal Studio 自定义手机扩展
 
 > 扩展包 ID：`ink.zenly.ext-7a9373`｜ 程序界面：`phone`、`phone-toast`  
-> 扩展版本：`1.3.0` ｜ 需要 LetsGal Studio SDK：`>=1.9.0`
-> 对齐：`@ink-zenly/phone-sdk@^0.5.5` ｜ `@ink-zenly/create-phone-app@0.3.7`
+> 扩展版本：`1.3.2` ｜ 需要 LetsGal Studio SDK：`>=1.9.0`
+> 对齐：`@ink-zenly/phone-sdk@0.5.26`（仓库版本）｜ `@ink-zenly/create-phone-app@0.3.7`
 
 这是一个**游戏里的手机**：剧情里挂上之后，玩家可以打开桌面、点 APP、看聊天消息，还能收到简单的提示（Toast）。
 
@@ -425,7 +425,9 @@ ink.zenly.ext-7a9373.open-phone
 
 | 版本 | 主要变化 |
 |------|------|
-| **1.3.0**（当前） | 聊天（`phone-chat`）与相册（`phone-album`）**内置**；Phone SDK 应用 ID 填程序 ID 即可（`phone-chat` / `phone-album`） |
+| **1.3.2**（当前） | 修复强制来电接听/挂断链路：按钮可交互，选择后立即关闭手机并运行对应片段；电话方法增加 Studio 内联摘要；优化手机内页首次导航与诊断开销；phone-sdk `0.5.26` 支持选择关闭动画 |
+| **1.3.1** | 聊天与相册调整为同包独立扩展模块；新增第一版 `PhoneEditorExtension` |
+| **1.3.0** | 聊天（`phone-chat`）与相册（`phone-album`）**内置**；Phone SDK 应用 ID 填程序 ID 即可（`phone-chat` / `phone-album`） |
 | **1.2.7** | phone-sdk `0.5.5`：Phone SDK 应用 ID 必须填「扩展ID/程序ID」；CLI `0.3.7` |
 | **1.2.6** | 相册迁出为独立扩展 `ink.zenly.app-cd6ad3`；phone-sdk `0.5.4` 桌面 APP 角标（红点/数字） |
 | **1.2.5** | 文档补齐相册；相册内页页面过渡；视频缩略不再错误 seek |

@@ -32,8 +32,51 @@ interface PhoneCallRuntime {
   releasePhoneCloseLock: (() => void) | null;
 }
 
+/**
+ * 强制来电发生在电话扩展方法上下文中，电话 APP 则由手机宿主上下文渲染。
+ * Studio 还可能重复实例化同一 bundle，因此来电不能只存在模块内 WeakMap；
+ * 用 Phone SDK 的 globalThis 槽位桥接当前一次来电，保持与 APP 注册表相同的
+ * 跨模块可见性，同时仍由原始 runtime 持有存档与 Promise。
+ */
+interface IncomingCallBridgeStore {
+  active: {
+    runtime: PhoneCallRuntime;
+    session: IncomingCallSession;
+    resolve(choice: "answer" | "decline"): boolean;
+    cancel(): void;
+  } | null;
+  listeners: Set<() => void>;
+}
+
+type PhoneCallSdkSlot = ReturnType<typeof getPhoneSdkSlot> & {
+  inkZenlyPhoneCallIncoming?: IncomingCallBridgeStore;
+};
+
 const runtimes = new WeakMap<object, PhoneCallRuntime>();
 let debugSequence = 0;
+
+function incomingBridgeStore(): IncomingCallBridgeStore {
+  const slot = getPhoneSdkSlot() as PhoneCallSdkSlot;
+  if (!slot.inkZenlyPhoneCallIncoming) {
+    slot.inkZenlyPhoneCallIncoming = {
+      active: null,
+      listeners: new Set(),
+    };
+  }
+  return slot.inkZenlyPhoneCallIncoming;
+}
+
+function notifyIncomingBridge(store: IncomingCallBridgeStore): void {
+  for (const listener of [...store.listeners]) {
+    try {
+      listener();
+    } catch (error) {
+      phoneCallDebug("bridge-listener-failed", {
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+}
 
 function emptyState(): PhoneCallState {
   return {
@@ -115,7 +158,15 @@ function normalizeStories(value: unknown): OutgoingStoryDefinition[] {
 }
 
 function notify(runtime: PhoneCallRuntime): void {
-  for (const listener of runtime.listeners) listener();
+  for (const listener of [...runtime.listeners]) {
+    try {
+      listener();
+    } catch (error) {
+      phoneCallDebug("runtime-listener-failed", {
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
 }
 
 export function phoneCallDebug(
@@ -201,6 +252,56 @@ export function getIncomingCall(
   return incoming ? { ...incoming } : null;
 }
 
+/** 读取当前由剧情方法发起的跨上下文强制来电。 */
+export function getActiveIncomingCall(): IncomingCallSession | null {
+  const incoming = incomingBridgeStore().active?.session;
+  return incoming ? { ...incoming } : null;
+}
+
+/** 订阅跨上下文来电变化，供电话 APP 在手机宿主上下文中刷新。 */
+export function subscribeActiveIncomingCall(listener: () => void): () => void {
+  const store = incomingBridgeStore();
+  store.listeners.add(listener);
+  return () => store.listeners.delete(listener);
+}
+
+/**
+ * 由电话 APP 处理当前强制来电。闭包会回到发起方法的原始 ctx/runtime，
+ * 避免用手机宿主 ctx 写错存档或无法解除剧情等待。
+ */
+export function resolveActiveIncomingCall(
+  choice: "answer" | "decline",
+): boolean {
+  const active = incomingBridgeStore().active;
+  if (!active) {
+    phoneCallDebug("bridge-choice-missing", { choice });
+    return false;
+  }
+  phoneCallDebug("bridge-choice-start", {
+    sessionId: active.session.id,
+    choice,
+    hasIncoming: active.runtime.incoming?.id === active.session.id,
+    hasResolver: Boolean(active.runtime.incomingResolve),
+  });
+  try {
+    const handled = active.resolve(choice);
+    phoneCallDebug("bridge-choice-complete", {
+      sessionId: active.session.id,
+      choice,
+      handled,
+      activeAfter: Boolean(incomingBridgeStore().active),
+    });
+    return handled;
+  } catch (error) {
+    phoneCallDebug("bridge-choice-failed", {
+      sessionId: active.session.id,
+      choice,
+      message: error instanceof Error ? error.message : String(error),
+    });
+    return false;
+  }
+}
+
 function setPhoneCallLayer(layer: "foreground" | "background"): void {
   const root = globalThis.document?.querySelector<HTMLElement>("[data-phone-root]");
   if (root) root.dataset.phoneCallLayer = layer;
@@ -210,16 +311,32 @@ function setPhoneCallLayer(layer: "foreground" | "background"): void {
 function clearIncoming(
   ctx: ExtensionContext,
   resolution: IncomingCallChoice,
+  runtime = runtimeFor(ctx),
 ): void {
-  const runtime = runtimeFor(ctx);
+  const bridge = incomingBridgeStore();
   const resolve = runtime.incomingResolve;
+  const releasePhoneCloseLock = runtime.releasePhoneCloseLock;
   runtime.incoming = null;
   runtime.incomingResolve = null;
-  runtime.releasePhoneCloseLock?.();
   runtime.releasePhoneCloseLock = null;
-  setPhoneCallLayer("foreground");
-  notify(runtime);
+  if (bridge.active?.runtime === runtime) {
+    bridge.active = null;
+  }
+
+  // Promise 必须先解除。热重载遗留的关闭回调或 UI 监听器即使抛错，
+  // 也不能再次把剧情方法永久卡在等待来电选择的状态。
   resolve?.(resolution);
+  try {
+    releasePhoneCloseLock?.();
+  } catch (error) {
+    phoneCallDebug("close-lock-release-failed", {
+      resolution,
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
+  setPhoneCallLayer("foreground");
+  notifyIncomingBridge(bridge);
+  notify(runtime);
 }
 
 export function listContacts(ctx: ExtensionContext): string[] {
@@ -324,6 +441,7 @@ export async function beginIncomingCall(
 ): Promise<IncomingCallChoice> {
   const slot = getPhoneSdkSlot();
   const runtime = runtimeFor(ctx);
+  const bridge = incomingBridgeStore();
   phoneCallDebug("begin", {
     sessionId: session.id,
     characterId: session.characterId,
@@ -341,16 +459,29 @@ export async function beginIncomingCall(
     phoneCallDebug("replace-previous", {
       previousSessionId: runtime.incoming?.id ?? null,
     });
-    clearIncoming(ctx, "cancelled");
+    clearIncoming(ctx, "cancelled", runtime);
+  }
+
+  // 同一手机宿主一次只能展示一个强制来电。若热重载后的另一模块实例仍有
+  // pending，先通过它保存的闭包正常取消，避免遗留 close lock 与剧情等待。
+  if (bridge.active && bridge.active.runtime !== runtime) {
+    bridge.active.cancel();
   }
 
   runtime.incoming = { ...session, phase: "ringing" };
   setPhoneCallLayer("foreground");
   runtime.releasePhoneCloseLock = acquirePhoneCloseLock();
-  notify(runtime);
   const choicePromise = new Promise<IncomingCallChoice>((resolve) => {
     runtime.incomingResolve = resolve;
   });
+  bridge.active = {
+    runtime,
+    session: { ...runtime.incoming },
+    resolve: (choice) => resolveIncomingCallForRuntime(ctx, runtime, choice),
+    cancel: () => clearIncoming(ctx, "cancelled", runtime),
+  };
+  notify(runtime);
+  notifyIncomingBridge(bridge);
 
   phoneCallDebug("open-request", {
     appId: PROGRAM_ID,
@@ -371,37 +502,61 @@ export async function beginIncomingCall(
       latestNavigateSeq: getPhoneSdkSlot().phoneNavigatePending?.seq ?? null,
     });
     if (result !== "opened") {
-      clearIncoming(ctx, "cancelled");
+      clearIncoming(ctx, "cancelled", runtime);
       throw new Error(`无法打开来电界面（${result}）`);
     }
   } catch (error) {
-    if (runtime.incoming?.id === session.id) clearIncoming(ctx, "cancelled");
+    if (runtime.incoming?.id === session.id) {
+      clearIncoming(ctx, "cancelled", runtime);
+    }
     console.error("[phone-call:incoming] open-request-failed", error);
     throw error;
   }
   return choicePromise;
 }
 
-export function resolveIncomingCall(
+function resolveIncomingCallForRuntime(
   ctx: ExtensionContext,
+  runtime: PhoneCallRuntime,
   choice: "answer" | "decline",
-): void {
-  const runtime = runtimeFor(ctx);
+): boolean {
   const current = runtime.incoming;
   if (
     !current ||
     !runtime.incomingResolve ||
     (choice === "decline" && current.requireAnswer)
   ) {
-    return;
+    phoneCallDebug("choice-ignored", {
+      sessionId: current?.id ?? null,
+      choice,
+      hasResolver: Boolean(runtime.incomingResolve),
+      requireAnswer: current?.requireAnswer ?? null,
+    });
+    return false;
   }
   phoneCallDebug("choice", { sessionId: current.id, choice });
-  addRecord(ctx, {
-    characterId: current.characterId,
-    direction: "incoming",
-    status: choice === "answer" ? "answered" : "declined",
-  });
-  clearIncoming(ctx, choice);
+  clearIncoming(ctx, choice, runtime);
+  try {
+    addRecord(ctx, {
+      characterId: current.characterId,
+      direction: "incoming",
+      status: choice === "answer" ? "answered" : "declined",
+    });
+  } catch (error) {
+    phoneCallDebug("record-write-failed", {
+      sessionId: current.id,
+      choice,
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
+  return true;
+}
+
+export function resolveIncomingCall(
+  ctx: ExtensionContext,
+  choice: "answer" | "decline",
+): boolean {
+  return resolveIncomingCallForRuntime(ctx, runtimeFor(ctx), choice);
 }
 
 export function releaseIncomingCall(ctx: ExtensionContext): void {

@@ -7,7 +7,7 @@
  *
  * @remarks
  * 在 Studio 控制台用过滤词 `phone-sdk-diag` 查看。
- * 关闭：`globalThis.__LetsGalPhoneSdkDiag__ = false`
+ * 开启：`globalThis.__LetsGalPhoneSdkDiag__ = true`
  * 本模块属于 `/plugin` 客户端工具，宿主不在此编写内页应用。
  */
 
@@ -18,7 +18,7 @@ import { getPhoneSdkAppsRegistry, getPhoneSdkSlot } from "../runtime/slot";
 /** 控制台统一前缀，便于过滤。 */
 export const PHONE_SDK_DIAG_PREFIX = "[phone-sdk-diag]";
 
-/** 诊断开关；设为 `false` 可关闭，其余情况默认开启。 */
+/** 诊断开关；仅显式设为 `true` 时开启，避免普通打开流程反复采集注册表快照。 */
 export const PHONE_SDK_DIAG_FLAG_KEY = "__LetsGalPhoneSdkDiag__" as const;
 
 type GlobalWithDiagFlag = typeof globalThis & {
@@ -28,10 +28,10 @@ type GlobalWithDiagFlag = typeof globalThis & {
 /**
  * 当前是否输出诊断日志。
  *
- * @returns 默认 `true`；显式设为 `false` 时关闭
+ * @returns 默认 `false`；显式设为 `true` 时开启
  */
 export function isPhoneSdkDiagEnabled(): boolean {
-  return (globalThis as GlobalWithDiagFlag)[PHONE_SDK_DIAG_FLAG_KEY] !== false;
+  return (globalThis as GlobalWithDiagFlag)[PHONE_SDK_DIAG_FLAG_KEY] === true;
 }
 
 /**

@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>银发女仆 · 纯 CSS 手绘</title>
+<style>
+/*
+ * A hand-built CSS illustration. No images, SVG, canvas, fonts, scripts,
+ * data URLs, external assets, or automatically traced shapes.
+ * 1 em = 1% of the 1216 × 832 composition's displayed width.
+ */
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; }
+body { min-height: 100svh; display: grid; place-items: center; background: #ded7df; }
+.frame { width: min(100%, 1216px); container-type: inline-size; }
+.art {
+  position: relative; width: 100%; height: 68.421em; font-size: 1cqw;
+  overflow: hidden; isolation: isolate;
+  background: linear-gradient(139deg, #e8e3e4, #faf8f5 43%, #f1edeb 80%, #e1d8e0);
+  --ink: #a899a6; --fine: .115em; --hair: #f5f0ef;
+}
+.art *, .art *::before, .art *::after { position: absolute; }
+.art i, .art b { display: block; font-style: normal; }
+.art *::before, .art *::after { content: ''; }
+.pillow-shadow { left: 28em; top: 1em; width: 14em; height: 25em; border-radius: 43%; background: #b4acbd; transform: rotate(-31deg); filter: blur(.3em); opacity: .68; }
+.pillow-shadow.right { left: 81em; top: 22em; width: 22em; height: 20em; transform: rotate(47deg); }
+.seam { border: .29em solid #c8bec4; border-top: 0; border-right: 0; width: 24em; height: 13em; left: 4em; top: -9em; transform: rotate(-42deg); }
+.seam.s2 { left: 29em; top: -8em; width: 30em; transform: rotate(-17deg); }
+.seam.s3 { left: 80em; top: -8em; width: 31em; transform: rotate(-70deg); }
+.fold { width: 24em; height: 8em; border-bottom: .24em solid #d1c6ce; border-radius: 50%; }
+.fold.f1 { left: 14em; top: 18em; transform: rotate(20deg); }
+.fold.f2 { left: 84em; top: 53em; width: 26em; transform: rotate(-16deg); }
+.fold.f3 { left: -9em; top: 34em; width: 29em; transform: rotate(-65deg); opacity: .5; }
+.pillow-light { left: 4em; top: 4em; width: 23em; height: 35em; border-radius: 50%; background: linear-gradient(110deg, #fff9, #fff0); transform: rotate(-32deg); }
+/* Hair underneath the figure. */
+.hair-bed { left: 47em; top: 10em; width: 36em; height: 62em; border-radius: 49% 47% 30% 39%; transform: rotate(-19deg); border: var(--fine) solid var(--ink); background: linear-gradient(105deg, #9e91aa, #c5b9ca 38%, #eee8eb 60%, #d1c5d0); }
+.hair-bed::after { left: 7em; top: 15em; width: 24em; height: 41em; border-radius: 48%; border-left: .42em solid #f4eeed; border-right: .2em solid #a99aac; transform: rotate(5deg); }
+.back-lock { background: linear-gradient(125deg, #b0a2ba, #ebe4e9 58%, #faf5f1); border: var(--fine) solid #ac9caf; }
+.back-lock.left-one { left: 27em; top: 18em; width: 24em; height: 17em; border-radius: 56% 10% 65% 24%; transform: rotate(31deg); }
+.back-lock.left-two { left: 17em; top: 27em; width: 27em; height: 12em; border-radius: 15% 55% 67% 80%; transform: rotate(-20deg); }
+.back-lock.left-three { left: 17em; top: 32em; width: 25em; height: 11em; border-radius: 5% 65% 75% 80%; transform: rotate(-24deg); }
+.back-lock.left-four { left: 26em; top: 28em; width: 22em; height: 19em; border-radius: 35% 45% 60% 55%; transform: rotate(20deg); }
+.back-lock.left-four::after { left: 1em; top: 1em; width: 14em; height: 14em; border-radius: 50%; border-left: .28em solid #f8f4f1; border-bottom: .22em solid #f8f4f1; transform: rotate(31deg); }
+.back-lock.right-one { left: 68em; top: 33em; width: 20em; height: 30em; border-radius: 35% 40% 8% 85%; transform: rotate(-26deg); }
+.back-lock.right-two { left: 74em; top: 39em; width: 19em; height: 27em; border-radius: 30% 45% 8% 85%; transform: rotate(-34deg); }
+.back-lock.right-three { left: 74em; top: 52em; width: 24em; height: 16em; border-radius: 40% 65% 15% 80%; transform: rotate(21deg); }
+.back-lock.right-four { left: 84em; top: 60em; width: 19em; height: 8em; border-radius: 65% 85% 18% 80%; transform: rotate(33deg); }
+.back-lock.right-one::after, .back-lock.right-two::after { left: 3em; top: 1em; width: 11em; height: 25em; border-left: .22em solid #fffcf8; border-bottom: .2em solid #b6a9ba; border-radius: 50%; transform: rotate(-7deg); }
+.loose-loop { left: 79em; top: 38em; width: 10em; height: 20em; border: .24em solid #c6b8c5; border-top-color: transparent; border-radius: 50%; transform: rotate(-26deg); }
+.loose-loop.two { left: 73em; top: 40em; height: 21em; transform: rotate(-33deg); border-color: #f7f0ef; border-top-color: transparent; }
+/* Opaque long sleeves, both extending beyond the frame. */
+.sleeve { border: .15em solid #68505f; background: linear-gradient(90deg, #8b7380, #645261 28%, #514352 70%, #332d3c); }
+.sleeve.left { left: 36em; top: -7em; width: 10.1em; height: 46em; transform: rotate(8deg); border-radius: 5% 0 33% 32%; }
+.sleeve.left::before { left: 1.3em; top: 10em; width: 1.6em; height: 29em; border-radius: 50%; background: linear-gradient(#b898a344, #a3879b11); }
+.sleeve.left::after { left: .4em; bottom: 2em; width: 8.5em; height: 4em; border-bottom: .17em solid #baa0ac66; border-radius: 50%; transform: rotate(-23deg); box-shadow: 0 .6em 0 -.48em #c3a5b366; }
+.sleeve.right { left: 65em; top: 10.9em; width: 12.6em; height: 50em; transform: rotate(47deg); transform-origin: 50% 84%; border-radius: 42% 33% 35% 40%; background: linear-gradient(90deg, #423847, #66515f 45%, #8a6f7d 88%, #735c6b); }
+.sleeve.right::before { left: 7em; top: 4em; height: 34em; width: 2.4em; border-radius: 50%; background: #b699a32c; }
+.sleeve.right::after { left: 1em; bottom: 5em; width: 10em; height: 4em; border-top: .2em solid #c0a0b24d; border-radius: 50%; transform: rotate(-13deg); box-shadow: 0 -.8em 0 -.64em #bca3b261; }
+.cuff { left: -.12em; top: 6em; width: 10.3em; height: 4.1em; border: .13em solid #aa98ab; background: repeating-linear-gradient(90deg, transparent 0 1.1em, #bcadbf 1.13em 1.19em, transparent 1.22em 1.5em), linear-gradient(#fffdfa, #eee7ed); transform: rotate(-2deg); }
+.cuff::after { left: 0; right: 0; top: .65em; height: 2.5em; border-top: .09em solid #baaebc; border-bottom: .09em solid #baaebc; }
+.right .cuff { width: 12.7em; top: 1.8em; }
+.bodice { left: 21em; top: 37em; width: 43em; height: 41em; border-radius: 45% 36% 4% 10%; background: linear-gradient(100deg, #302938, #504251 50%, #282532); transform: rotate(32deg); border: .15em solid #4a3b4b; }
+.dress-skirt { left: 9em; top: 51em; width: 48em; height: 35em; border-radius: 51% 32% 12% 10%; transform: rotate(19deg); background: repeating-conic-gradient(from 138deg at 55% 0%, #302a38 0deg 8deg, #756574 11deg 15deg, #423648 18deg 27deg); border: .16em solid #4c3e4e; }
+.bib { left: 40.3em; top: 39.2em; width: 25em; height: 20em; border-radius: 26% 32% 38% 39%; transform: rotate(25deg); border: .14em solid #c0afbe; background: linear-gradient(106deg, #fdfaf8, #dfd4df 24%, #fffaf8 47%, #f5eff3 87%, #d5c8d8); }
+.bib::before { left: 2em; top: 2em; width: 17em; height: 14em; border-left: .23em solid #ccbccc; border-bottom: .1em solid #b7a6ba; border-radius: 50%; transform: rotate(-15deg); opacity: .65; }
+.bib::after { right: 2em; top: 4em; width: 7em; height: 11em; background: linear-gradient(100deg, #fff0, #fffcf9); border-radius: 50%; transform: rotate(19deg); }
+/* Each scallop is an HTML element with a CSS border radius. */
+.frill { width: 15em; height: 5em; transform: rotate(-37deg); left: 28em; top: 38.5em; }
+.frill i { bottom: 0; left: var(--x); width: 2.8em; height: var(--h, 3.6em); border: .1em solid #c4b6c6; border-radius: 55% 55% 16% 10%; background: linear-gradient(100deg, #f9f6f4, #fffdfa 61%, #ded3df); transform: rotate(var(--r, 0deg)); }
+.frill i::after { left: 50%; top: .8em; height: 1.7em; width: .1em; border-radius: 50%; background: #d4c5d4; }
+.frill::after { bottom: -.6em; left: .7em; width: 14em; height: 1.9em; background: #fbf7f5; border-bottom: .11em solid #b9a8bb; transform: rotate(-2deg); }
+.frill.right { left: 61.5em; top: 48em; transform: rotate(118deg); width: 17em; }
+.frill.right::after { width: 17em; }
+.neck { left: 53.4em; top: 32.4em; width: 8.2em; height: 9.2em; transform: rotate(22deg); background: linear-gradient(160deg, #b68c97, #e8c4c3 51%, #f7e1d8); border: .1em solid #bd929b; border-radius: 20% 20% 36% 42%; }
+.collar { left: 50.7em; top: 38.8em; width: 11.4em; height: 5em; background: linear-gradient(#fffaf8, #e3d7e2); border: .12em solid #b8a6ba; border-radius: 15% 25% 35% 35%; transform: rotate(22deg); }
+.collar::before { left: -.3em; top: 1.6em; width: 5.5em; height: 4.2em; background: linear-gradient(130deg, #fffdf9, #e8dee7); clip-path: polygon(0 0, 100% 35%, 58% 100%); }
+.collar::after { right: -.8em; top: .9em; width: 6.9em; height: 5.3em; background: linear-gradient(110deg, #d9cbdc, #fffaf5 55%); clip-path: polygon(8% 42%, 100% 0, 71% 100%); }
+.bow { left: 48.6em; top: 41.2em; width: 14em; height: 5em; transform: rotate(20deg); }
+.bow .wing { top: .1em; left: 0; width: 6.6em; height: 4.2em; border: .12em solid #3b303f; border-radius: 25% 62% 53% 20%; transform: rotate(4deg); background: linear-gradient(170deg, #695769, #463a4b 52%, #796473); }
+.bow .wing::after { left: 1.1em; top: 1.6em; width: 5em; height: .9em; border-top: .15em solid #b495a760; border-radius: 50%; transform: rotate(13deg); }
+.bow .wing.r { left: 6.3em; transform: rotate(180deg); width: 6.8em; }
+.bow .tail { left: 4.6em; top: 2.2em; width: 4.5em; height: 25em; background: linear-gradient(90deg, #87717e, #4b3d4e 35%, #392f40 72%, #6d5768); clip-path: polygon(38% 0, 94% 0, 67% 55%, 87% 83%, 48% 100%, 2% 85%, 14% 63%); transform: rotate(-5deg); }
+.bow .tail.short { left: 7.1em; width: 3.4em; height: 12em; transform: rotate(-27deg); background: linear-gradient(90deg, #786070, #3f3546); }
+.bow .knot { left: 5.5em; top: .7em; width: 2.4em; height: 2.8em; border-radius: 30%; border: .12em solid #433448; background: linear-gradient(130deg, #8b7483, #584657); transform: rotate(5deg); }
+/* Apron folds are CSS triangles, crescents, and gradient fields. */
+.apron { left: 18em; top: 55em; width: 44em; height: 26em; border-radius: 23% 30% 4% 4%; transform: rotate(23deg); border: .14em solid #bcaabd; background: linear-gradient(135deg, #fffdfa 15%, #e1d5e2 46%, #fffcf8 68%, #cabacf); overflow: hidden; }
+.apron .pleat { left: 3em; top: 2em; width: 36em; height: 3em; border-radius: 50%; border-top: .13em solid #b7a6bd; background: linear-gradient(#cbbbd23d, #fff0); transform: rotate(var(--r)); transform-origin: 0 50%; }
+.apron .pleat.p2 { top: 2.8em; left: 4em; width: 39em; height: 7em; }
+.apron .pleat.p3 { top: 4em; left: 7em; width: 35em; height: 10em; }
+.apron .pleat.p4 { top: 7em; left: 2em; width: 28em; height: 6em; }
+.apron::after { left: 10em; top: 10em; width: 37em; height: 6em; border-top: .18em solid #fffaf9; border-radius: 50%; transform: rotate(14deg); }
+.apron-edge { left: 17em; top: 59em; width: 30em; height: 12em; transform: rotate(37deg); }
+.apron-edge i { left: var(--x); top: var(--y, 0em); width: 4.9em; height: 5em; border-radius: 10% 35% 60% 45%; background: linear-gradient(120deg, #fffaf8 35%, #d6c8dc 90%); border: .11em solid #c1afc5; transform: rotate(var(--r, 0deg)); }
+.waist-bow { left: 11em; top: 49em; width: 14em; height: 11em; transform: rotate(-21deg); }
+.waist-bow::before { left: 0; top: .2em; width: 6em; height: 7em; border: .12em solid #b4a2ba; border-radius: 38% 70% 15% 45%; background: linear-gradient(65deg, #e6dce9, #fffafa 64%); transform: rotate(-16deg); }
+.waist-bow::after { left: 6.5em; top: 2.2em; width: 6.2em; height: 4.6em; border: .12em solid #b4a2ba; border-radius: 65% 26% 45% 10%; background: linear-gradient(140deg, #fff9f7, #ded1e2); transform: rotate(-12deg); }
+.waist-bow b { left: 5em; top: 4em; width: 2.5em; height: 2.8em; border-radius: 30% 25% 50% 30%; background: #d6c9dc; border: .12em solid #ae9ab5; z-index: 1; transform: rotate(-12deg); }
+.waist-bow i { left: 6em; top: 5em; width: 4em; height: 12em; border-radius: 0 30% 20% 70%; transform: rotate(-24deg); background: linear-gradient(90deg, #c8b8d0, #fffaf8 50%, #e1d3e6); }
+.foreground { left: -8em; top: 31em; width: 17em; height: 44em; border-radius: 40% 50% 20% 20%; border: .16em solid #c5b4c4; transform: rotate(4deg); background: linear-gradient(100deg, #fffdfb, #eee5ee 40%, #fdf9f7 66%); }
+.foreground::before { left: 9em; top: 3em; width: 4em; height: 24em; border-radius: 50%; border-right: .22em solid #d0bfd1; transform: rotate(-8deg); }
+.foreground::after { left: 2em; top: 23em; width: 12em; height: 19em; border-right: .35em solid #fff; border-radius: 50%; transform: rotate(-32deg); }
+/* Headband sits behind the crown; the thirteen lobes are hand placed. */
+.headband { left: 51em; top: -1em; width: 35em; height: 28em; transform: rotate(17deg); }
+.headband .band-base { inset: 1em 0 0; border-radius: 49% 53% 28% 30%; background: #e4dce7; border: .14em solid #ab9aaf; }
+.headband i { left: var(--x); top: var(--y); width: var(--w, 6.2em); height: var(--h, 9em); border: .12em solid #a99aaa; border-radius: 48% 45% 20% 25%; background: linear-gradient(90deg, #fdfbf8, #f3eef3 60%, #e4dce8); transform: rotate(var(--r)); }
+.headband i::after { left: 45%; top: 1em; width: .85em; height: 4.8em; border-radius: 50%; background: #dcd2e050; transform: rotate(-6deg); }
+.headband i:nth-of-type(-n+4) { background: linear-gradient(100deg, #bab0cb, #e4dce7); }
+.hair-cap { left: 45.5em; top: 3.9em; width: 36em; height: 35.5em; border-radius: 49% 51% 36% 38%; transform: rotate(17deg); background: linear-gradient(112deg, #b5a7c1 5%, #dfd5e2 31%, #f7f1f1 57%, #e8dfe5 85%, #b5a5bb); border: .15em solid #a291a9; box-shadow: inset 1.6em .5em 1.8em #a89ab04d; }
+.hair-cap::after { left: 2.4em; top: 1.2em; width: 29em; height: 23em; border-top: .23em solid #fffafaa1; border-left: .12em solid #f6f0f5b3; border-radius: 50%; transform: rotate(-15deg); }
+.side-hair { left: 45.4em; top: 15em; width: 10em; height: 24em; border: .12em solid #af9caf; border-radius: 45% 25% 17% 70%; transform: rotate(-10deg); background: linear-gradient(95deg, #b8a8be, #f8f3ee 60%, #d2c4d3); }
+.side-hair::after { left: 1.3em; top: 4em; width: 7em; height: 19em; border-left: .3em solid #fff9f5; border-radius: 50%; transform: rotate(-8deg); }
+.side-hair.right { left: 69.6em; top: 19em; width: 10em; height: 23em; transform: rotate(26deg); border-radius: 25% 45% 75% 10%; background: linear-gradient(90deg, #bfaec3, #f9f5ef 65%); }
+.ear { left: 49.2em; top: 22.1em; width: 3.1em; height: 5.4em; border-radius: 43%; transform: rotate(-18deg); border: .12em solid #b0828d; background: linear-gradient(90deg, #e6acb6, #f9d6cd); }
+.ear::after { left: .9em; top: 1em; width: 1.3em; height: 2.8em; border-radius: 50%; border: .24em solid #cf929f; border-bottom-color: transparent; }
+.face { left: 51.2em; top: 13.7em; width: 22.7em; height: 23em; transform: rotate(20deg); border: .13em solid #a77983; border-radius: 44% 49% 44% 43% / 42% 43% 57% 58%; background: radial-gradient(ellipse at 52% 43%, #fff6ef 20%, #ffefe7 62%, #efc8c5 100%); overflow: hidden; }
+.face::before { left: -2em; top: -4em; width: 27em; height: 11em; border-radius: 50%; background: #b78eac2b; transform: rotate(-8deg); }
+.blush { left: 1.4em; top: 11.5em; width: 7.2em; height: 4.5em; border-radius: 50%; background: radial-gradient(ellipse, #eba2ad6e, #edb1b340 39%, #f4b5b000 72%); }
+.blush.right { left: 15.5em; top: 11.6em; width: 6.5em; }
+.blush::after { left: 1.9em; top: 1.9em; width: 3.4em; height: 1.1em; transform: skew(-36deg); background: repeating-linear-gradient(90deg, transparent 0 .62em, #d9909c66 .65em .71em, transparent .74em .94em); opacity: .6; }
+.brow { left: 1.7em; top: 6.7em; width: 6.7em; height: 1.5em; border-top: .16em solid #af8797; border-radius: 50%; transform: rotate(-5deg); }
+.brow.right { left: 14.3em; top: 6.7em; width: 6.8em; transform: rotate(3deg); }
+.eye { left: 1.9em; top: 8.4em; width: 6.9em; height: 2.9em; overflow: hidden; border-radius: 63% 67% 35% 38%; border-top: .5em solid #59404f; border-bottom: .1em solid #c495a4; transform: rotate(-3deg); background: linear-gradient(#d8b9cf 0 15%, #fff9f5 34%); }
+.eye .iris { left: 2.3em; top: -.7em; width: 3.1em; height: 3.4em; border-radius: 50%; border: .12em solid #9a71af; background: radial-gradient(ellipse at 50% 72%, #d6a1f7 0 20%, #b375e0 43%, #73528e 70%, #544263 90%); }
+.eye .iris::before { left: 1.18em; top: .8em; width: .68em; height: 1.65em; border-radius: 48%; background: #654678; box-shadow: 0 .32em .35em #6d448466; }
+.eye .iris::after { left: .35em; top: 1em; width: .57em; height: .8em; border-radius: 50%; background: #fffefb; box-shadow: 1.56em .83em 0 -.08em #f2d9ff; }
+.eye .gleam { left: 3em; bottom: .15em; width: 2em; height: .6em; border-bottom: .22em solid #e9bdff; border-radius: 50%; transform: rotate(-9deg); }
+.eye.right { left: 14.2em; top: 8.5em; transform: rotate(4deg); width: 6.6em; }
+.eye.right .iris { left: 1.5em; border-color: #8d849e; background: radial-gradient(ellipse at 48% 72%, #d7cce3 0 15%, #aea3bc 42%, #797184 65%, #52495f 90%); }
+.eye.right .iris::before { background: #625b70; }
+.eye.right .gleam { left: 2em; border-color: #e4d6ef; }
+.lashes { left: 1.35em; top: 8.5em; width: 1.8em; height: 1.6em; background: #5d4352; clip-path: polygon(80% 18%, 0 0, 29% 37%, 2% 30%, 39% 81%, 100% 100%); transform: rotate(3deg); }
+.lashes.right { left: 19.9em; top: 8.7em; transform: scaleX(-1) rotate(-5deg); }
+.lid { left: 2.5em; top: 7.9em; width: 5.4em; height: .8em; border-top: .11em solid #b68a9c; border-radius: 50%; }
+.lid.right { left: 14.7em; top: 8em; }
+.nose { left: 11.4em; top: 12.3em; width: .9em; height: 1.3em; border-radius: 62% 18% 34% 60%; background: linear-gradient(110deg, #e5aba7, #f5d1c4 74%); transform: rotate(-10deg); }
+.nose::after { left: .5em; top: 1.5em; width: .45em; border-bottom: .11em solid #c19191; transform: rotate(-7deg); }
+.mouth { left: 10.4em; top: 17em; width: 2.8em; height: 1.15em; border-bottom: .16em solid #af7884; border-radius: 0 0 52% 49%; transform: rotate(-6deg); }
+.mouth::after { left: .8em; top: 1.75em; width: 1.6em; height: .36em; border-bottom: .13em solid #e2b3b3; border-radius: 50%; }
+/* Foreground hair locks are actual CSS rounded shapes, not image masks. */
+.bang { border: .12em solid #af9db0; border-top-color: transparent; background: linear-gradient(108deg, #c9bcd1, #f6f0f0 42%, #fffbf7 76%, #e6dce5); transform-origin: 50% 12%; }
+.bang.b1 { left: 47.5em; top: 8.5em; width: 8.2em; height: 17em; border-radius: 85% 8% 9% 95%; transform: rotate(15deg); background: linear-gradient(100deg, #b6a7c0, #ebe1ed 55%, #faf5f0); }
+.bang.b2 { left: 51.7em; top: 7.2em; width: 7.2em; height: 17.1em; border-radius: 79% 13% 10% 90%; transform: rotate(17deg); }
+.bang.b3 { left: 54.8em; top: 6.4em; width: 7.6em; height: 16.6em; border-radius: 75% 23% 7% 92%; transform: rotate(24deg); }
+.bang.b4 { left: 58.7em; top: 5.5em; width: 7.5em; height: 18.7em; border-radius: 70% 29% 90% 10%; transform: rotate(17deg); }
+.bang.b5 { left: 63em; top: 5.9em; width: 7.9em; height: 20.5em; border-radius: 67% 35% 13% 84%; transform: rotate(4deg); background: linear-gradient(110deg, #beaec4 0%, #f8f3ef 15%, #f4edef 60%, #e6dce5); }
+.bang.b6 { left: 68.5em; top: 6.9em; width: 7.5em; height: 19.5em; border-radius: 42% 55% 12% 87%; transform: rotate(-9deg); background: linear-gradient(94deg, #f9f4f1 30%, #fdf8f4 75%, #d0c1d2); }
+.bang.b7 { left: 72.1em; top: 11em; width: 8.7em; height: 24em; border-radius: 35% 60% 80% 14%; transform: rotate(10deg); background: linear-gradient(90deg, #d6c8d8, #faf6f0 38%, #f7f2ed 82%, #cbbccc); }
+.bang.b1::after, .bang.b2::after, .bang.b3::after { left: 1.3em; top: 1.8em; width: 4em; height: 12em; border-left: .11em solid #fffdfad9; border-radius: 50%; transform: rotate(4deg); }
+.bang.b4::after { left: 1.7em; top: 2.8em; width: 3em; height: 11em; border-left: .1em solid #baa7bd; border-radius: 50%; transform: rotate(12deg); }
+.bang.b5::after { left: .6em; top: 2.3em; width: 4em; height: 12em; border-left: .22em solid #b09bb3; border-radius: 50%; transform: rotate(4deg); }
+.bang.b6::after { left: 2em; top: 2em; width: 4em; height: 13em; border-right: .1em solid #bba7bd; border-radius: 50%; }
+.bang.b7::after { left: 2em; top: 5em; width: 4.7em; height: 17em; border-right: .11em solid #b3a0b5; border-radius: 50%; transform: rotate(9deg); }
+.hair-shine { left: 62em; top: 13.7em; width: 3.5em; height: 1.2em; border-radius: 10% 10% 45% 25%; background: #ffffffb3; transform: rotate(21deg); }
+.hair-shine.s2 { left: 67.2em; top: 15.2em; width: 3.3em; transform: rotate(9deg); }
+.hair-shine.s3 { left: 71.1em; top: 15.4em; width: 1.15em; transform: rotate(-9deg); }
+.hair-shine.s4 { left: 76em; top: 15.3em; width: .65em; transform: rotate(5deg); }
+.hair-shine.s5 { left: 59.2em; top: 12.4em; width: .8em; height: 2em; transform: rotate(36deg); }
+.swept-lock { left: 51.2em; top: 14.3em; width: 11.5em; height: 1.8em; border-radius: 50%; border-bottom: .14em solid #b1a0a8; transform: rotate(4deg); }
+.swept-lock::after { left: 1em; top: 1.23em; width: 9em; border-radius: 50%; border-bottom: .16em solid #fffaf3; }
+.cheek-lock { left: 64.8em; top: 24.7em; width: 10.7em; height: 7.6em; border-radius: 15% 0 70% 44%; border-bottom: 1.15em solid #f8f3ee; border-right: .4em solid #faf5f0; transform: rotate(-17deg); filter: drop-shadow(0 .12em 0 #a994aa); }
+.cheek-lock::after { left: .5em; top: 3.2em; width: 8em; height: 2.7em; border-bottom: .1em solid #bba7bc; border-radius: 50%; transform: rotate(-9deg); }
+.lower-lock { left: 49.1em; top: 31.1em; width: 10em; height: 10em; border-left: 1.8em solid #faf5ef; border-bottom: 1.1em solid #faf5ef; border-radius: 13% 0 14% 87%; transform: rotate(-15deg); filter: drop-shadow(0 .12em 0 #bbaabc); }
+.lower-lock.right { left: 55em; top: 33.4em; width: 13em; height: 9em; border: 0; border-bottom: 1.5em solid #faf5ef; border-right: .5em solid #faf5ef; border-radius: 0 0 70% 50%; transform: rotate(-19deg); }
+.lower-lock.tip { left: 61em; top: 37em; width: 9em; height: 7.8em; border: 0; border-bottom: .85em solid #f8f3ed; border-right: .7em solid #f8f3ed; border-radius: 0 0 85% 30%; transform: rotate(-16deg); }
+.ahoge { left: 64.1em; top: -1.6em; width: 7.7em; height: 16em; border-radius: 65% 70% 0 0; border-left: .48em solid #fcfaf6; border-top: .24em solid #fcfaf6; border-right: .1em solid #a695a9; transform: rotate(28deg); filter: drop-shadow(-.09em -.08em 0 #94849c); }
+.ahoge.two { left: 73.8em; top: .1em; width: 7em; height: 14em; transform: rotate(-2deg); border-left-width: .13em; border-right: .4em solid #fffaf5; }
+.flyaway { left: 44em; top: 15em; width: 5em; height: 14em; border-left: .24em solid #fff9f3; border-bottom: .22em solid #fff9f3; border-radius: 50%; transform: rotate(18deg); }
+.flyaway.two { left: 42.8em; top: 9em; height: 11em; width: 7em; transform: rotate(41deg); border-color: #9a87ad; border-bottom: 0; }
+/* Small neutral ornament, instead of the source's speech balloon. */
+.ornament { left: 15.8em; top: 7em; width: 10em; height: 16em; opacity: .66; }
+.ornament .curl { left: 2em; top: 0; width: 8em; height: 9em; border: .1em solid #ac98b0; border-left-color: transparent; border-radius: 50%; transform: rotate(-22deg); }
+.ornament .curl::after { left: 1em; top: 3.3em; width: 4em; height: 4em; border: .1em solid #ac98b0; border-right-color: transparent; border-radius: 50%; transform: rotate(43deg); }
+.ornament .curl.small { left: 1.7em; top: 8em; width: 5em; height: 7em; transform: rotate(145deg); }
+.ornament .leaf { left: 5.8em; top: 2.2em; width: 1.7em; height: 2.5em; border: .1em solid #af9bb4; border-radius: 80% 10% 70% 10%; background: #d7cadd; transform: rotate(27deg); }
+.ornament .leaf.two { left: .6em; top: 10em; transform: rotate(71deg); }
+.ornament .star { left: 8.9em; top: 10.5em; width: 1.5em; height: 1.5em; background: #b39db9; clip-path: polygon(50% 0, 57% 42%, 100% 50%, 57% 57%, 50% 100%, 43% 57%, 0 50%, 43% 42%); }
+.ornament .star.two { left: -1.5em; top: 4.2em; transform: scale(.7); }
+.ornament .dot { left: .3em; top: 8em; width: .36em; height: .36em; border-radius: 50%; background: #ac98b4; box-shadow: 8.4em 6em 0 -.04em #ac98b4; }
+@media print { body { background: white; } .frame { width: 100%; } .art { print-color-adjust: exact; -webkit-print-color-adjust: exact; } }
+</style>
+</head>
+<body>
+<main class="frame">
+<div class="art" role="img" aria-label="纯 CSS 手工绘制：一位银白色长发、紫灰双眼的成年女仆，穿着完整的深色长袖高领女仆装和白色围裙，双臂舒展，靠在浅色软垫上，面带微笑。">
+  <i class="pillow-shadow"></i><i class="pillow-shadow right"></i>
+  <i class="seam"></i><i class="seam s2"></i><i class="seam s3"></i>
+  <i class="fold f1"></i><i class="fold f2"></i><i class="fold f3"></i><i class="pillow-light"></i>
+  <i class="hair-bed"></i>
+  <i class="back-lock left-one"></i><i class="back-lock left-two"></i><i class="back-lock left-three"></i><i class="back-lock left-four"></i>
+  <i class="back-lock right-one"></i><i class="back-lock right-two"></i><i class="back-lock right-three"></i><i class="back-lock right-four"></i>
+  <i class="loose-loop"></i><i class="loose-loop two"></i>
+  <div class="sleeve left"><i class="cuff"></i></div>
+  <div class="sleeve right"><i class="cuff"></i></div>
+  <i class="dress-skirt"></i><i class="bodice"></i><i class="bib"></i>
+  <div class="frill">
+    <i style="--x:0em;--r:-18deg;--h:2.5em"></i><i style="--x:2em;--r:-12deg;--h:3em"></i><i style="--x:4em;--r:-5deg"></i><i style="--x:6em"></i><i style="--x:8em;--r:7deg"></i><i style="--x:10em;--r:14deg"></i><i style="--x:12em;--r:22deg;--h:3em"></i>
+  </div>
+  <div class="frill right">
+    <i style="--x:0em;--r:-18deg;--h:2.7em"></i><i style="--x:2em;--r:-12deg;--h:3em"></i><i style="--x:4em;--r:-5deg"></i><i style="--x:6em"></i><i style="--x:8em;--r:7deg"></i><i style="--x:10em;--r:14deg"></i><i style="--x:12em;--r:19deg;--h:3em"></i><i style="--x:14em;--r:25deg;--h:2.7em"></i>
+  </div>
+  <i class="neck"></i><i class="collar"></i>
+  <div class="bow"><i class="wing"></i><i class="wing r"></i><i class="tail"></i><i class="tail short"></i><i class="knot"></i></div>
+  <div class="apron"><i class="pleat" style="--r:8deg"></i><i class="pleat p2" style="--r:19deg"></i><i class="pleat p3" style="--r:27deg"></i><i class="pleat p4" style="--r:35deg"></i></div>
+  <div class="apron-edge"><i style="--x:0em;--r:-9deg"></i><i style="--x:4em;--y:.3em;--r:5deg"></i><i style="--x:8em;--y:.5em;--r:-5deg"></i><i style="--x:12em;--y:.7em;--r:8deg"></i><i style="--x:16em;--y:1em;--r:-3deg"></i><i style="--x:20em;--y:1.5em;--r:10deg"></i></div>
+  <div class="waist-bow"><i></i><b></b></div><i class="foreground"></i>
+  <div class="headband">
+    <b class="band-base"></b>
+    <i style="--x:-.6em;--y:8em;--r:-48deg;--h:6em"></i>
+    <i style="--x:1em;--y:4.8em;--r:-37deg;--h:7em"></i>
+    <i style="--x:3.6em;--y:2.4em;--r:-26deg"></i>
+    <i style="--x:7em;--y:.7em;--r:-16deg"></i>
+    <i style="--x:11em;--y:0em;--r:-5deg"></i>
+    <i style="--x:15em;--y:.1em;--r:6deg"></i>
+    <i style="--x:19em;--y:1em;--r:18deg"></i>
+    <i style="--x:22.4em;--y:3em;--r:28deg"></i>
+    <i style="--x:25em;--y:5.7em;--r:42deg"></i>
+    <i style="--x:27em;--y:9.3em;--r:58deg"></i>
+    <i style="--x:28em;--y:13.2em;--r:72deg"></i>
+    <i style="--x:27.5em;--y:17em;--r:85deg;--h:8em"></i>
+    <i style="--x:26em;--y:20em;--r:98deg;--h:7em"></i>
+  </div>
+  <i class="hair-cap"></i><i class="side-hair"></i><i class="side-hair right"></i><i class="ear"></i>
+  <div class="face">
+    <i class="blush"></i><i class="blush right"></i><i class="brow"></i><i class="brow right"></i>
+    <i class="lid"></i><i class="lid right"></i>
+    <div class="eye"><i class="iris"></i><i class="gleam"></i></div>
+    <div class="eye right"><i class="iris"></i><i class="gleam"></i></div>
+    <i class="lashes"></i><i class="lashes right"></i><i class="nose"></i><i class="mouth"></i>
+  </div>
+  <i class="bang b1"></i><i class="bang b2"></i><i class="bang b3"></i><i class="bang b4"></i><i class="bang b5"></i><i class="bang b6"></i><i class="bang b7"></i>
+  <i class="hair-shine"></i><i class="hair-shine s2"></i><i class="hair-shine s3"></i><i class="hair-shine s4"></i><i class="hair-shine s5"></i>
+  <i class="swept-lock"></i><i class="cheek-lock"></i><i class="lower-lock"></i><i class="lower-lock right"></i><i class="lower-lock tip"></i>
+  <i class="ahoge"></i><i class="ahoge two"></i><i class="flyaway"></i><i class="flyaway two"></i>
+  <div class="ornament"><i class="curl"></i><i class="curl small"></i><i class="leaf"></i><i class="leaf two"></i><i class="star"></i><i class="star two"></i><i class="dot"></i></div>
+</div>
+</main>
+</body>
+</html>

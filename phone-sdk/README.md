@@ -91,6 +91,19 @@ clearPhoneAppBadge("chat");
 
 打开该内页时宿主自动 clear；内页仍可再 `set`。
 
+## 程序化关闭手机
+
+调用方可以选择关闭手机时是否播放宿主动画；省略选项时保持原有动画：
+
+```ts
+import { closePhoneApp } from "@ink-zenly/phone-sdk/plugin";
+
+await closePhoneApp();                    // 默认：播放宿主关闭动画
+await closePhoneApp({ animated: false }); // 立即关闭，不播放动画
+```
+
+`force` 仅供已经完成不可跳过交互的宿主流程绕过遗留关闭锁；普通内页不应设置。
+
 ## 扩展入口引导（本仓库）
 
 ```ts

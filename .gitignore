@@ -6,6 +6,7 @@ sdk
 .DS_Store
 .idea
 .worktrees/
+.pnpm-store/
 
 release
 

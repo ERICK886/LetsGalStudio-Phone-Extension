@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>白帽少女 · 纯 CSS 手绘</title>
+<style>
+/* Hand-authored CSS illustration. All visible marks are HTML boxes,
+   borders, gradients, shadows, or manually placed CSS polygons.
+   No image assets, SVG, canvas, JavaScript, tracing, or external resources.
+   Coordinates use em; 1em is 1% of the responsive illustration width. */
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; }
+body { display: grid; place-items: start center; background: #faf8f8; }
+.frame { width: min(100%, 832px); container-type: inline-size; }
+.drawing {
+  width: 100%; height: 146.154em; font-size: 1cqw; position: relative;
+  overflow: hidden; isolation: isolate; background: #fcfafa;
+  --line: #95849d; --hair-line: #62566b; --skin-line: #c78f9c;
+  --white: #f2f5f9; --lavender: #c8c6d8;
+}
+.drawing *, .drawing *::before, .drawing *::after { position: absolute; }
+.drawing i, .drawing b { display: block; font-style: normal; }
+.drawing *::before, .drawing *::after { content: ''; }
+/* The outer hair silhouette. */
+.hair-back { left: 29.3em; top: 15.1em; width: 44.9em; height: 62em;
+  border: .13em solid #776780; border-radius: 47% 46% 14% 19%;
+  background: linear-gradient(92deg, #797185, #a08c9e 27%, #756876 49%, #413d4c 81%, #898090);
+  transform: rotate(-2deg);
+}
+.hair-back::before { left: 5.2em; top: 23em; width: 19em; height: 36em; border-radius: 15% 10% 65% 20%; background: linear-gradient(90deg, #b798aa, #c4a1b2 39%, #756577 45%, #aa8f9f 70%, #b9a2af); opacity: .78; }
+.hair-back::after { right: 1.4em; top: 15em; width: 9em; height: 41em; border-right: .34em solid #b9abba; border-left: .2em solid #a095a5; border-radius: 47%; transform: rotate(-6deg); }
+.back-strand { top: 28em; left: var(--x); width: var(--w, 3em); height: var(--h, 38em); border-radius: 20% 35% 35% 60%; border-left: .14em solid #b8a3b6; border-right: .16em solid #4d4658; transform: rotate(var(--r, 0deg)); }
+.back-strand.light { background: linear-gradient(90deg, #bbb0c033, #d0b2c33d, #bba5ba00); }
+.back-strand.dark { background: #554d5d; }
+.hair-loop { left: 27.6em; top: 28em; width: 7.5em; height: 17em; border: .15em solid #8b8297; border-right: 0; border-radius: 50%; transform: rotate(10deg); }
+.hair-loop.lower { left: 29.4em; top: 48em; width: 4.7em; height: 20em; border-width: .12em; transform: rotate(3deg); }
+/* Loose jacket, behind the figure. */
+.jacket-back { left: 21em; top: 68.5em; width: 57em; height: 84em;
+  background: linear-gradient(112deg, #e8edf3, #bac0d3 34%, #eef3f7 63%, #c5c3d7 93%);
+  clip-path: polygon(12% 1%, 32% 0, 62% 6%, 84% 5%, 99% 54%, 98% 100%, 0 100%, 6% 58%, 0 24%);
+}
+.coat-left { left: 17.7em; top: 76.7em; width: 15.4em; height: 79em; transform: rotate(10deg);
+  background: linear-gradient(90deg, #e9eaf4, #cad0df 30%, #e9eff5 67%, #b5b2ca 83%, #f1f4f9);
+  border: .14em solid #a58fbd; border-radius: 30% 14% 3% 5%;
+}
+.coat-left::before { left: 3.4em; top: 10em; width: 4.8em; height: 58em; border-radius: 50%; border-left: .28em solid #9993ad; border-right: .2em solid #f6f9fc; transform: rotate(-3deg); }
+.coat-left::after { right: 2em; top: 20em; width: 1.4em; height: 35em; border-left: .27em solid #a8a2ba; border-radius: 50%; }
+.coat-right { left: 66.9em; top: 75em; width: 16.8em; height: 79em; transform: rotate(-8deg);
+  background: linear-gradient(90deg, #a9a5bf, #edf1f7 34%, #d6d8e6 70%, #f9fafb);
+  border: .14em solid #a68bbc; border-radius: 27% 34% 6% 9%;
+}
+.coat-right::before { left: 4em; top: 5em; width: 10em; height: 58em; border-left: .5em solid #c1bdd4; border-right: .16em solid #aaa0ba; border-radius: 50%; transform: rotate(-6deg); }
+.coat-right::after { left: 3.3em; top: 24em; width: 6em; height: 31em; border-right: 1.8em solid #f9fbfc; border-radius: 50%; transform: rotate(8deg); }
+.coat-corner { left: 76.5em; top: 121em; width: 9em; height: 30em; background: linear-gradient(95deg, #a7a1ba, #f2f5f9 42%, #e0e1ed); border: .14em solid #b398c6; border-radius: 30% 60% 10% 20%; transform: rotate(-6deg); }
+.coat-corner::after { left: 2em; top: 4em; width: 4em; height: 9em; border-radius: 50%; border-left: 1.8em solid #c3bfd4; transform: rotate(22deg); }
+/* Legs are cropped by the bottom edge, as in the reference. */
+.leg { left: 29em; top: 135em; width: 23em; height: 24em; border: .13em solid #c28c99; border-radius: 13% 20% 25% 25%; background: linear-gradient(90deg, #edc7cd, #fff2eb 38%, #fae5e0 80%, #eac5ca); transform: rotate(5deg); }
+.leg.right { left: 51.5em; top: 131.5em; width: 22.4em; height: 29em; transform: rotate(8deg); background: linear-gradient(90deg, #deb7c1, #fbe6df 25%, #fff5ef 69%); }
+.leg::after { top: 1em; left: 1em; right: 1em; height: 5em; background: linear-gradient(#bd93a561, transparent); border-radius: 35%; }
+/* Torso and arms: soft, restrained flat-color shading. */
+.torso { left: 29.2em; top: 74.6em; width: 38.3em; height: 39.7em; transform: rotate(-4deg);
+  border: .13em solid var(--skin-line); border-radius: 26% 32% 9% 8% / 29% 31% 12% 8%;
+  background: linear-gradient(97deg, #efc6cb, #fff3ed 22%, #fff4ee 68%, #f4d8d5);
+  clip-path: polygon(0 0, 97% 0, 98% 16%, 91% 31%, 88% 44%, 89% 58%, 100% 88%, 100% 100%, 0 100%, 3% 78%, 4% 50%, 0 24%);
+}
+.torso::before { left: -.5em; top: 1em; width: 4.8em; height: 31em; border-radius: 50%; background: linear-gradient(90deg, #d99ba555, #f4d4d300); transform: rotate(-7deg); }
+.torso::after { right: 2.4em; top: 12em; width: 5.5em; height: 7em; border-top: .14em solid #d3a4ac77; border-radius: 50%; transform: rotate(12deg); }
+.navel { left: 38.2em; top: 100.1em; width: 1em; height: 1.6em; border-radius: 45%; border-left: .13em solid #c898a1; background: linear-gradient(90deg, #eac3c7, #fae6e0); transform: rotate(-14deg); }
+.shoulder-left { left: 32.6em; top: 58.8em; width: 8.7em; height: 15em; border-radius: 65% 27% 40% 40%; background: linear-gradient(90deg, #e9b4c0, #ffeae4 40%, #fce7e1); border: .13em solid #bd8999; transform: rotate(14deg); }
+.shoulder-left::after { left: 3em; top: 1.8em; width: 2em; height: 8em; border-left: .22em solid #d193a3; border-radius: 50%; transform: rotate(16deg); }
+.neck { left: 46.7em; top: 45.5em; width: 12.7em; height: 14em; transform: rotate(5deg); border: .13em solid #bb8a98; border-radius: 6% 9% 35% 32%; background: linear-gradient(175deg, #c795a6 5%, #f4d3d3 46%, #fde6df 74%); }
+.neck::after { left: 2em; bottom: 0; width: 8em; height: 5em; border-bottom: .12em solid #d5a4ac; border-radius: 50%; transform: rotate(3deg); }
+.arm-right { left: 64em; top: 54.4em; width: 11.2em; height: 39em; border: .14em solid #bb8293; border-radius: 46% 49% 44% 35% / 16% 24% 50% 80%; transform: rotate(7deg); background: linear-gradient(94deg, #e7b4bf, #fff3eb 24%, #fcece6 77%, #f2d1d4); }
+.arm-right::before { left: .3em; top: 7em; width: 3em; height: 11em; background: linear-gradient(90deg, #cf829973, #f0c0c800); border-radius: 50%; transform: rotate(-7deg); }
+.arm-right::after { left: 1.5em; bottom: -5em; width: 6.1em; height: 18em; background: linear-gradient(90deg, #e9b8c5, #fff0e9 45%); border-left: .13em solid #c38c9c; border-radius: 10% 35% 55% 40%; transform: rotate(-8deg); }
+/* Sleeveless dark top and white collar. */
+.top { left: 29.7em; top: 56.9em; width: 35.9em; height: 30.7em; transform: rotate(-3deg);
+  border-radius: 35% 21% 18% 17%; background: linear-gradient(118deg, #706779, #8b7f8e 45%, #796f80 77%, #5e566b);
+  clip-path: polygon(26% 7%, 46% 0, 82% 0, 86% 22%, 100% 58%, 94% 100%, 85% 89%, 66% 82%, 34% 77%, 29% 66%, 24% 76%, 9% 80%, 0 92%, 4% 60%, 8% 34%);
+  filter: drop-shadow(0 .16em 0 #62526c);
+}
+.top::before { left: 2.7em; top: 8.6em; width: 6em; height: 14em; border-left: .2em solid #49424f77; border-radius: 50%; transform: rotate(15deg); }
+.top::after { right: 1.8em; top: 2em; width: 6em; height: 19em; border-left: .2em solid #b1a1b34d; border-radius: 50%; transform: rotate(-19deg); }
+.top-hem { left: 41.1em; top: 77.7em; width: 21em; height: 7.2em; border-top: .17em solid #b9a0b0; border-radius: 50%; transform: rotate(15deg); }
+.top-heart { left: 39.4em; top: 72.6em; width: 1.5em; height: 1.4em; background: #fff5ee; transform: rotate(-42deg); border-radius: 0 0 0 .2em; }
+.top-heart::before { left: .7em; top: 0; width: 1.4em; height: 1.4em; background: #fff5ee; border-radius: 50%; }
+.top-heart::after { left: 0; top: -.7em; width: 1.4em; height: 1.4em; background: #fff5ee; border-radius: 50%; }
+.choker { left: 50.6em; top: 51.8em; width: 10.9em; height: 2.6em; background: linear-gradient(#4d4557, #797083); border-radius: 45% 50% 15% 15%; transform: rotate(-4deg); border: .12em solid #5a4d61; }
+.collar { left: 45.8em; top: 54em; width: 16.4em; height: 7em; transform: rotate(-9deg); }
+.collar .left { left: 0; top: .5em; width: 8em; height: 6em; background: linear-gradient(145deg, #f7f8fa, #d7d5e4 58%, #fffdfb); clip-path: polygon(0 65%, 35% 9%, 100% 0, 78% 100%); }
+.collar .right { left: 7.1em; top: 0; width: 9.3em; height: 9.3em; background: linear-gradient(125deg, #fcfcfa 25%, #d9dbe9 27% 38%, #f6f7fa 41% 66%, #d0cddd 69% 76%, #fffefa 80%); clip-path: polygon(0 0, 100% 0, 87% 39%, 16% 100%); }
+.jewel { left: 50.5em; top: 53.9em; width: 3em; height: 2.7em; transform: rotate(-12deg); background: linear-gradient(140deg, #e7579a, #bd226d 48%, #6f244d); border: .17em solid #5e3f5c; border-radius: 48% 44% 48% 46%; box-shadow: 0 .15em .2em #77536550; }
+.jewel::before { left: .4em; top: .3em; width: .6em; height: .8em; background: #ffbed9; border-radius: 50%; transform: rotate(24deg); }
+.jewel::after { left: .95em; top: 1.5em; width: 1.1em; border-bottom: .18em solid #f06ba8; border-radius: 50%; }
+.collar-bow { left: 44em; top: 56.5em; width: 13em; height: 5.3em; transform: rotate(-3deg); }
+.collar-bow .wing { left: 0; top: 0; width: 6.2em; height: 5em; border: .14em solid #4e465b; border-radius: 40% 56% 47% 24%; background: linear-gradient(133deg, #b0a5b6, #6d6679 46%, #8f879a); transform: rotate(12deg); }
+.collar-bow .wing.right { left: 5.8em; transform: rotate(173deg); }
+.collar-bow .wing::before { left: 2em; top: 1.6em; width: 3em; height: 1em; border-radius: 50%; background: #514958; transform: rotate(-13deg); }
+.collar-bow .wing::after { left: 1.3em; top: .8em; width: 2.7em; height: 2.7em; border-bottom: .18em solid #c5b7c73b; border-radius: 50%; }
+.collar-bow .knot { left: 5em; top: 1.2em; width: 2.1em; height: 2.2em; border: .13em solid #494355; border-radius: 35%; transform: rotate(14deg); background: linear-gradient(135deg, #aaa0b0, #655c72); }
+/* The jacket is draped below both shoulders. */
+.left-sleeve { left: 12.2em; top: 80.8em; width: 15.1em; height: 36em; border: .14em solid #a58dbc; border-radius: 34% 27% 26% 30%; transform: rotate(-11deg); background: linear-gradient(103deg, #eeedf7, #c1c7d9 35%, #d5d9e5 71%, #b4aec9); }
+.left-sleeve::before { left: 1.2em; top: 9em; width: 7em; height: 17em; border-radius: 50%; border-left: 2.3em solid #a4a2bc66; transform: rotate(-22deg); }
+.left-sleeve::after { left: 1.8em; top: 23em; width: 8.4em; height: 8em; border-radius: 20% 50% 30% 40%; border-left: 2em solid #8f86a677; border-bottom: .4em solid #f8faff; transform: rotate(17deg); }
+.left-lapel { left: 25.4em; top: 66.6em; width: 7.2em; height: 29em; border: .14em solid #9a87b1; border-radius: 60% 0 43% 22%; background: linear-gradient(95deg, #f5f7fa, #c1bfd6 47%, #e4e9f3 70%); transform: rotate(9deg); }
+.left-lapel::after { left: 2em; top: 4em; width: 3.2em; height: 20em; border-left: 1.1em solid #aaa5c0; border-radius: 50%; transform: rotate(7deg); }
+.forearm-left { left: 17.7em; top: 75.5em; width: 8.1em; height: 15em; border: .13em solid #bf8196; border-radius: 24% 35% 42% 40%; transform: rotate(-12deg); background: linear-gradient(90deg, #efc5d0, #fde6e0 62%, #eebfcb); }
+.forearm-left::after { left: 4.5em; top: 5em; width: 3em; height: 5em; border-left: .15em solid #c48799; border-radius: 50%; transform: rotate(30deg); }
+.cuff-left { left: 15.2em; top: 83.4em; width: 11.5em; height: 12em; border: .14em solid #a18bb7; border-radius: 18% 20% 43% 39%; transform: rotate(-20deg); background: linear-gradient(95deg, #d8d9e8, #f4f7f9 42%, #c8cadf 75%, #eef2f9); }
+.cuff-left::before { left: .8em; top: .3em; width: 9.8em; height: 4.2em; border-bottom: .32em solid #fcfdff; border-left: .16em solid #b1a3c4; border-radius: 50%; transform: rotate(4deg); }
+.cuff-left::after { left: 2.4em; top: 4em; width: 3.5em; height: 6em; border-left: 1.4em solid #b8b3d1; border-radius: 50%; transform: rotate(-10deg); opacity: .7; }
+.hand { left: 19.1em; top: 69.7em; width: 8em; height: 12em; background: linear-gradient(105deg, #f4d5da, #fff1e9 68%); border: .14em solid #b97890; border-radius: 30% 38% 44% 22%; transform: rotate(7deg); }
+.hand::after { left: .45em; top: 3.8em; width: 1.8em; height: 6.5em; border-radius: 50%; background: #e9b4c264; transform: rotate(-6deg); }
+.finger { left: 20.9em; top: 70em; width: 7.1em; height: 2.7em; border: .14em solid #b87f90; border-radius: 35% 33% 30% 41%; transform: rotate(-7deg); background: #ffede6; }
+.finger.two { top: 72em; left: 21.1em; width: 7.4em; transform: rotate(6deg); border-bottom-color: #cf99a7; }
+.finger.three { top: 74em; left: 21.5em; width: 6.3em; transform: rotate(-6deg); border-left: 0; border-top-color: #f8e5df; }
+.finger::after { right: 1em; top: 1em; width: 1.2em; border-bottom: .13em solid #c38999; border-radius: 50%; }
+.thumb { left: 21em; top: 68.2em; width: 4.2em; height: 4em; border: .14em solid #b67b8e; background: #ffefe8; border-radius: 30% 27% 20% 40%; transform: rotate(-40deg); }
+.thumb::after { left: 1.4em; top: 2.9em; width: 2.2em; border-top: .13em solid #c397a1; transform: rotate(5deg); }
+.right-lapel { left: 66.4em; top: 74.1em; width: 17.2em; height: 37em; transform: rotate(9deg); background: linear-gradient(105deg, #f7f9fb 20%, #e7ecf4 57%, #d6d8e9 78%, #f8faff); border: .15em solid #a68abd; border-radius: 39% 28% 13% 8%; clip-path: polygon(47% 0, 83% 0, 100% 9%, 76% 34%, 100% 53%, 92% 66%, 36% 100%, 10% 68%, 0 52%, 12% 26%); }
+.right-lapel::before { left: 3em; top: 16em; width: 4em; height: 13em; border-left: 2em solid #c4bad2; border-radius: 50%; transform: rotate(9deg); }
+.right-lapel::after { left: 6em; top: 1em; width: 9em; height: 3em; border-radius: 50%; border-top: 1.1em solid #c6c9dd; transform: rotate(26deg); }
+.right-cuff { left: 73.2em; top: 96em; width: 10em; height: 27em; background: linear-gradient(110deg, #bbc0d4, #fbfcfb 40%, #e7e6f2 80%); border: .13em solid #aa94bd; border-radius: 0 10% 32% 32%; transform: rotate(17deg); }
+.right-cuff::before { left: 2em; top: 3em; width: 4.7em; height: 10em; border-right: 1.2em solid #aaa5c0; border-radius: 50%; transform: rotate(11deg); }
+.right-cuff::after { left: 2em; top: 20em; width: 6em; height: 4em; border-left: .8em solid #bcb7d2; border-bottom: .15em solid #9588aa; border-radius: 50%; }
+.button { left: 26.5em; top: 97.7em; width: 3em; height: 5.2em; border: .12em solid #9986ad; border-radius: 50%; background: #d9dfed; transform: rotate(-10deg); }
+.button::before { inset: .45em; border: .14em solid #ac98ba; border-radius: 50%; }
+.button::after { inset: 1em .75em; border-right: .22em solid #b5a9c8; border-radius: 50%; }
+/* Waistband and the two loose pleated shorts panels. */
+.shorts-back { left: 27.5em; top: 111em; width: 47.4em; height: 33.5em; background: #d3d3e3; border: .13em solid #aa8fac; transform: rotate(-8deg); border-radius: 2% 3% 10% 3%; clip-path: polygon(3% 0, 91% 0, 100% 84%, 61% 100%, 51% 80%, 47% 100%, 0 87%); }
+.shorts-left { left: 27.7em; top: 113.7em; width: 27.9em; height: 31.9em; transform: rotate(-2deg);
+  background: linear-gradient(99deg, #c9c8d9 3%, #edf0f6 17%, #e2e4ee 38%, #bdbbd0 57%, #f6f7fa 81%, #e5e4ef);
+  border: .14em solid #a88fae; border-radius: 4% 8% 3% 5%;
+  clip-path: polygon(5% 0, 99% 0, 99% 45%, 94% 100%, 73% 98%, 63% 100%, 40% 96%, 30% 99%, 0 96%, 5% 49%);
+}
+.shorts-right { left: 49.7em; top: 110.4em; width: 25em; height: 29.8em; transform: rotate(-11deg);
+  background: linear-gradient(98deg, #f5f6f9, #d5d5e5 23%, #f6f8fa 47%, #c8c7d9 56%, #f7f9fb 67%, #e5e4ef 90%);
+  border: .14em solid #a78cad; border-radius: 9% 6% 5% 2%;
+  clip-path: polygon(0 0, 96% 0, 99% 49%, 100% 92%, 79% 95%, 64% 93%, 62% 100%, 40% 99%, 38% 95%, 17% 97%, 16% 100%, 0 100%);
+}
+.pleat { left: var(--x); top: var(--y, 2em); width: var(--w, 3em); height: var(--h, 25em); border-left: var(--th, .5em) solid var(--c, #aaa7bf); border-radius: 50%; transform: rotate(var(--r, 0deg)); opacity: var(--o, .7); }
+.pleat.white { --c: #fffefd; --th: .7em; }
+.pleat.wide { --th: 2em; --c: #b4b1c9; }
+.waistband { left: 29.4em; top: 109em; width: 40.2em; height: 4.6em; background: linear-gradient(100deg, #d5d7e4, #ecf0f7 30%, #c9cadb 52%, #f8fafb 83%); border: .13em solid #aaa1b8; border-radius: 17% 16% 23% 20%; transform: rotate(-10deg); }
+.waistband::before { left: 2em; top: .3em; width: 31em; height: 1.8em; border-top: .23em solid #fffdfd; border-radius: 50%; transform: rotate(1deg); }
+.waistband::after { left: 24em; top: .4em; width: 4em; height: 3.3em; border-radius: 45% 65% 35% 45%; background: #b8b9d059; transform: rotate(-21deg); }
+/* Head: large soft eyes, quiet expression, and a rounded jaw. */
+.ear { left: 64.8em; top: 32.9em; width: 5.2em; height: 9.3em; transform: rotate(4deg); border: .14em solid #b97e92; border-radius: 45% 50% 45% 40%; background: linear-gradient(95deg, #f8d9d4, #edb7c3 63%, #ffe8dd); }
+.ear::before { left: 1.5em; top: 1.5em; width: 2.2em; height: 5.1em; border: .3em solid #db96a9; border-left-color: transparent; border-radius: 50%; transform: rotate(5deg); }
+.ear::after { left: 1.2em; bottom: 1.3em; width: 1.3em; height: 1.6em; border-radius: 50%; background: #f4c5ca; }
+.face { left: 36.2em; top: 23.4em; width: 30.9em; height: 27.6em; transform: rotate(-5deg);
+  border: .14em solid #bc8696; border-radius: 39% 44% 49% 48% / 39% 39% 56% 53%;
+  background: radial-gradient(ellipse at 50% 70%, #fff6f0 0 47%, #ffeae4 79%, #ecc4ca); overflow: hidden;
+}
+.face::before { left: -1em; top: -3em; width: 35em; height: 12em; border-radius: 50%; background: #b782a428; transform: rotate(4deg); }
+.blush { left: 1em; top: 15em; width: 8.7em; height: 7em; border-radius: 50%; background: radial-gradient(ellipse, #ed95b176, #f2afbb3d 49%, transparent 75%); transform: rotate(-7deg); }
+.blush.right { left: 20em; top: 13.1em; width: 9em; height: 7em; }
+.blush::after { left: 1.8em; top: 1.7em; width: 5.3em; height: 3.4em; transform: skew(3deg); border-radius: 30%; background: repeating-linear-gradient(90deg, transparent 0 .38em, #e18da54f .42em .49em, transparent .53em .72em); }
+.brow { left: 2em; top: 4.1em; width: 7.3em; height: 2em; border-top: .16em solid #6c5a6e; border-radius: 50%; transform: rotate(-9deg); }
+.brow.right { left: 19em; top: 1.1em; width: 9em; transform: rotate(14deg); }
+.upper-lid { left: 1.8em; top: 9.3em; width: 8.4em; height: 2.5em; border-top: .18em solid #be8496; border-radius: 50%; transform: rotate(-13deg); }
+.upper-lid.right { left: 19.2em; top: 6.6em; width: 8.4em; transform: rotate(6deg); }
+.eye { left: 1.2em; top: 10.5em; width: 8.3em; height: 5.8em; border-radius: 64% 57% 28% 35%; border-top: .58em solid #614252; border-left: .2em solid #7d5265; border-bottom: .12em solid #d59ba9; background: linear-gradient(#d5b4c3 0 12%, #fff8ee 33%); transform: rotate(-11deg); overflow: hidden; }
+.eye .iris { left: 2.8em; top: -.25em; width: 4.7em; height: 5.85em; border: .13em solid #a0507c; border-radius: 48%; background: radial-gradient(ellipse at 54% 78%, #ffbdce 0 17%, #ef8eb6 38%, #d16a9e 63%, #8d4276 81%, #6a365e); }
+.eye .iris::before { left: 1.9em; top: 1.6em; width: .85em; height: 2.3em; border: .13em solid #8c416a; border-radius: 50%; background: linear-gradient(#a24975, #e497b4); }
+.eye .iris::after { left: 1.1em; top: .3em; width: .72em; height: 1.1em; border-radius: 50%; background: #fff5ef; box-shadow: 1.76em 1.1em 0 -.14em #ffd5e1, -.3em 3.9em 0 -.16em #ffe4df; transform: rotate(12deg); }
+.eye .iris-line { left: 3.5em; bottom: -.15em; width: 3.5em; height: 1.7em; border-bottom: .22em solid #ffd7d7; border-radius: 50%; }
+.eye .iris-line::before { left: .5em; top: .2em; width: .24em; height: .85em; border-radius: 50%; background: #ffcecd; box-shadow: .8em .25em 0 #ffcecd, 1.6em .1em 0 #ffcecd; }
+.eye.right { left: 19.5em; top: 7.8em; width: 8.3em; height: 5.7em; transform: rotate(3deg); }
+.eye.right .iris { left: .9em; }
+.eye.right .iris-line { left: 1.7em; }
+.lashes { left: .8em; top: 10em; width: 3.2em; height: 2.4em; background: #5c3c4b; clip-path: polygon(100% 3%, 20% 24%, 0 8%, 9% 49%, 0 43%, 10% 82%, 38% 100%, 56% 55%); transform: rotate(-9deg); }
+.lashes.right { left: 25.5em; top: 7.6em; transform: scaleX(-1) rotate(6deg); width: 3em; }
+.lash-tip { left: 2.6em; top: 10.1em; width: 1.8em; height: 1.2em; border-left: .3em solid #59394d; border-bottom: .16em solid #59394d; border-radius: 0 0 0 70%; transform: rotate(-20deg); }
+.lash-tip.right { left: 24.4em; top: 7.6em; transform: rotate(6deg); }
+.lower-lid { left: 2em; top: 16.4em; width: 6.2em; height: .8em; border-top: .12em solid #c2869a; border-radius: 50%; transform: rotate(-8deg); }
+.lower-lid.right { left: 20.5em; top: 13.7em; width: 6.7em; transform: rotate(4deg); }
+.nose { left: 13.4em; top: 14em; width: 1.6em; height: 1.7em; border-radius: 50%; background: #f0c2c744; transform: rotate(15deg); }
+.nose::after { left: 1em; top: 1.5em; width: .28em; height: .13em; border-radius: 50%; background: #c4959e; }
+.mouth { left: 14.1em; top: 20.4em; width: 1.55em; height: .7em; border-top: .18em solid #c37e91; border-radius: 50%; transform: rotate(2deg); }
+/* Long front locks framing the face. */
+.side-lock { left: 31.8em; top: 25.5em; width: 9.2em; height: 39em; border-left: .15em solid #6f6078; border-right: .13em solid #b7a4b5; border-radius: 22% 28% 15% 84%; transform: rotate(-5deg); background: linear-gradient(90deg, #625a6e, #a18e9f 38%, #7c6d7e 61%, #594f64); }
+.side-lock::after { left: 2.7em; top: 8em; width: 3.6em; height: 29em; border-left: .17em solid #b6a0b3; border-radius: 50%; transform: rotate(-3deg); }
+.side-lock.right { left: 60em; top: 22.6em; width: 8.8em; height: 45em; border-radius: 21% 10% 90% 17%; transform: rotate(9deg); background: linear-gradient(90deg, #877789, #67596c 35%, #9a8a9c 61%, #665c70); }
+.side-lock.right::after { left: 2.6em; top: 12em; height: 29em; border-color: #c3b0bf; transform: rotate(2deg); }
+.front-tip { left: 35em; top: 52.4em; width: 7em; height: 12em; border-left: 1.25em solid #766c80; border-bottom: .5em solid #766c80; border-radius: 0 0 0 95%; transform: rotate(-14deg); filter: drop-shadow(.12em .08em 0 #a597ad); }
+.front-tip.right { left: 56em; top: 54.7em; width: 7em; height: 12.5em; transform: scaleX(-1) rotate(-14deg); border-color: #817488; }
+.thin-lock { left: 63em; top: 30em; width: 3em; height: 11em; border-right: .58em solid #6a5b70; border-bottom: .24em solid #6a5b70; border-radius: 0 0 80% 20%; transform: rotate(17deg); }
+.thin-lock.two { left: 63em; top: 38em; width: 2.8em; height: 6.7em; transform: rotate(33deg); border-right-width: .21em; border-bottom-width: .13em; }
+/* Fringe: independently authored rounded CSS shapes. */
+.bang { top: 17em; border-left: .12em solid #6e5c71; border-right: .12em solid #b69aaa; background: linear-gradient(173deg, #4d4756 8%, #665365 33%, #9c7e90 64%, #c199a7 94%); transform-origin: 50% 8%; }
+.bang.b1 { left: 29em; top: 19em; width: 9em; height: 23em; border-radius: 75% 14% 5% 90%; transform: rotate(9deg); background: linear-gradient(110deg, #514c5f, #706778 43%, #9c889c); }
+.bang.b2 { left: 33.8em; top: 16.5em; width: 7.1em; height: 20em; border-radius: 55% 20% 11% 84%; transform: rotate(8deg); }
+.bang.b3 { left: 39.2em; top: 16.7em; width: 6.1em; height: 16em; border-radius: 10% 15% 16% 40%; transform: rotate(-6deg); }
+.bang.b4 { left: 43.5em; top: 16.3em; width: 5.9em; height: 16.6em; border-radius: 10% 10% 20% 29%; transform: rotate(-7deg); }
+.bang.b5 { left: 48em; top: 16.7em; width: 4.1em; height: 16.1em; border-radius: 4% 10% 23% 16%; transform: rotate(-4deg); }
+.bang.b6 { left: 51.4em; top: 16.3em; width: 3em; height: 16em; border-radius: 0 15% 20% 75%; transform: rotate(-4deg); background: linear-gradient(90deg, #8d6c7d, #e6b4b9 75%, #a27b8f); }
+.bang.b7 { left: 55.9em; top: 16.5em; width: 5.8em; height: 13em; border-radius: 0 30% 10% 90%; transform: rotate(-18deg); }
+.bang.b8 { left: 61em; top: 15.3em; width: 5.8em; height: 17em; border-radius: 10% 30% 70% 8%; transform: rotate(-8deg); background: linear-gradient(90deg, #8d7b8d, #605163 70%, #ab91a5); }
+.bang.b1::after { left: 1.6em; top: 6em; width: 5.6em; height: 15em; border-left: .6em solid #a5a6b9; border-radius: 50%; transform: rotate(-7deg); }
+.bang.b2::after { left: 2em; top: 6em; width: 3em; height: 12em; border-left: .2em solid #b29cb2; border-radius: 50%; }
+.bang.b3::after, .bang.b4::after, .bang.b5::after { left: .7em; bottom: .1em; width: 3em; height: 5em; border-left: .1em solid #d3a3b0; border-radius: 40%; transform: rotate(-5deg); }
+.bang.b7::after { left: 1.5em; top: 3em; width: 2em; height: 10em; border-left: .12em solid #b098ab; border-radius: 50%; }
+.hair-highlight { left: 43.8em; top: 22.8em; width: 6.9em; height: 2em; border-radius: 45%; transform: rotate(-5deg); background: linear-gradient(90deg, transparent 0 8%, #f1ddeb 9% 11%, transparent 12% 24%, #f7e8f1 25% 29%, transparent 31% 38%, #ead4e4 40% 44%, transparent 46% 53%, #fff7f8 54% 71%, #ecdce9 73% 82%, transparent 84% 89%, #f6e6ef 90% 93%, transparent 95%); clip-path: polygon(0 28%, 50% 16%, 100% 30%, 97% 84%, 75% 78%, 64% 96%, 39% 66%, 4% 72%); }
+.hair-highlight.small { left: 55.6em; top: 20em; width: 2.3em; height: 1.1em; opacity: .47; transform: rotate(29deg); }
+.fringe-line { left: 40em; top: 28em; width: 4em; height: 6em; border-left: .1em solid #ad8397; border-radius: 50%; transform: rotate(-13deg); }
+.fringe-line.two { left: 51em; top: 24em; width: 2em; height: 8em; transform: rotate(-10deg); }
+/* Oversized soft white cap, with separate shaded folds and a sewn brim. */
+.cap { left: 25.9em; top: -3.3em; width: 52.9em; height: 33em; transform: rotate(-3deg);
+  border: .14em solid #a08bad; border-radius: 40% 43% 27% 16% / 45% 54% 22% 31%;
+  background: linear-gradient(146deg, #f4f8fa 0 34%, #edf2f8 57%, #e4e6f1 82%, #f5f4f9);
+  clip-path: polygon(1% 84%, 0 54%, 10% 22%, 24% 7%, 48% 0, 72% 4%, 91% 24%, 100% 52%, 99% 86%, 87% 100%, 15% 98%);
+}
+.cap::before { left: .4em; top: 8em; width: 5em; height: 19em; border-left: 2.1em solid #dbc9e9; border-right: .8em solid #d0d0e2; border-radius: 50%; transform: rotate(7deg); }
+.cap::after { right: 2.5em; top: 4em; width: 6em; height: 13em; border-bottom: 1em solid #c5c5da; border-left: .3em solid #d8d8e7; border-radius: 50%; transform: rotate(-25deg); opacity: .66; }
+.cap-fold { left: var(--x); top: var(--y); width: var(--w); height: var(--h); border-top: var(--th, 1em) solid var(--c, #d2d5e5); border-radius: 50%; transform: rotate(var(--r, 0deg)); opacity: var(--o, .76); }
+.cap-fold.edge { border-top: 0; border-left: var(--th, 1em) solid #bfc2d8; }
+.cap-fold.soft { filter: blur(.35em); }
+.cap-tail { left: 73.7em; top: 14.8em; width: 6.9em; height: 20em; border: .13em solid #b78dc8; border-radius: 18% 22% 62% 25%; transform: rotate(-10deg); background: linear-gradient(103deg, #d7dbea 3%, #f8fafb 23%, #fafbfc 41%, #c5c7dc 50%, #f4f5fa 62%, #e8d9ef 88%); }
+.cap-tail::after { left: 1.7em; top: 4em; width: 3.1em; height: 11em; border-right: .7em solid #cac9df; border-bottom: .4em solid #cac9df; border-radius: 50%; transform: rotate(8deg); }
+.brim { left: 21.5em; top: 12.5em; width: 45.3em; height: 12.7em; border: .14em solid #9a83a7; border-radius: 57% 47% 48% 11% / 74% 55% 36% 36%; background: linear-gradient(159deg, #f6f9fb 0 46%, #e7ebf4 67%, #d9cfdf 82%); transform: rotate(-9deg); clip-path: polygon(0 72%, 8% 30%, 27% 7%, 49% 0, 72% 11%, 100% 52%, 99% 78%, 88% 85%, 60% 58%, 38% 42%, 27% 51%, 14% 79%, 5% 100%, 1% 94%); }
+.brim::before { left: 2em; top: 3em; width: 40em; height: 8.6em; border-top: .16em solid #b4a1bc; border-radius: 50%; transform: rotate(9deg); }
+.brim::after { left: .9em; top: 5em; width: 15em; height: 7em; border-left: .75em solid #d3dce9; border-radius: 60%; transform: rotate(6deg); }
+.brim-top { left: 30.6em; top: 11.5em; width: 35.2em; height: 7.5em; background: linear-gradient(165deg, #f7f9fb, #edf1f7); border-top: .13em solid #9e88a9; border-bottom: .1em solid #b6a7bd; border-radius: 58% 49% 40% 40%; transform: rotate(4deg); clip-path: polygon(0 80%, 13% 37%, 29% 10%, 53% 0, 77% 20%, 100% 72%, 98% 96%, 74% 96%, 47% 80%, 23% 79%); }
+.brim-top::before { left: 1.6em; top: 1em; width: 31em; height: 6em; border-top: .12em solid #b9adc2; border-radius: 50%; }
+.brim-top::after { left: 10em; top: 1em; width: 2em; height: 4em; background: #d6dbe959; transform: skew(-32deg); box-shadow: 4em .3em 0 -.35em #dbe0ed7a, 6em .4em 0 -.65em #cdd5e442; border-radius: 45%; }
+/* Black ribbon and two hanging magenta cherry ornaments. */
+.hat-bow { left: 64.6em; top: 9.3em; width: 11em; height: 13em; transform: rotate(-5deg); }
+.hat-bow .wing { left: 1em; top: 0; width: 4.2em; height: 9.4em; background: linear-gradient(95deg, #5b5164, #938798 38%, #82768a 77%, #494454); border: .15em solid #52485b; border-radius: 35% 47% 38% 13%; transform: rotate(-14deg); }
+.hat-bow .wing::after { left: 2.1em; top: 5em; width: 1.1em; height: 3em; background: #3c3948; border-radius: 50%; transform: rotate(-10deg); }
+.hat-bow .wing.right { left: 6em; top: 6.5em; width: 5em; height: 6.5em; transform: rotate(14deg); border-radius: 17% 40% 21% 30%; background: linear-gradient(140deg, #8b7f91 35%, #575061 39% 72%, #7d7187); }
+.hat-bow .wing.right::after { left: 1em; top: 1.3em; width: 1.4em; height: 1.5em; transform: rotate(-28deg); }
+.hat-bow .knot { left: 4.3em; top: 6.7em; width: 1.6em; height: 2.2em; border: .13em solid #4d4454; border-radius: 45%; transform: rotate(-34deg); background: #928695; }
+.cherry-stem { left: 67.5em; top: 16.9em; width: 4.8em; height: 7.4em; border-left: .29em solid #74647e; border-right: .29em solid #74647e; border-radius: 40% 60% 0 0; transform: rotate(-15deg); }
+.cherry-stem::after { left: .3em; top: .6em; width: 2em; height: 3em; border-radius: 80% 10% 80% 15%; background: linear-gradient(100deg, #8b9b8f, #ced1b8); border: .1em solid #7d7a83; transform: rotate(41deg); }
+.cherry { left: 65.3em; top: 19.3em; width: 2.9em; height: 3.2em; border: .14em solid #985072; border-radius: 48%; background: radial-gradient(ellipse at 37% 32%, #f281b5, #cd3a82 42%, #9c235d 70%, #7b345e); box-shadow: 0 .48em .17em #473c535c; transform: rotate(-16deg); }
+.cherry::before { left: .4em; top: .35em; width: .65em; height: .8em; background: #ffd2e2b3; border-radius: 50%; transform: rotate(20deg); }
+.cherry::after { left: .8em; bottom: .4em; width: 1.3em; height: .6em; border-bottom: .13em solid #f76ba3; border-radius: 50%; }
+.cherry.two { left: 71.2em; top: 23.6em; width: 2.6em; height: 2.7em; transform: rotate(8deg); }
+@media print { .frame { width: 100%; } .drawing { print-color-adjust: exact; -webkit-print-color-adjust: exact; } }
+</style>
+</head>
+<body>
+<main class="frame">
+<div class="drawing" role="img" aria-label="纯 CSS 手工临摹插画：戴着宽大白帽的黑色长发女孩，粉色眼睛，帽侧别着深色蝴蝶结和两颗樱桃挂饰。身穿深灰色无袖短上衣与白色宽松短裤，白色外套披在手臂上，一只手轻轻握着衣襟，背景为留白。">
+  <i class="hair-back"></i>
+  <i class="back-strand light" style="--x:32em;--w:4em;--h:42em;--r:1deg"></i>
+  <i class="back-strand light" style="--x:40em;--w:4em;--h:37em;--r:2deg"></i>
+  <i class="back-strand" style="--x:44em;--w:3em;--h:34em;--r:-3deg"></i>
+  <i class="back-strand dark" style="--x:67em;--w:3em;--h:39em;--r:-2deg"></i>
+  <i class="back-strand light" style="--x:71em;--w:3em;--h:43em;--r:-8deg"></i>
+  <i class="hair-loop"></i><i class="hair-loop lower"></i>
+  <i class="jacket-back"></i><i class="coat-left"></i><i class="coat-right"></i><i class="coat-corner"></i>
+  <i class="leg"></i><i class="leg right"></i>
+  <i class="torso"></i><i class="navel"></i><i class="shoulder-left"></i><i class="neck"></i><i class="arm-right"></i>
+  <i class="top"></i><i class="top-hem"></i><i class="top-heart"></i><i class="choker"></i>
+  <div class="collar"><i class="left"></i><i class="right"></i></div><i class="jewel"></i>
+  <div class="collar-bow"><i class="wing"></i><i class="wing right"></i><i class="knot"></i></div>
+  <i class="left-sleeve"></i><i class="left-lapel"></i><i class="forearm-left"></i><i class="cuff-left"></i>
+  <i class="hand"></i><i class="thumb"></i><i class="finger"></i><i class="finger two"></i><i class="finger three"></i>
+  <i class="right-cuff"></i><i class="right-lapel"></i><i class="button"></i>
+  <i class="shorts-back"></i>
+  <div class="shorts-left">
+    <i class="pleat" style="--x:2em;--w:3em;--h:26em;--r:5deg;--th:1em"></i>
+    <i class="pleat white" style="--x:5em;--w:3em;--h:23em;--r:3deg"></i>
+    <i class="pleat" style="--x:8em;--w:4em;--h:14em;--r:-12deg"></i>
+    <i class="pleat wide" style="--x:12em;--w:6em;--h:24em;--r:-19deg;--o:.35"></i>
+    <i class="pleat white" style="--x:18em;--w:4em;--h:25em;--r:-6deg"></i>
+    <i class="pleat" style="--x:23em;--w:3em;--h:29em;--r:-5deg;--th:.8em"></i>
+  </div>
+  <div class="shorts-right">
+    <i class="pleat wide" style="--x:1em;--w:3em;--h:25em;--r:6deg;--o:.5"></i>
+    <i class="pleat white" style="--x:5em;--w:3em;--h:26em;--r:8deg"></i>
+    <i class="pleat" style="--x:9em;--w:4em;--h:13em;--r:9deg"></i>
+    <i class="pleat" style="--x:12em;--w:2em;--h:27em;--r:-3deg"></i>
+    <i class="pleat white" style="--x:14em;--w:3em;--h:28em;--r:1deg"></i>
+    <i class="pleat" style="--x:21em;--w:2em;--h:27em;--r:-1deg;--th:.65em"></i>
+  </div>
+  <i class="waistband"></i>
+  <i class="ear"></i>
+  <div class="face">
+    <i class="blush"></i><i class="blush right"></i><i class="brow"></i><i class="brow right"></i>
+    <i class="upper-lid"></i><i class="upper-lid right"></i>
+    <div class="eye"><i class="iris"></i><i class="iris-line"></i></div>
+    <div class="eye right"><i class="iris"></i><i class="iris-line"></i></div>
+    <i class="lashes"></i><i class="lashes right"></i><i class="lash-tip"></i><i class="lash-tip right"></i>
+    <i class="lower-lid"></i><i class="lower-lid right"></i><i class="nose"></i><i class="mouth"></i>
+  </div>
+  <i class="side-lock"></i><i class="side-lock right"></i><i class="front-tip"></i><i class="front-tip right"></i>
+  <i class="thin-lock"></i><i class="thin-lock two"></i>
+  <i class="bang b1"></i><i class="bang b2"></i><i class="bang b3"></i><i class="bang b4"></i><i class="bang b5"></i><i class="bang b6"></i><i class="bang b7"></i><i class="bang b8"></i>
+  <i class="hair-highlight"></i><i class="hair-highlight small"></i><i class="fringe-line"></i><i class="fringe-line two"></i>
+  <i class="cap-tail"></i>
+  <div class="cap">
+    <i class="cap-fold soft" style="--x:6em;--y:8em;--w:8em;--h:6em;--r:-18deg;--o:.43"></i>
+    <i class="cap-fold edge" style="--x:5.9em;--y:10em;--w:7em;--h:11em;--r:14deg;--th:.7em"></i>
+    <i class="cap-fold" style="--x:7em;--y:16em;--w:9em;--h:4em;--r:38deg;--th:1.4em;--o:.55"></i>
+    <i class="cap-fold soft" style="--x:15em;--y:9.7em;--w:13em;--h:4em;--r:28deg;--th:1.8em;--o:.4"></i>
+    <i class="cap-fold" style="--x:16em;--y:11em;--w:15em;--h:4em;--r:27deg;--th:.6em"></i>
+    <i class="cap-fold" style="--x:16.6em;--y:13em;--w:4em;--h:5em;--r:41deg;--th:1.1em"></i>
+    <i class="cap-fold edge" style="--x:25em;--y:12em;--w:5em;--h:7em;--r:-36deg;--th:.5em"></i>
+    <i class="cap-fold" style="--x:33em;--y:15em;--w:7em;--h:6em;--r:-31deg;--th:2em;--o:.36"></i>
+  </div>
+  <i class="brim"></i><i class="brim-top"></i>
+  <div class="hat-bow"><i class="wing"></i><i class="wing right"></i><i class="knot"></i></div>
+  <i class="cherry-stem"></i><i class="cherry"></i><i class="cherry two"></i>
+</div>
+</main>
+</body>
+</html>

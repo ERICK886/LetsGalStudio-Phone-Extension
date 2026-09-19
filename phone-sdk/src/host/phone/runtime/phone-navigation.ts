@@ -17,11 +17,14 @@
 
 import type { ExtensionContext } from "@avg-studio/sdk";
 import {
+  clearPhoneNavigatePending,
   emitPhoneClosed,
   getPhoneSdkSlot,
   isPhoneCloseLocked,
+  phoneSdkDebug,
   publishPhoneNavigate,
   waitForPhoneClosed,
+  type ClosePhoneAppOptions,
   type OpenPhoneAppOptions,
   type OpenPhoneAppResult,
   type PhoneNavigationController,
@@ -31,6 +34,10 @@ import {
   getPhoneRuntime,
   hidePhoneUi,
 } from "../extension/phone-extension";
+import {
+  resolvePhoneOpenLifecycle,
+  shouldAnimatePhoneClose,
+} from "./phone-navigation-lifecycle";
 
 /** 调用方维护的单调递增序号，便于宿主去重 / 排序。模块级以跨 onRegister 重建保持递增。 */
 let phoneNavigateSeq = 0;
@@ -57,7 +64,7 @@ export function createPhoneNavigationController(
       const slot = getPhoneSdkSlot();
       if (options.position) slot.phonePositionOverride = options.position;
       else delete slot.phonePositionOverride;
-      console.info("[phone-call:incoming]", {
+      phoneSdkDebug("宿主收到打开内页请求", {
         event: "host-navigation-enter",
         appId: options.appId,
         phoneMounted: runtime.phoneMounted,
@@ -66,7 +73,7 @@ export function createPhoneNavigationController(
       });
       if (runtime.storyMessageSessionVisible) {
         console.warn("[phone] openPhoneApp: 消息手机占用中，已跳过");
-        console.warn("[phone-call:incoming] host-navigation-blocked", {
+        phoneSdkDebug("宿主阻止打开内页", {
           reason: "story-message-session",
           appId: options.appId,
         });
@@ -74,50 +81,71 @@ export function createPhoneNavigationController(
       }
       activatePhoneRuntime(ctx, runtime);
 
+      // 先发布、后挂载：首次 React render 可直接命中目标 APP，避免先画桌面再切内页。
+      const navigateRequest = {
+        appId: options.appId,
+        seq: ++phoneNavigateSeq,
+        ...(options.payload ? { payload: options.payload } : {}),
+      };
+      publishPhoneNavigate(navigateRequest);
+
+      let phoneShowFailure: Promise<"failed"> | null = null;
       if (!ctx.ui.isVisible("phone")) {
         try {
-          await ctx.ui.show("phone", undefined, {
+          const showResult = ctx.ui.show("phone", undefined, {
             size: "(100%, 100%)",
             position: "(0, 0)",
             // 程序化打开的内页同样需要接管输入；强制来电、聊天回复等
             // 都依赖玩家点击。false 会让 Studio 把整层当作不可交互展示层。
             interactable: true,
+            // 明确关闭根容器指针穿透；不能依赖宿主版本的默认值，否则来电按钮
+            // 可见但点击可能继续落到底层剧情画面。
+            pointerEventsPassthrough: false,
           });
-          console.info("[phone-call:incoming]", {
-            event: "host-ui-show-resolved",
-            appId: options.appId,
-            phoneUiVisible: ctx.ui.isVisible("phone"),
+
+          // 某些 Studio / SDK 版本会让 ui.show() 的 Promise 持续到 UI 被关闭。
+          // waitUntil: "none" 若在此 await，就会形成：等待 show 结束 -> 才能关闭手机
+          // -> show 永远不结束的循环，来电按钮虽已响应却无法继续调用剧情片段。
+          phoneShowFailure = new Promise<"failed">((resolve) => {
+            void Promise.resolve(showResult).then(() => {
+              phoneSdkDebug("手机 Host 显示调用结束", {
+                event: "host-ui-show-resolved",
+                appId: options.appId,
+                phoneUiVisible: ctx.ui.isVisible("phone"),
+              });
+            }, (error: unknown) => {
+              clearPhoneNavigatePending(navigateRequest.seq);
+              console.error("[phone] openPhoneApp: 显示手机失败", error);
+              resolve("failed");
+            });
           });
         } catch (error) {
+          clearPhoneNavigatePending(navigateRequest.seq);
           console.error("[phone] openPhoneApp: 显示手机失败", error);
           return "failed";
         }
       }
 
-      publishPhoneNavigate({
-        appId: options.appId,
-        seq: ++phoneNavigateSeq,
-        ...(options.payload ? { payload: options.payload } : {}),
-      });
-      console.info("[phone-call:incoming]", {
+      phoneSdkDebug("内页导航已发布", {
         event: "host-navigation-published",
         appId: options.appId,
-        navigateSeq: phoneNavigateSeq,
+        navigateSeq: navigateRequest.seq,
         phoneUiVisible: ctx.ui.isVisible("phone"),
       });
 
-      if (options.waitUntil !== "none") {
-        await waitForPhoneClosed(ctx.flow.signal);
-      }
-      return "opened";
+      return await resolvePhoneOpenLifecycle(
+        options.waitUntil,
+        () => waitForPhoneClosed(ctx.flow.signal),
+        phoneShowFailure,
+      );
     },
 
-    async closePhoneApp(): Promise<void> {
-      if (isPhoneCloseLocked()) return;
+    async closePhoneApp(options: ClosePhoneAppOptions = {}): Promise<void> {
+      if (!options.force && isPhoneCloseLocked()) return;
       delete getPhoneSdkSlot().phonePositionOverride;
       const animated = getPhoneSdkSlot().requestAnimatedClosePhone;
-      if (animated) {
-        await animated();
+      if (animated && shouldAnimatePhoneClose(options.animated)) {
+        await animated(options);
         return;
       }
 

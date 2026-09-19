@@ -66,9 +66,19 @@ export function getLatestPhoneNavigate(): NavigateRequest | null {
 
 /**
  * 清除 pending navigate 请求；UI 消费后或手机关闭时调用，避免后续订阅回放 stale pending。
+ * 传入序号时仅清除仍匹配的请求，防止较早的失败打开误删后来请求。
  */
-export function clearPhoneNavigatePending(): void {
-  delete getPhoneSdkSlot().phoneNavigatePending;
+export function clearPhoneNavigatePending(expectedSeq?: number): boolean {
+  const slot = getPhoneSdkSlot();
+  if (
+    expectedSeq !== undefined &&
+    slot.phoneNavigatePending?.seq !== expectedSeq
+  ) {
+    return false;
+  }
+  if (!slot.phoneNavigatePending) return false;
+  delete slot.phoneNavigatePending;
+  return true;
 }
 
 /**

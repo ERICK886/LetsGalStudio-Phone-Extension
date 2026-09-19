@@ -63,16 +63,30 @@ const DEFAULTS: PhoneCallSettings = {
 
 const cachedByRuntime = new WeakMap<object, PhoneCallSettings>();
 
+function objectScope(value: unknown): object | undefined {
+  return (typeof value === "object" && value !== null) ||
+    typeof value === "function"
+    ? value as object
+    : undefined;
+}
+
 export const PHONE_CALL_SETTINGS_KEYS = Object.keys(
   DEFAULTS,
 ) as Array<keyof PhoneCallSettings>;
 
 export function phoneCallRuntimeScope(ctx: ExtensionContext): object {
   try {
-    const host = ctx.getHost();
-    if ((typeof host === "object" && host !== null) || typeof host === "function") {
-      return host as object;
-    }
+    const host = ctx.getHost() as {
+      application?: unknown;
+      varsStore?: unknown;
+      characterStore?: unknown;
+    } | null;
+    // Studio 的 getHost() 每次调用都会返回新的包装对象，不能直接作为
+    // WeakMap key。优先使用包装对象中跨调用稳定的宿主实例/Store。
+    const stableHost = objectScope(host?.application) ??
+      objectScope(host?.varsStore) ??
+      objectScope(host?.characterStore);
+    if (stableHost) return stableHost;
   } catch {
     // 测试或精简宿主可能不实现 getHost；ctx 本身仍是稳定作用域。
   }

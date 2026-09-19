@@ -16,6 +16,7 @@
  */
 
 export type {
+  ClosePhoneAppOptions,
   NavigateRequest,
   OpenPhoneAppOptions,
   OpenPhoneAppResult,

@@ -553,6 +553,20 @@ function seedCharacterFromRawParam(
 }
 
 /**
+ * 使用 Studio 当前 React/Fiber 角色目录把角色参数转换为显示名。
+ * 电话、聊天等 line-card 共用此入口，避免各模块对 UUID 的解析结果不一致。
+ */
+export function resolveStudioCharacterLabel(
+  content: HTMLElement,
+  rawParam: unknown,
+  literalParam: unknown,
+): string {
+  const names = collectCharacterNameMap(content);
+  seedCharacterFromRawParam(rawParam, names);
+  return displayCharacter(literalParam ?? rawParam, names);
+}
+
+/**
  * 将有效消息/回复槽转为内联卡片摘要片段。
  *
  * @param slot - `resolveMessageSlot` 结果
