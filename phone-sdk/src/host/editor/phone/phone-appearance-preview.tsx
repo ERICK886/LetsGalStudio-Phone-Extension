@@ -15,6 +15,7 @@ import { useExtensionContext } from "@avg-studio/sdk";
 import phoneCss from "../../phone/ui/styles/phone.css?inline";
 import { firstGlyph, resolveAssetUrl } from "../../phone/ui/asset-utils";
 import { sanitizeBackgroundCss } from "../../phone/catalog";
+import { resolvePhoneHudConfig } from "../../phone/phone-hud-config";
 import { useTheme, FONT_SIZE_DEFAULT } from "../theme/theme-provider";
 import { readPhonePreviewApps } from "./phone-preview-catalog";
 import { PhonePreviewStatusBar } from "./phone-preview-status-bar";
@@ -93,10 +94,31 @@ export function PhoneAppearancePreview({
     () => resolveAssetUrl(ctx, values.phoneHudIcon || undefined),
     [ctx, values.phoneHudIcon],
   );
+  const hudImageUrl = useMemo(
+    () => resolveAssetUrl(ctx, values.phoneHudImage || undefined),
+    [ctx, values.phoneHudImage],
+  );
+  const hudBackgroundImageUrl = useMemo(
+    () => resolveAssetUrl(ctx, values.phoneHudBackgroundImage || undefined),
+    [ctx, values.phoneHudBackgroundImage],
+  );
+  const hudConfig = resolvePhoneHudConfig({
+    buttonType: values.phoneHudButtonType,
+    text: values.phoneHudText,
+    iconPreset: values.phoneHudIconPreset,
+    stylePreset: values.phoneHudStylePreset,
+    backgroundColor: values.phoneHudBackgroundColor,
+    textColor: values.phoneHudTextColor,
+    borderColor: values.phoneHudBorderColor,
+    borderWidth: values.phoneHudBorderWidth,
+    borderRadius: values.phoneHudBorderRadius,
+    size: values.phoneHudSize,
+    width: values.phoneHudWidth,
+    contentSize: values.phoneHudContentSize,
+  });
   const hudPosition = values.phoneHudPosition || "bottom-right";
   const hudOffsetX = previewNumber(values.phoneHudOffsetX, 0, -1000, 1000);
   const hudOffsetY = previewNumber(values.phoneHudOffsetY, 0, -1000, 1000);
-  const hudSize = previewNumber(values.phoneHudSize, 56, 36, 120);
   const hudTop = hudPosition.startsWith("top-");
   const hudBottom = hudPosition.startsWith("bottom-");
   const hudLeft = hudPosition.endsWith("-left");
@@ -151,30 +173,68 @@ export function PhoneAppearancePreview({
           style={{
             position: "absolute",
             zIndex: 20,
-            width: hudSize,
-            height: hudSize,
+            width: hudConfig.width > 0
+              ? hudConfig.width
+              : hudConfig.buttonType === "text"
+                ? "auto"
+                : hudConfig.height,
+            minWidth: hudConfig.buttonType === "text" ? hudConfig.height : undefined,
+            height: hudConfig.height,
             top: hudTop ? 16 + hudOffsetY : hudMiddle ? `calc(50% + ${hudOffsetY}px)` : undefined,
             bottom: hudBottom ? 16 - hudOffsetY : undefined,
             left: hudLeft ? 16 + hudOffsetX : hudCenter ? `calc(50% + ${hudOffsetX}px)` : undefined,
             right: hudRight ? 16 - hudOffsetX : undefined,
             transform: hudTransform,
-            padding: 0,
-            border: "1px solid rgba(255,255,255,.58)",
-            borderRadius: "28%",
-            background: "rgba(18,22,31,.82)",
-            boxShadow: "0 4px 18px rgba(0,0,0,.34)",
-            color: "#fff",
+            padding: hudConfig.buttonType === "text"
+              ? `0 ${Math.max(10, Math.round(hudConfig.height * 0.28))}px`
+              : 0,
+            border: `${hudConfig.borderWidth}px solid ${hudConfig.borderColor}`,
+            borderRadius: hudConfig.borderRadius,
+            backgroundColor: hudConfig.backgroundColor,
+            backgroundImage: hudBackgroundImageUrl
+              ? `url(${JSON.stringify(hudBackgroundImageUrl)})`
+              : undefined,
+            backgroundPosition: "center",
+            backgroundRepeat: "no-repeat",
+            backgroundSize: "cover",
+            boxShadow: hudConfig.boxShadow,
+            color: hudConfig.textColor,
+            backdropFilter: hudConfig.backdropBlur > 0 ? `blur(${hudConfig.backdropBlur}px)` : undefined,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             pointerEvents: "none",
             overflow: "hidden",
+            whiteSpace: "nowrap",
+            boxSizing: "border-box",
           }}
         >
-          {hudIconUrl ? (
-            <img src={hudIconUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          {hudConfig.buttonType === "text" ? (
+            <span style={{ fontSize: hudConfig.contentSize, fontWeight: 600, lineHeight: 1 }}>
+              {hudConfig.text}
+            </span>
+          ) : hudConfig.buttonType === "image" ? (
+            hudImageUrl || hudIconUrl ? (
+              <img
+                src={hudImageUrl || hudIconUrl}
+                alt=""
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              />
+            ) : (
+              <span aria-hidden="true" style={{ fontSize: hudConfig.contentSize, lineHeight: 1 }}>
+                {hudConfig.iconGlyph}
+              </span>
+            )
+          ) : hudIconUrl ? (
+            <img
+              src={hudIconUrl}
+              alt=""
+              style={{ width: hudConfig.contentSize, height: hudConfig.contentSize, objectFit: "contain" }}
+            />
           ) : (
-            <span aria-hidden="true" style={{ fontSize: "58%", lineHeight: 1 }}>📱</span>
+            <span aria-hidden="true" style={{ fontSize: hudConfig.contentSize, lineHeight: 1 }}>
+              {hudConfig.iconGlyph}
+            </span>
           )}
         </button>
       ) : null}

@@ -1,6 +1,6 @@
 /**
  * @file asset-uri-field.tsx
- * @description 编辑器内「素材 URI / 引用」输入 + 组件内缩略图预览。
+ * @description 编辑器内「素材 URI / 引用」输入 + 图片缩略图或音频试听。
  * @author 池水三两升
  * @date 2026-08-10
  * @version 0.1.0
@@ -8,7 +8,8 @@
  * @remarks
  * Studio 宿主属性面板的 `item.asset()` 自带选图与预览；自定义手机编辑器
  * 此前只暴露纯文本框。本组件用 `resolveAssetUrl` 解析 URI，在输入旁（或
- * 列表行内）展示可渲染缩略图；解析失败或图片加载失败时显示占位。
+ * 列表行内）展示可渲染缩略图；音频素材显示试听控件；解析失败或图片
+ * 加载失败时显示占位。
  *
  * @example
  * ```tsx
@@ -47,6 +48,8 @@ const PREVIEW_SIZE_THUMB = 28;
 export interface AssetUriFieldProps {
   value: string;
   onChange: (uri: string) => void;
+  /** 素材类型；音频会显示原生试听控件。 */
+  assetKind?: "image" | "audio" | "video" | "any";
   placeholder?: string;
   disabled?: boolean;
   tokens?: ThemeTokens;
@@ -64,6 +67,7 @@ export interface AssetUriFieldProps {
  */
 export interface AssetUriThumbProps {
   uri: string | undefined;
+  assetKind?: "image" | "audio" | "video" | "any";
   size?: number;
   tokens?: ThemeTokens;
   title?: string;
@@ -83,6 +87,7 @@ export interface AssetUriThumbProps {
  */
 export function AssetUriThumb({
   uri,
+  assetKind = "image",
   size = PREVIEW_SIZE_THUMB,
   tokens: tokensProp,
   title,
@@ -136,6 +141,19 @@ export function AssetUriThumb({
     );
   }
 
+  if (assetKind !== "image") {
+    const glyph = assetKind === "audio" ? "♫" : assetKind === "video" ? "▶" : "◆";
+    return (
+      <ChakraDiv
+        style={{ ...box, fontSize: Math.max(18, Math.round(size * 0.42)) }}
+        title={title ?? trimmed}
+        aria-hidden
+      >
+        {glyph}
+      </ChakraDiv>
+    );
+  }
+
   return (
     <ChakraDiv style={box} title={title ?? trimmed}>
       <ChakraImage
@@ -165,13 +183,22 @@ export function AssetUriThumb({
 export function AssetUriField({
   value,
   onChange,
-  placeholder = "图片素材 URI（可空）",
+  assetKind = "image",
+  placeholder,
   disabled = false,
   tokens: tokensProp,
   ariaLabel = "素材 URI",
 }: AssetUriFieldProps): React.ReactElement {
   const { tokens: themeTokens } = useTheme();
   const tokens = tokensProp ?? themeTokens;
+  const ctx = useExtensionContext();
+  const trimmed = value.trim();
+  const resolvedUrl = useMemo(
+    () => resolveAssetUrl(ctx, trimmed || undefined),
+    [ctx, trimmed],
+  );
+  const resolvedPlaceholder = placeholder ??
+    (assetKind === "audio" ? "音频素材 URI（可空）" : "图片素材 URI（可空）");
 
   const controlStyle: React.CSSProperties = {
     width: "100%",
@@ -188,9 +215,11 @@ export function AssetUriField({
   };
 
   const hint =
-    value.trim() === ""
+    trimmed === ""
       ? "空值不预览"
-      : "左侧为解析后的缩略图；无法解析或加载失败时显示「?」";
+      : assetKind === "audio"
+        ? "下方可试听所选来电铃声；运行时使用原始素材 URI"
+        : "左侧为解析后的缩略图；无法解析或加载失败时显示「?」";
 
   return (
     <ChakraDiv style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -204,6 +233,7 @@ export function AssetUriField({
       >
         <AssetUriThumb
           uri={value}
+          assetKind={assetKind}
           size={PREVIEW_SIZE_FIELD}
           tokens={tokens}
           rounded={6}
@@ -213,11 +243,20 @@ export function AssetUriField({
           value={value}
           disabled={disabled}
           onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
+          placeholder={resolvedPlaceholder}
           aria-label={ariaLabel}
           style={{ ...controlStyle, flex: 1, minWidth: 0, alignSelf: "center" }}
         />
       </ChakraDiv>
+      {assetKind === "audio" && resolvedUrl ? (
+        <audio
+          controls
+          preload="metadata"
+          src={resolvedUrl}
+          aria-label={`${ariaLabel} 试听`}
+          style={{ width: "100%", height: 34 }}
+        />
+      ) : null}
       <ChakraDiv
         style={{
           fontSize: 10,

@@ -6,6 +6,7 @@ import { addRecord, getActiveIncomingCall, getIncomingCall, getOutgoingStory, li
 import { getPhoneCallSettings } from "./settings";
 import { PHONE_CALL_EDITOR_SCHEMA } from "./editor-schema";
 import { resolvePhoneCallEditorPanes } from "./editor-panes";
+import { startIncomingRingtone } from "./ringtone";
 
 const hangupPath = "M28 51.906c13.055 0 23.906-10.851 23.906-23.906c0-13.078-10.875-23.906-23.93-23.906C14.899 4.094 4.095 14.922 4.095 28c0 13.055 10.828 23.906 23.906 23.906m-.023-30.984c8.578 0 16.406 2.601 16.406 8.695v.844c0 1.852-1.008 2.977-2.93 2.719c-1.5-.235-2.953-.47-5.273-.914c-1.782-.305-2.25-1.149-2.274-2.72l-.023-1.382c0-.398-.375-.727-.727-.82c-.984-.258-2.86-.422-5.156-.422c-2.297 0-4.242.234-5.156.422c-.352.093-.75.328-.75.82v1.383c-.024 1.594-.516 2.414-2.274 2.719c-2.414.468-3.844.68-5.297.914c-1.922.258-2.93-.89-2.93-2.72v-.843c0-6.117 7.852-8.695 16.383-8.695";
 const answerPath = "M28 51.906c13.055 0 23.906-10.851 23.906-23.906c0-13.078-10.875-23.906-23.93-23.906C14.899 4.094 4.095 14.922 4.095 28c0 13.055 10.828 23.906 23.906 23.906m-6.117-18.07c-5.813-5.79-9.516-13.172-5.133-17.555c.258-.258.539-.515.797-.773c1.336-1.266 2.625-1.195 3.773.422l3.047 4.336c1.031 1.5.773 2.343-.328 3.515l-.961 1.055c-.351.328-.21.773-.047 1.055c.446.843 1.711 2.343 3.07 3.703c1.407 1.406 2.836 2.601 3.727 3.093c.328.188.797.235 1.102-.046l1.007-.961c1.125-1.102 2.04-1.383 3.493-.352a319 319 0 0 0 4.43 3.094c1.476 1.078 1.827 2.414.327 3.773c-.257.258-.492.54-.75.797c-4.382 4.36-11.742.656-17.554-5.156";
@@ -26,12 +27,13 @@ function describeEventElement(value: EventTarget | Element | null): string | nul
   return `${value.tagName.toLowerCase()}${id}${classes}`;
 }
 
-function PhoneCallApp(props:PhoneAppRenderProps){ ensureCss(); const ctx=useExtensionContext(); const [version,setVersion]=useState(0); const [tab,setTab]=useState<Tab>("keypad"); const [number,setNumber]=useState(""); const [dialMessage,setDialMessage]=useState(""); const handledIncomingSession=useRef<string|null>(null); const incoming=getActiveIncomingCall() ?? getIncomingCall(ctx);
+function PhoneCallApp(props:PhoneAppRenderProps){ ensureCss(); const ctx=useExtensionContext(); const [version,setVersion]=useState(0); const [tab,setTab]=useState<Tab>("keypad"); const [number,setNumber]=useState(""); const [dialMessage,setDialMessage]=useState(""); const handledIncomingSession=useRef<string|null>(null); const incoming=getActiveIncomingCall() ?? getIncomingCall(ctx); const settings=getPhoneCallSettings(ctx);
   useEffect(()=>{phoneCallDebug("ui-mounted",{appId:props.appId,hasIncoming:Boolean(getIncomingCall(ctx))});return()=>phoneCallDebug("ui-unmounted",{appId:props.appId})},[ctx,props.appId]);
   useEffect(()=>subscribePhoneCall(ctx,()=>{phoneCallDebug("ui-store-event",{hasIncoming:Boolean(getIncomingCall(ctx))});setVersion(v=>v+1)}),[ctx]);
   useEffect(()=>subscribeActiveIncomingCall(()=>{phoneCallDebug("ui-incoming-bridge-event",{hasIncoming:Boolean(getActiveIncomingCall())});setVersion(v=>v+1)}),[]);
   useEffect(()=>subscribePhoneNavigate(req=>{if(req.appId===PROGRAM_ID){phoneCallDebug("ui-navigation-event",{navigateSeq:req.seq,screen:String(req.payload?.screen??""),sessionId:String(req.payload?.sessionId??"")});if((req.payload as any)?.screen==="incoming")setVersion(v=>v+1);clearPhoneNavigatePending(req.seq)}}),[]);
   useEffect(()=>{phoneCallDebug("ui-render-state",{hasIncoming:Boolean(incoming),incomingSessionId:incoming?.id??null,tab,version})},[incoming?.id,tab,version]);
+  useEffect(()=>incoming?startIncomingRingtone(ctx.sound,settings.incomingRingtone):undefined,[ctx.sound,incoming?.id,settings.incomingRingtone]);
   useEffect(()=>{
     if(!incoming)return undefined;
     const sessionId=incoming.id;
@@ -47,7 +49,7 @@ function PhoneCallApp(props:PhoneAppRenderProps){ ensureCss(); const ctx=useExte
     window.addEventListener("pointerdown",inspectPointer,true);
     return()=>window.removeEventListener("pointerdown",inspectPointer,true);
   },[incoming?.id]);
-  const state=useMemo(()=>readPhoneCallState(ctx),[ctx,version]); const contacts=useMemo(()=>listContacts(ctx),[ctx,version]); const settings=getPhoneCallSettings(ctx);
+  const state=useMemo(()=>readPhoneCallState(ctx),[ctx,version]); const contacts=useMemo(()=>listContacts(ctx),[ctx,version]);
   const skin = {"--pc-bg":settings.styleBg,"--pc-surface":settings.styleSurface,"--pc-text":settings.styleText,"--pc-muted":settings.styleMuted,"--pc-accent":settings.styleAccent,"--pc-incoming-bg":settings.styleIncomingBg,"--pc-answer":settings.styleAnswer,"--pc-decline":settings.styleDecline} as React.CSSProperties;
   if(incoming){
     const traceButtonEvent=(phase:string,choice:"answer"|"decline",event:React.SyntheticEvent<HTMLButtonElement>)=>phoneCallDebug(`ui-button-${phase}`,{sessionId:incoming.id,choice,eventType:event.type,eventPhase:event.eventPhase,defaultPrevented:event.defaultPrevented,target:describeEventElement(event.target),currentTarget:describeEventElement(event.currentTarget)});

@@ -23,6 +23,7 @@ export interface PhoneCallSettings {
   incomingLabel: string;
   incomingHint: string;
   incomingRequiredHint: string;
+  incomingRingtone: string;
   answerLabel: string;
   declineLabel: string;
   styleBg: string;
@@ -49,6 +50,7 @@ const DEFAULTS: PhoneCallSettings = {
   incomingLabel: "来电",
   incomingHint: "正在呼叫…",
   incomingRequiredHint: "请接听电话",
+  incomingRingtone: "",
   answerLabel: "接听",
   declineLabel: "挂断",
   styleBg: "#f5f5f7",
@@ -109,6 +111,10 @@ export function buildPhoneCallSettings(
     incomingLabel: s.string("来电状态文案").default("来电"),
     incomingHint: s.string("普通来电提示").default("正在呼叫…"),
     incomingRequiredHint: s.string("必须接听提示").default("请接听电话"),
+    incomingRingtone: s
+      .asset("来电铃声")
+      .accepts("audio")
+      .describe("可选。强制来电界面显示期间循环播放；接听、挂断、取消或关闭界面时停止。"),
     answerLabel: s.string("接听按钮文案").default("接听"),
     declineLabel: s.string("挂断按钮文案").default("挂断"),
     styleBg: s.color("页面背景").default("#f5f5f7"),
@@ -166,6 +172,7 @@ export function readPhoneCallSettings(ctx: ExtensionContext): PhoneCallSettings 
     incomingLabel: text("incomingLabel"),
     incomingHint: text("incomingHint"),
     incomingRequiredHint: text("incomingRequiredHint"),
+    incomingRingtone: text("incomingRingtone"),
     answerLabel: text("answerLabel"),
     declineLabel: text("declineLabel"),
     styleBg: text("styleBg"),

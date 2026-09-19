@@ -236,6 +236,7 @@ export function PhonePropertyPanel({
         {item.fieldType === "asset" ? (
           <AssetUriField
             value={value}
+            assetKind={item.assetKind}
             disabled={dependencyBlocked}
             onChange={(next) => onChange(item.id, next)}
             placeholder="素材 URI（可空）"

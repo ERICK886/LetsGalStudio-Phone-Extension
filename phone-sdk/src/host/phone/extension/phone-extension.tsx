@@ -20,6 +20,7 @@ import { installPhoneExtensionSdkHost } from "../runtime/install-host";
 import { bindPhoneNavigationController } from "../runtime/phone-navigation";
 import { emitPhoneClosed, getPhoneSdkSlot } from "@ink-zenly/phone-sdk/plugin";
 import { clearPhonePositionOverride } from "../runtime/phone-navigation-lifecycle";
+import { PHONE_HUD_SETTING_KEYS } from "../phone-hud-config";
 import { PhoneUI } from "../ui/phone-ui";
 import { resolveAssetUrl } from "../ui/asset-utils";
 import { enqueueToast } from "../../toast/core/toast-runtime";
@@ -1033,13 +1034,28 @@ function boundedSetting(ctx: ExtensionContext, key: string, fallback: number, mi
 function showPhoneHudUi(ctx: ExtensionContext, runtime: PhoneRuntime): void {
   if (!runtime.phoneMounted || ctx.settings.get<boolean>("showPhoneHudButton") === false || !runtime.openPhoneFromHud) return;
   const icon = ctx.settings.get<string>("phoneHudIcon");
+  const image = ctx.settings.get<string>("phoneHudImage");
+  const backgroundImage = ctx.settings.get<string>("phoneHudBackgroundImage");
   void ctx.ui.show("phone-hud", {
     visible: true,
+    buttonType: ctx.settings.get<string>("phoneHudButtonType") || "icon",
+    text: ctx.settings.get<string>("phoneHudText") || "打开手机",
+    iconPreset: ctx.settings.get<string>("phoneHudIconPreset") || "phone",
     iconUrl: resolveAssetUrl(ctx, icon),
+    imageUrl: resolveAssetUrl(ctx, image),
+    backgroundImageUrl: resolveAssetUrl(ctx, backgroundImage),
+    stylePreset: ctx.settings.get<string>("phoneHudStylePreset") || "dark-glass",
+    backgroundColor: ctx.settings.get<string>("phoneHudBackgroundColor"),
+    textColor: ctx.settings.get<string>("phoneHudTextColor"),
+    borderColor: ctx.settings.get<string>("phoneHudBorderColor"),
+    borderWidth: boundedSetting(ctx, "phoneHudBorderWidth", 1, 0, 12),
+    borderRadius: boundedSetting(ctx, "phoneHudBorderRadius", 16, 0, 120),
     position: ctx.settings.get<string>("phoneHudPosition") || "bottom-right",
     offsetX: boundedSetting(ctx, "phoneHudOffsetX", 0, -1000, 1000),
     offsetY: boundedSetting(ctx, "phoneHudOffsetY", 0, -1000, 1000),
-    size: boundedSetting(ctx, "phoneHudSize", 56, 36, 120),
+    size: boundedSetting(ctx, "phoneHudSize", 56, 24, 240),
+    width: boundedSetting(ctx, "phoneHudWidth", 0, 0, 400),
+    contentSize: boundedSetting(ctx, "phoneHudContentSize", 0, 0, 200),
     onOpen: runtime.openPhoneFromHud,
   }, {
     size: "(100%, 100%)",
@@ -2141,14 +2157,7 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
     const runtime = getPhoneRuntime(ctx);
     runtime.openPhoneFromHud = openPhone;
     if (runtime.phoneMounted) showPhoneHudUi(ctx, runtime);
-    for (const key of [
-      "showPhoneHudButton",
-      "phoneHudIcon",
-      "phoneHudPosition",
-      "phoneHudOffsetX",
-      "phoneHudOffsetY",
-      "phoneHudSize",
-    ]) {
+    for (const key of PHONE_HUD_SETTING_KEYS) {
       unsubscribers.push(
         ctx.settings.subscribe(key, () => {
           if (ctx.flow.signal.aborted) return;

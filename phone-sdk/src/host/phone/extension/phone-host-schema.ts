@@ -16,6 +16,11 @@ import {
   type PlayerPhonePreferences,
 } from "../catalog";
 import {
+  PHONE_HUD_BUTTON_TYPES,
+  PHONE_HUD_ICON_PRESETS,
+  PHONE_HUD_STYLE_PRESETS,
+} from "../phone-hud-config";
+import {
   DEFAULT_CHAT_ROLE_BUBBLE_COLOR,
   DEFAULT_CHAT_ROLE_CUSTOM_CSS,
   DEFAULT_CHAT_ROLE_FONT_SIZE,
@@ -80,13 +85,75 @@ export function buildPhoneHostSettingsFields(
         "普通手机未显示时用于打开手机的默认按键，例如 ArrowUp、KeyP 或 Ctrl+KeyP。消息手机显示时不会触发打开。",
       ),
     showPhoneHudButton: s
-      .boolean("显示手机 HUD 图标按钮")
+      .boolean("显示手机 HUD 按钮")
       .default(true)
       .describe("挂载手机后在游戏画面上显示一个适合触屏操作的按钮；点击后打开手机。"),
+    phoneHudButtonType: s
+      .enum("手机 HUD 按钮类型", PHONE_HUD_BUTTON_TYPES)
+      .default("icon")
+      .labels({
+        icon: "图标按钮",
+        text: "文本按钮",
+        image: "图片按钮",
+      })
+      .describe("图标按钮可选择预设或自定义素材；文本按钮显示自定义文字；图片按钮让素材铺满整个按钮。"),
+    phoneHudText: s
+      .string("手机 HUD 按钮文字")
+      .default("打开手机")
+      .describe("按钮类型为“文本按钮”时显示。"),
+    phoneHudIconPreset: s
+      .enum("手机 HUD 图标预设", PHONE_HUD_ICON_PRESETS)
+      .default("phone")
+      .labels({
+        phone: "📱 手机",
+        grid: "▦ 应用网格",
+        menu: "☰ 菜单",
+        message: "💬 消息",
+        settings: "⚙ 设置",
+        star: "★ 星标",
+      })
+      .describe("按钮类型为“图标按钮”且未选择自定义图标时使用。"),
     phoneHudIcon: s
-      .asset("手机 HUD 按钮图标")
+      .asset("手机 HUD 自定义图标")
       .accepts("image")
-      .describe("可选。留空时使用内置手机图标。"),
+      .describe("可选。图标按钮使用；留空时使用上方图标预设。"),
+    phoneHudImage: s
+      .asset("手机 HUD 图片按钮素材")
+      .accepts("image")
+      .describe("图片按钮使用，素材会铺满整个按钮；留空时回退自定义图标或图标预设。"),
+    phoneHudStylePreset: s
+      .enum("手机 HUD 外观预设", PHONE_HUD_STYLE_PRESETS)
+      .default("dark-glass")
+      .labels({
+        "dark-glass": "深色玻璃",
+        light: "浅色",
+        accent: "蓝色强调",
+        transparent: "透明",
+        custom: "自定义颜色",
+      }),
+    phoneHudBackgroundImage: s
+      .asset("手机 HUD 按钮背景图")
+      .accepts("image")
+      .describe("可选。作为按钮背景铺满显示，仍可叠加文字或图标内容。"),
+    phoneHudBackgroundColor: s
+      .color("手机 HUD 自定义背景色")
+      .default("#12161F"),
+    phoneHudTextColor: s
+      .color("手机 HUD 自定义内容颜色")
+      .default("#ffffff"),
+    phoneHudBorderColor: s
+      .color("手机 HUD 自定义边框颜色")
+      .default("#FFFFFF"),
+    phoneHudBorderWidth: s
+      .number("手机 HUD 边框宽度（像素）")
+      .default(1)
+      .range(0, 12)
+      .step(1),
+    phoneHudBorderRadius: s
+      .number("手机 HUD 圆角（像素）")
+      .default(16)
+      .range(0, 120)
+      .step(1),
     phoneHudPosition: s
       .enum("手机 HUD 按钮位置", PHONE_HUD_POSITIONS)
       .default("bottom-right")
@@ -111,9 +178,20 @@ export function buildPhoneHostSettingsFields(
       .range(-1000, 1000)
       .step(1),
     phoneHudSize: s
-      .number("手机 HUD 按钮大小（像素）")
+      .number("手机 HUD 按钮高度（像素）")
       .default(56)
-      .range(36, 120)
+      .range(24, 240)
+      .step(1),
+    phoneHudWidth: s
+      .number("手机 HUD 按钮宽度（像素）")
+      .default(0)
+      .range(0, 400)
+      .step(1)
+      .describe("0 表示自动：图标/图片按钮保持方形，文本按钮按文字与内边距自适应。"),
+    phoneHudContentSize: s
+      .number("手机 HUD 图标/文字大小（像素）")
+      .default(0)
+      .range(0, 200)
       .step(1),
     phoneStylePreset: s
       .enum("手机样式预设", ["apple", "android"] as const)

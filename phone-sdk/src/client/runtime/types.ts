@@ -161,6 +161,7 @@ export interface PhoneEditorEnumOption {
  * @property enumOptions - enum 选项
  * @property settingKey - 覆盖 settings 键；缺省等于 id
  * @property allowEmpty - 空串是否保留（不回退 default）；壁纸等用
+ * @property assetKind - asset 字段允许的素材类型；缺省为 image
  * @property dependsOn - 依赖另一内容项取值时才可编辑
  * @property multiline - 为 true 且 fieldType 为 string 时，属性面板使用多行 textarea
  */
@@ -175,6 +176,8 @@ export interface PhoneEditorContentItemSchema {
   enumOptions?: PhoneEditorEnumOption[];
   settingKey?: string;
   allowEmpty?: boolean;
+  /** `fieldType: "asset"` 时的素材类型；缺省为 `image`。 */
+  assetKind?: "image" | "audio" | "video" | "any";
   /**
    * 覆盖分区默认 `settingsModuleId`；用于聊天分区内编辑宿主 `phone` 字段。
    */

@@ -91,6 +91,22 @@ clearPhoneAppBadge("chat");
 
 打开该内页时宿主自动 clear；内页仍可再 `set`。
 
+## 编辑器音频素材字段
+
+内页的 `styleEditor.contentItems` 可把 `asset` 字段声明为音频素材。宿主编辑器会显示音频标识与试听控件；`assetKind` 未填写时仍按图片素材处理。
+
+```ts
+{
+  id: "incomingRingtone",
+  group: "来电页",
+  label: "来电铃声",
+  fieldType: "asset",
+  assetKind: "audio",
+  defaultValue: "",
+  allowEmpty: true,
+}
+```
+
 ## 程序化关闭手机
 
 调用方可以选择关闭手机时是否播放宿主动画；省略选项时保持原有动画：

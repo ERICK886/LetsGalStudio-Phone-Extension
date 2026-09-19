@@ -163,6 +163,13 @@ function normalizeEditorContentItems(
         ? item.settingKey.trim().slice(0, 64)
         : undefined;
     const allowEmpty = item.allowEmpty === true ? true : undefined;
+    const assetKind = item.fieldType === "asset" &&
+      (item.assetKind === "image" ||
+        item.assetKind === "audio" ||
+        item.assetKind === "video" ||
+        item.assetKind === "any")
+      ? item.assetKind
+      : undefined;
     const multiline = item.multiline === true ? true : undefined;
     const min = typeof item.min === "number" && Number.isFinite(item.min) ? item.min : undefined;
     const max = typeof item.max === "number" && Number.isFinite(item.max) ? item.max : undefined;
@@ -211,6 +218,7 @@ function normalizeEditorContentItems(
       ...(description ? { description } : {}),
       ...(settingKey ? { settingKey } : {}),
       ...(allowEmpty ? { allowEmpty } : {}),
+      ...(assetKind ? { assetKind } : {}),
       ...(multiline ? { multiline } : {}),
       ...(min !== undefined ? { min } : {}),
       ...(max !== undefined ? { max } : {}),
