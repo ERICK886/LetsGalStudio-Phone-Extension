@@ -15,14 +15,17 @@ import {
 } from "../schema/phone-host-editor-schema.ts";
 
 describe("PHONE_HOST_CONTENT_ITEMS", () => {
-  it("has 19 unique items matching schema", () => {
-    assert.equal(PHONE_HOST_CONTENT_ITEMS.length, 19);
+  it("has unique, usable fields matching the host section", () => {
     assert.equal(
       PHONE_HOST_CONTENT_ITEMS.length,
       PHONE_HOST_EDITOR_SCHEMA.contentItems.length,
     );
     const ids = PHONE_HOST_CONTENT_ITEMS.map((item) => item.id);
     assert.equal(new Set(ids).size, ids.length);
+    for (const item of PHONE_HOST_CONTENT_ITEMS) {
+      assert.ok(item.id && item.group && item.label, `incomplete field ${item.id}`);
+      assert.equal(typeof item.defaultValue, "string");
+    }
   });
 
   it("lookup via getSectionContentItem", () => {

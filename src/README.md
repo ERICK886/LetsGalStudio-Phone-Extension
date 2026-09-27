@@ -2,7 +2,9 @@
 
 > 面向开发者：在本仓或脚手架工程中开发手机内页、使用 CLI / phone-sdk。  
 > 作者侧「如何使用手机」（挂载、设置、消息、Toast）见根目录 [README.md](../README.md)。  
-> 当前推荐：`@ink-zenly/phone-sdk@^0.5.5` ｜ `@ink-zenly/create-phone-app@0.3.7` ｜ Studio SDK `>=1.9.0`
+> 当前仓库：`@ink-zenly/phone-sdk@0.5.26` ｜ `@ink-zenly/create-phone-app@0.3.7` ｜ Studio SDK 清单要求 `>=1.9.0`。phone-sdk 0.5.26 已发布 npm（2026-09-27 核实）；CLI 版本仍按仓库记录。
+
+手机宿主搭建、完整公开 API、编辑器 schema 与生命周期约定见 [Phone SDK 参考](../phone-sdk/README.md)。当前完整性、测试结果与待完善项见 [SDK 检查报告](../phone-sdk/AUDIT.md)。
 
 本目录 `src/` 是本仓宿主扩展的入口与内页应用（`demo-shop/`、`phone-chat/`、`phone-album/`）。宿主实现在 `@ink-zenly/phone-sdk`，脚手架在 `cli/`。  
 **聊天与相册已内置**于本扩展（`src/phone-chat/`、`src/phone-album/`），工坊只需启用本包。同包**多模块**：`PhoneExtension`（壳）+ `PhoneEditorExtension`（作者编辑器，源码在 phone-sdk）+ `ChatController`（`phone-chat`）+ `PhoneAlbumExtension`（`phone-album`）。  
@@ -38,16 +40,16 @@
 
 宿主扩展包 id **≠** 内页 app-id。
 
-### 推荐版本
+### 当前仓库版本与清单要求
 
 ```text
 LetsGal Studio SDK          >= 1.9.0
-本仓扩展 / 自建宿主          1.1.0+
-@ink-zenly/phone-sdk        ^0.5.0
-@ink-zenly/create-phone-app 0.3.5
+本仓扩展                    1.3.2
+@ink-zenly/phone-sdk        0.5.26（npm / 仓库；本地 CLI 生成 ^0.5.26）
+@ink-zenly/create-phone-app 0.3.7
 ```
 
-本仓联调可用 `"@ink-zenly/phone-sdk": "file:phone-sdk"`。
+本仓联调可用 `"@ink-zenly/phone-sdk": "file:phone-sdk"`；独立工程可安装已发布的 `@ink-zenly/phone-sdk@0.5.26`。下文固定旧版 CLI 的示例按其历史模板行为理解，不代表本仓当前输出。
 
 ### 构建与重载（开发）
 
@@ -292,7 +294,7 @@ pnpm watch
 - 宿主入口（导出 Phone / Toast）；`extension.json.id` = 你指定的 `--extension-id`
 - 首个内页 `src/my-shop/`（`--app-id`，与宿主 id **独立**）
 - `vite` 注入 `__PHONE_HOST_EXTENSION_ID__`（见 [§4](#4-宿主扩展包-id-注入phone-sdk--040)）
-- 依赖 `@ink-zenly/phone-sdk` 的 npm 版本（当前脚手架写入 `^0.5.0`）与捆绑 `sdk/`
+- 依赖 `@ink-zenly/phone-sdk` 与捆绑 `sdk/`；本仓 CLI 从 phone-sdk/package.json 生成 `^0.5.26`，独立发布 CLI 的配置兜底为 `^0.5.5`。使用 npm 前核实目标版本已经发布。
 
 之后在该工程内继续 `add` 更多内页，或改 `src/my-shop/app.tsx`。  
 Studio 中启用的是**该宿主扩展**的 `extension.json.id`（例如 `com.acme.my-phone`），不是本仓官方 id。
@@ -342,7 +344,7 @@ export class ShopController extends Extension {
 | 内页（plugin） | 只从 `@ink-zenly/phone-sdk/plugin` 引用 API；由宿主或内页包入口打包 |
 
 本仓开发：`package.json` 可用 `"@ink-zenly/phone-sdk": "file:phone-sdk"`。  
-脚手架默认写 npm `^0.5.0`（见 CLI `inkZenly.phoneSdkVersion`），不要改成默认 `file:`。
+脚手架优先读取本仓 phone-sdk/package.json 的版本；独立发布态才使用 CLI `inkZenly.phoneSdkVersion` 兜底。默认写 npm 范围，不改成默认 `file:`。当前生成模板缺 HUD/编辑器导出，完整宿主补齐方式见 [SDK 参考](../phone-sdk/README.md)；phone-sdk 0.5.26 已声明 Chakra / Emotion 依赖。
 
 ### 2.7 内页开发检查清单
 
@@ -511,13 +513,13 @@ CSS 使用通用选择器 `[data-phone-root]` / `[data-phone-toast-root]`；DOM 
 
 ## 5. phone-sdk 包说明与 API 要点
 
-包名：`@ink-zenly/phone-sdk@0.5.0`（[npm](https://www.npmjs.com/package/@ink-zenly/phone-sdk)）。源码在仓库 `phone-sdk/`，细节见 [`../phone-sdk/README.md`](../phone-sdk/README.md)。
+包名：`@ink-zenly/phone-sdk`，当前仓库版本 `0.5.26`。源码在 `phone-sdk/`；完整宿主与 API 参考见 [SDK README](../phone-sdk/README.md)。以下只作开发流程摘要，不用于判断 npm 当前发布状态。
 
 ### 5.1 两个入口，不要混用
 
 | 入口 | 给谁用 | 导出重点 |
 |------|--------|----------|
-| `@ink-zenly/phone-sdk`（**main**） | **宿主扩展** | `PhoneExtension`、`ToastExtension`、默认导出 |
+| `@ink-zenly/phone-sdk`（**main**） | **宿主扩展** | `PhoneExtension`、`PhoneHudExtension`、`ToastExtension`、`PhoneEditorExtension`、编辑器组件/schema、默认导出 |
 | `@ink-zenly/phone-sdk/plugin` | **内页应用** | `registerPhoneApp`、`bootstrapPhonePluginApps`、`definePhonePluginRegistry`、类型与调试工具 |
 
 ```text
@@ -544,10 +546,12 @@ phone-sdk/src/
 ```json
 {
   "dependencies": {
-    "@ink-zenly/phone-sdk": "^0.5.0"
+    "@ink-zenly/phone-sdk": "^0.5.26"
   }
 }
 ```
+
+此版本范围对应已发布的 0.5.26；React / React DOM 与 Studio SDK 的接入要求见 SDK 参考。
 
 约定：
 
@@ -569,7 +573,9 @@ bootstrapPhonePluginApps(
   definePhonePluginRegistry(registerDemoShopPhoneApp),
 );
 
-export { PhoneExtension, ToastExtension } from "@ink-zenly/phone-sdk";
+export {
+  PhoneExtension, PhoneHudExtension, ToastExtension, PhoneEditorExtension,
+} from "@ink-zenly/phone-sdk";
 export { default } from "@ink-zenly/phone-sdk";
 ```
 
@@ -613,7 +619,7 @@ import { openPhoneApp } from "@ink-zenly/phone-sdk/plugin";
 await openPhoneApp({ appId: "chat", waitUntil: "close" });
 ```
 
-`waitUntil: "close"` 会在玩家关手机后 resolve；`"none"` 则显示后立即返回。
+`waitUntil: "close"` 在整部手机关闭或 flow abort 后返回；`"none"` 在请求发出后返回。结果 `opened` 不保证目标内页成功渲染，参数、返回值与 payload 消费方式见 [SDK 参考](../phone-sdk/README.md)。
 
 桌面 APP 角标（≥ 0.5.4，仅内存）：
 
@@ -653,7 +659,7 @@ clearPhoneAppBadge("chat");
 ## 6. 版本更新日志
 
 下列要点依据本仓库 `git` 历史与 npm 已发布版本整理。  
-**npm 已发布**的 phone-sdk：`0.3.0`、`0.3.1`、`0.4.0`、`0.4.6`、`0.4.7`、`0.5.0`；create-phone-app：`0.1.0`–`0.1.5`、`0.3.0`–`0.3.5`。  
+早期记录中的 **npm 已发布**版本：phone-sdk `0.3.0`、`0.3.1`、`0.4.0`、`0.4.6`、`0.4.7`、`0.5.0`；create-phone-app `0.1.0`–`0.1.5`、`0.3.0`–`0.3.5`。phone-sdk 本次发布版本为 `0.5.26`（2026-09-27）；此处早期列表不是完整发布清单。
 中间仅出现在 git、未单独发到 npm 的版本号，会标注「仓库版本」。
 
 ### 6.1 本仓扩展（`extension.json`）
@@ -683,7 +689,7 @@ clearPhoneAppBadge("chat");
 
 | 版本 | npm | 要点 |
 |------|-----|------|
-| **0.5.26** | 本地 | `closePhoneApp({ animated })` 支持调用方选择动画或立即关闭；修复 `waitUntil: "none"` 被 `ui.show()` 阻塞；首次挂载可直接进入目标内页；重型调试与诊断改为显式开启。 |
+| **0.5.26** | ✅ npm（2026-09-27） | `closePhoneApp({ animated })` 支持调用方选择动画或立即关闭；修复 `waitUntil: "none"` 被 `ui.show()` 阻塞；首次挂载可直接进入目标内页；重型调试与诊断改为显式开启。发布时补齐编辑器依赖声明并排除测试文件。 |
 | **0.5.6** | 本地 | 宿主内置内页 Phone SDK 应用 ID 恢复为可只填程序 ID；跨扩展仍支持 `扩展ID/程序ID`。 |
 | **0.5.5** | ✅ npm | 曾强制「扩展ID/程序ID」；桌面角标 API 并入。 |
 | **0.5.4** | （未单独发 npm，并入 0.5.5） | 桌面 APP 角标 API：`setPhoneAppBadge` / `clearPhoneAppBadge`（`dot` \| `count`）。 |

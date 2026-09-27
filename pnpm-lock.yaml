@@ -22,7 +22,7 @@ importers:
         version: 0.3.7
       '@ink-zenly/phone-sdk':
         specifier: file:phone-sdk
-        version: file:phone-sdk(@avg-studio/sdk@file:sdk(react@18.3.1))(react@18.3.1)
+        version: file:phone-sdk(@avg-studio/sdk@file:sdk(react@18.3.1))(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
     devDependencies:
       '@avg-studio/sdk':
         specifier: file:./sdk
@@ -532,6 +532,7 @@ packages:
     peerDependencies:
       '@avg-studio/sdk': '*'
       react: ^18.0.0
+      react-dom: ^18.0.0
 
   '@internationalized/date@3.12.2':
     resolution: {integrity: sha512-FY1Y+H64NDs+HAF6omlnWxm3mEpfgaCSWtL5l551ZZfImA+kGjPFgrnJrGjH6lfmLL0g8Z/mBu1R3kufeCp6Jw==}
@@ -1737,10 +1738,16 @@ snapshots:
       picocolors: 1.1.1
       tsx: 4.23.1
 
-  '@ink-zenly/phone-sdk@file:phone-sdk(@avg-studio/sdk@file:sdk(react@18.3.1))(react@18.3.1)':
+  '@ink-zenly/phone-sdk@file:phone-sdk(@avg-studio/sdk@file:sdk(react@18.3.1))(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
     dependencies:
       '@avg-studio/sdk': file:sdk(react@18.3.1)
+      '@chakra-ui/react': 3.36.1(@emotion/react@11.14.0(@types/react@18.3.31)(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      '@emotion/react': 11.14.0(@types/react@18.3.31)(react@18.3.1)
       react: 18.3.1
+      react-dom: 18.3.1(react@18.3.1)
+    transitivePeerDependencies:
+      - '@types/react'
+      - supports-color
 
   '@internationalized/date@3.12.2':
     dependencies:

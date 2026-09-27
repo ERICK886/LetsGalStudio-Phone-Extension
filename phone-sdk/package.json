@@ -9,6 +9,7 @@
   "types": "./src/index.ts",
   "files": [
     "src",
+    "!src/**/*.test.ts",
     "README.md"
   ],
   "exports": {
@@ -29,7 +30,12 @@
   },
   "peerDependencies": {
     "react": "^18.0.0",
+    "react-dom": "^18.0.0",
     "@avg-studio/sdk": "*"
+  },
+  "dependencies": {
+    "@chakra-ui/react": "^3.31.0",
+    "@emotion/react": "^11.14.0"
   },
   "keywords": [
     "letsgal",

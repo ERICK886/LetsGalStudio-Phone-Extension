@@ -19,7 +19,13 @@ describe("PHONE_HOST_EDITOR_SCHEMA", () => {
   it("declares full section schema fields", () => {
     assert.equal(PHONE_HOST_EDITOR_SCHEMA.sectionId, "phone");
     assert.equal(PHONE_HOST_EDITOR_SCHEMA.settingsModuleId, "phone");
-    assert.equal(PHONE_HOST_EDITOR_SCHEMA.contentItems.length, 19);
+    const fieldIds = new Set(PHONE_HOST_EDITOR_SCHEMA.contentItems.map((item) => item.id));
+    assert.ok(fieldIds.has("phoneTitle"));
+    for (const page of PHONE_HOST_EDITOR_SCHEMA.pages) {
+      for (const id of page.contentItemIds ?? []) {
+        assert.ok(fieldIds.has(id), `${page.id} references missing field ${id}`);
+      }
+    }
     assert.equal(PHONE_HOST_EDITOR_SCHEMA.pages.length, 7);
   });
 
@@ -73,14 +79,39 @@ describe("PHONE_HOST_EDITOR_SCHEMA", () => {
     assert.equal(page?.preview, "desktop");
     assert.deepEqual(items.map((item) => item.id), [
       "showPhoneHudButton",
+      "phoneHudButtonType",
+      "phoneHudText",
+      "phoneHudIconPreset",
       "phoneHudIcon",
+      "phoneHudImage",
+      "phoneHudStylePreset",
+      "phoneHudBackgroundImage",
+      "phoneHudBackgroundColor",
+      "phoneHudTextColor",
+      "phoneHudBorderColor",
+      "phoneHudBorderWidth",
+      "phoneHudBorderRadius",
       "phoneHudPosition",
       "phoneHudOffsetX",
       "phoneHudOffsetY",
       "phoneHudSize",
+      "phoneHudWidth",
+      "phoneHudContentSize",
     ]);
     assert.equal(items.find((item) => item.id === "phoneHudPosition")?.enumOptions?.length, 8);
-    assert.ok(items.filter((item) => item.fieldType === "number").length === 3);
+    const byId = new Map(items.map((item) => [item.id, item]));
+    assert.deepEqual(byId.get("phoneHudButtonType")?.enumOptions?.map((item) => item.value), ["icon", "text", "image"]);
+    for (const [id, type] of [["phoneHudText", "text"], ["phoneHudIcon", "icon"], ["phoneHudImage", "image"]] as const) {
+      assert.deepEqual(byId.get(id)?.dependsOn, { contentItemId: "phoneHudButtonType", equals: type });
+    }
+    for (const id of ["phoneHudBackgroundColor", "phoneHudTextColor", "phoneHudBorderColor"]) {
+      assert.deepEqual(byId.get(id)?.dependsOn, { contentItemId: "phoneHudStylePreset", equals: "custom" });
+    }
+    for (const item of items.filter((entry) => entry.fieldType === "number")) {
+      assert.ok(Number.isFinite(item.min) && Number.isFinite(item.max), `missing numeric bounds for ${item.id}`);
+      assert.ok(Number(item.defaultValue) >= item.min! && Number(item.defaultValue) <= item.max!, `default outside bounds for ${item.id}`);
+      assert.ok((item.step ?? 0) > 0, `missing positive step for ${item.id}`);
+    }
   });
 
   it("player-permissions page covers three boolean flags", () => {

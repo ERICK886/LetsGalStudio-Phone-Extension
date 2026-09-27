@@ -2,7 +2,7 @@
 
 > 扩展包 ID：`ink.zenly.ext-7a9373`｜ 程序界面：`phone`、`phone-toast`  
 > 扩展版本：`1.3.2` ｜ 需要 LetsGal Studio SDK：`>=1.9.0`
-> 对齐：`@ink-zenly/phone-sdk@0.5.26`（仓库版本）｜ `@ink-zenly/create-phone-app@0.3.7`
+> 对齐：`@ink-zenly/phone-sdk@0.5.26`（已发布 npm，2026-09-27 核实）｜ `@ink-zenly/create-phone-app@0.3.7`
 
 这是一个**游戏里的手机**：剧情里挂上之后，玩家可以打开桌面、点 APP、看聊天消息，还能收到简单的提示（Toast）。
 
@@ -426,6 +426,8 @@ ink.zenly.ext-7a9373.open-phone
 ---
 
 写内页、CLI、phone-sdk 的说明和更细的版本表 → [`src/README.md`](src/README.md)（phone-sdk ≥ 0.5.0 可从剧本用 `openPhoneApp` 深开内页；≥ 0.5.1 可 `closePhoneApp`）
+
+手机宿主接入与完整公开 API → [Phone SDK 参考](phone-sdk/README.md)。SDK 完整性、已确认问题及验证结果 → [检查报告](phone-sdk/AUDIT.md)。
 
 ## 11. 更新日志
 
