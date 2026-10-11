@@ -930,6 +930,7 @@
   display: flex;
   min-height: 0;
   flex: 1;
+  container-type: size;
   flex-direction: column;
   justify-content: flex-start;
   gap: 12px;
@@ -1037,17 +1038,24 @@
   white-space: pre-wrap;
 }
 
-[data-phone-root] .phone-story-bubble img {
-  display: block;
-  max-width: min(180px, 100%);
-  max-height: 180px;
-  border-radius: 8px;
-  object-fit: cover;
+[data-phone-root] .phone-story-image {
+  max-width: 100%;
+  line-height: 0;
 }
 
-[data-phone-root] .phone-story-bubble:has(img) {
-  padding: 4px;
-  line-height: 0;
+[data-phone-root] .phone-story-image img {
+  display: block;
+  width: auto;
+  height: auto;
+  /* 按消息行宽预留头像、间距和状态；小图保持原尺寸，大图等比缩小。 */
+  max-width: min(240px, calc(min(92cqw, 330px) - var(--phone-story-image-inline-space, 78px)));
+  max-height: min(320px, 60cqh);
+  border-radius: 8px;
+  object-fit: contain;
+}
+
+[data-phone-root] .phone-story-message-row[data-show-avatar="false"] .phone-story-image {
+  --phone-story-image-inline-space: 28px;
 }
 
 [data-phone-root] .phone-story-message-body {

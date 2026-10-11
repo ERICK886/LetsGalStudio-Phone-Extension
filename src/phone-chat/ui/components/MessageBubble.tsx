@@ -27,9 +27,10 @@ function BubbleContent({ message }: { message: ChatMessage }) {
   const imageUrl = isImage ? resolveAssetUrl(ctx, message.imageAsset) : undefined;
   const [imageLoadFailed, setImageLoadFailed] = useState(false);
   useEffect(() => setImageLoadFailed(false), [imageUrl]);
+  const showImage = isImage && !!imageUrl && !imageLoadFailed;
 
   return (
-    <div className="chat-bubble">
+    <div className={showImage ? "chat-image-message" : "chat-bubble"}>
       {isImage ? (
         imageLoadFailed || !imageUrl ? (
           "图片加载失败"

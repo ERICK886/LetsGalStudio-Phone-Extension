@@ -177,6 +177,7 @@ export const PhoneStoryMessageItem: React.FC<{ storyMessage: PhoneStoryMessage }
   const [imageLoadFailed, setImageLoadFailed] = useState(false);
 
   useEffect(() => setImageLoadFailed(false), [imageUrl]);
+  const showImage = isImage && !!imageUrl && !imageLoadFailed && storyMessage.status !== "recalled";
 
   // 撤回完成：仅居中系统行（角色名 + 后缀）。
   if (
@@ -243,7 +244,10 @@ export const PhoneStoryMessageItem: React.FC<{ storyMessage: PhoneStoryMessage }
               <MessageStatusIndicator status={storyMessage.status} />
             </span>
           ) : null}
-          <div className="phone-story-bubble" style={bubbleStyle}>
+          <div
+            className={showImage ? "phone-story-image" : "phone-story-bubble"}
+            style={showImage ? undefined : bubbleStyle}
+          >
             {storyMessage.status === "recalled" ? null : isImage ? (
               imageLoadFailed || !imageUrl ? (
                 <p style={bodyStyle}>图片加载失败</p>

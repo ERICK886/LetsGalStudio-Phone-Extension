@@ -167,6 +167,7 @@ const CSS_TEXT = `
 .chat-log {
   flex: 1 1 auto;
   min-height: 0;
+  container-type: size;
   overflow: auto;
   padding: 12px 10px 8px;
   display: flex;
@@ -207,16 +208,19 @@ const CSS_TEXT = `
   box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
 }
 .chat-msg[data-direction="outgoing"] .chat-bubble { background: #95ec69; }
+.chat-image-message {
+  max-width: 100%;
+  line-height: 0;
+}
 .chat-bubble-img {
   display: block;
-  max-width: 180px;
-  max-height: 180px;
+  width: auto;
+  height: auto;
+  /* 按原图比例缩小,同时为头像和短屏中的其它消息留出空间。 */
+  max-width: min(240px, 72cqw, calc(100cqw - 52px));
+  max-height: min(320px, 60cqh);
   border-radius: 4px;
-  object-fit: cover;
-}
-.chat-bubble:has(.chat-bubble-img) {
-  padding: 4px;
-  line-height: 0;
+  object-fit: contain;
 }
 .chat-status { font-size: 11px; color: #888; }
 .chat-status[data-error="true"] { color: #fa5151; }
