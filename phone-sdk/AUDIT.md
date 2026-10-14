@@ -1,6 +1,6 @@
 # 手机宿主 SDK 完整性检查
 
-检查日期：2026-09-27。范围：本仓 `phone-sdk/`、扩展入口、构建配置、CLI 宿主模板和相关 README。SDK 仓库版本 0.5.26；扩展版本 1.3.2；CLI 版本 0.3.7。以下第 1–6 节保留首次检查快照；后续发布准备的复查见第 7 节，2026-09-30 工作区修复见第 8 节。未运行真实 Studio Preview。
+检查日期：2026-09-27。范围：本仓 `phone-sdk/`、扩展入口、构建配置、CLI 宿主模板和相关 README。SDK 仓库版本 0.5.26；扩展版本 1.3.2；CLI 版本 0.3.7。以下第 1–6 节保留首次检查快照；后续发布准备的复查见第 7 节，2026-09-30 工作区修复见第 8 节，0.5.27 发布验证见第 9 节。未运行真实 Studio Preview。
 
 ## 结论
 
@@ -222,3 +222,20 @@ sha512-GtqB4qbGVQQjh0nxuoO2O/bsiuSCpLBGTfsaF2qSepSSW1Armsb/gAqAPdKmkP17zJS2mGWDM
 验证：SDK/内页扫描 52 个测试文件，223 项通过；CLI 扫描 11 个测试文件，38 项通过。根工程 pnpm run build 通过。使用当前 SDK tarball 分别生成 default/minimal 临时宿主，以自身 package.json 离线安装依赖后构建通过；未使用仓库 node_modules 链接替代安装。TypeScript 仍只有 sdk/index.ts:22 缺少 ./extension-inspector 的 TS2307，未改动合同副本。
 
 限制：未执行真实 Studio 剧本 Preview，快捷键/触屏/skip/seek/暂停恢复仍需实际验证。全局 SDK 桥仍是单活动导航宿主；角标、关闭锁等未升级为完整多宿主协议，第三方应用 ID 仍需全局唯一。未同步、重启、提交、推送或发布。
+
+## 9. 0.5.27 发布验证（2026-10-14）
+
+- SDK 从 0.5.26 升为 0.5.27，包含第 8 节 SDK 修复及 Android WebView 默认触摸高亮调整。扩展清单与根 package.json 同步升为 1.3.4；CLI 保持 0.3.7，本次未发布 CLI。
+- 本次发布前已验证提交 37a8adf 的 SDK/内页 52 个测试文件、223 项测试及 CLI 11 个测试文件、38 项测试全部通过。此次仅更新版本和说明，未再次修改运行时代码。
+- 插件 1.3.4 的根 Vite 构建通过。SDK 0.5.27 tarball 在新建 default/minimal 宿主中分别离线安装和构建通过；生成的 SDK 范围为 ^0.5.27，验证时替换为待发布 tarball，不借用仓库 node_modules。
+- tarball 共 115 个文件、207208 字节；公开入口与新增运行时文件齐全，未打入测试文件。依赖与 peerDependencies 保持原发布契约。
+- TypeScript 已在同一会话中对照待发布源码与原 HEAD：均只有 sdk/index.ts:22 缺少 ./extension-inspector 的 TS2307。未改动 Studio SDK 合同，不能视为完整类型检查通过。
+- npm 官方源已可查询 0.5.27，latest 标签为 0.5.27；发布时刻为 2026-10-14 14:35:18（北京时间）。registry 的 dist.integrity 与重新下载的官方 tarball 均匹配本次验证产物。
+
+已发布 tarball 的 SHA-512：
+
+```text
+sha512-X104mOTftV074/F1ffRP4l5mkhuN4koPlE6TMz0bIVHrcZfdoYVy10Q7QDFjjBw6qO7cuWzQX7Gwx0SsmmvpZw==
+```
+
+发布页：[npm 0.5.27](https://www.npmjs.com/package/@ink-zenly/phone-sdk/v/0.5.27)。限制：未执行真实 Studio 剧本 Preview，未同步或重启 Studio。

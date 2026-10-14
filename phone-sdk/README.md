@@ -1,6 +1,6 @@
 # @ink-zenly/phone-sdk
 
-LetsGal 游戏内手机的宿主 SDK。本文描述仓库 **0.5.26** 源码，包含 2026-09-30 的未发布修复；不能据此认为 npm 同版本已经包含这些改动。
+LetsGal 游戏内手机的宿主 SDK。本文对应 **0.5.27**（2026-10-14），包含注册、导航关闭、会话清理和编辑器契约修复。
 
 SDK 提供手机桌面、内页容器、HUD、Toast、作者编辑器与跨 bundle 桥接。聊天、相册、电话等业务内页由扩展工程注册，SDK 不内置这些 APP。
 
@@ -28,7 +28,7 @@ openPhoneApp → 导航 pending → 手机 UI → registration.render
 
 ### 依赖
 
-本仓联调使用 `"@ink-zenly/phone-sdk": "file:phone-sdk"`；独立工程使用已经发布并验证过的版本。CLI 本地解析本包版本为 `^0.5.26`，独立发布 CLI 的兜底版本当前为 `^0.5.5`，两者不能混为同一来源。
+本仓联调使用 `"@ink-zenly/phone-sdk": "file:phone-sdk"`；独立工程使用 `@ink-zenly/phone-sdk@^0.5.27`。CLI 本地解析本包版本为 `^0.5.27`；已发布 CLI 0.3.7 的兜底版本为 `^0.5.5`，旧脚手架工程请显式更新 SDK 依赖。
 
 宿主需 React 18、React DOM、Studio SDK、Vite 和 React 插件。本包声明 React/React DOM/Studio SDK 为 peerDependencies，声明 `@chakra-ui/react`、`@emotion/react` 为 dependencies；安装宿主时提供这些 peers，编辑器依赖由包管理器安装。独立安装构建应使用打出的 SDK 包验证，不能只依赖本仓根工程的依赖。
 
@@ -309,7 +309,7 @@ node ./node_modules/typescript/bin/tsc --noEmit
 pnpm run build
 ```
 
-2026-09-30 工作区已修复模板导出、注册顺序、锁/导航监听器异常、schema 规范化及绑定/关闭等待问题，尚未发布。Studio SDK 合同完整性与真实剧本 Preview 验证仍未完成；全局桥仍采用单活动导航宿主，不承诺并行独立手机实例或版本协商。
+0.5.27 包含注册顺序、锁/导航监听器异常隔离、schema 规范化、绑定清理与关闭等待修复，并公开 OpenPhoneAppPosition。仓库 CLI 模板已补齐宿主四模块导出。Studio SDK 合同完整性与真实剧本 Preview 验证仍未完成；全局桥仍采用单活动导航宿主，不承诺并行独立手机实例或版本协商。
 
 ### 引导回调的归属
 
