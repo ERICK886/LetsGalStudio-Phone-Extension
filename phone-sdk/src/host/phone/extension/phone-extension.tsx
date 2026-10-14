@@ -711,7 +711,7 @@ export interface PhoneUIProps extends ExtensionProps {
   loadAppAvailability: () => readonly PhoneAppAvailabilityOverride[];
   /** 读取当前运行时挂载状态；UI 在异步关闭后据此阻止继续启动动作。 */
   isPhoneMounted: () => boolean;
-  closePhone: () => void;
+  closePhone: () => Promise<void>;
   storyMessages?: readonly PhoneStoryMessage[];
   storyPopupPosition?: PhonePopupPosition;
   /** 当前剧情消息组的可选屏幕背景素材；空值回退普通手机背景。 */
@@ -1088,6 +1088,7 @@ export async function hidePhoneUi(ctx: ExtensionContext): Promise<void> {
     await ctx.ui.hide("phone");
   } catch (error) {
     console.error("[phone] 关闭手机 UI 失败", error);
+    throw error;
   }
 }
 
@@ -1125,11 +1126,13 @@ async function deactivatePhoneRuntime(
     epoch: runtime.phoneMountEpoch,
     hadPendingSequence: Boolean(pending),
   });
-  if (!ctx.ui.isVisible("phone")) return;
+  if (!ctx.ui.isVisible("phone")) { emitPhoneClosed(ctx.flow.signal); return; }
   try {
     await ctx.ui.hide("phone");
   } catch (error) {
     console.error("[phone] 卸载时关闭手机失败", error);
+  } finally {
+    emitPhoneClosed(ctx.flow.signal);
   }
 }
 
@@ -2030,14 +2033,15 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
    * 保险计时器会释放 `opening` 锁，避免一次异常显示永久阻塞之后的打开动作。
    */
   static onRegister(ctx: ExtensionContext): void {
+    if (ctx.flow.signal.aborted) return;
     const registrationKey = ctx.flow.signal;
     phoneRegistrationCleanups.get(registrationKey)?.();
     const unsubscribers: Array<() => void> = [];
 
     // 尽早安装 Phone SDK 宿主，便于第三方扩展在其后（或排队在其前）完成 registerPhoneApp。
-    installPhoneExtensionSdkHost();
+    unsubscribers.push(installPhoneExtensionSdkHost());
     // 闭包住手机扩展的 ctx，供插件侧 openPhoneApp 委托 ui.show("phone")。
-    bindPhoneNavigationController(ctx);
+    unsubscribers.push(bindPhoneNavigationController(ctx));
 
     let registeredShortcut = normalizeOpenPhoneShortcut(
       ctx.settings.get<unknown>("openPhoneShortcut"),
@@ -2171,7 +2175,9 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
     }
 
     const cleanup = () => {
-      for (const unsubscribe of unsubscribers.splice(0)) unsubscribe();
+      for (const unsubscribe of unsubscribers.splice(0)) {
+        try { unsubscribe(); } catch (error) { console.warn("[phone] cleanup failed", error); }
+      }
       ctx.flow.signal.removeEventListener("abort", cleanup);
       if (runtime.openPhoneFromHud === openPhone) {
         runtime.openPhoneFromHud = undefined;
@@ -2293,7 +2299,7 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
             "appAvailability",
           ),
         isPhoneMounted: () => runtime.phoneMounted,
-        closePhone: () => {
+        closePhone: async () => {
           finishStoryMessageSequence(runtime, "ui-close");
           runtime.storyMessageSessionVisible = false;
           clearStoryRecallTimers(runtime);
@@ -2304,7 +2310,7 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
           this.close();
           // 关闭动画已由 UI 播放完毕（closeWithAnimation）；此处释放 phone 容器，
           // 再唤醒等待中的 openPhoneApp 调用方。hide 与 emit 串行，避免在 UI 仍可见时提前返回。
-          void hidePhoneUi(this.context).finally(() => emitPhoneClosed());
+          await hidePhoneUi(this.context).finally(() => emitPhoneClosed(this.context.flow.signal));
           showPhoneHudUi(this.context, runtime);
         },
         // 不依赖 ctx.ui.show() 的初始 data：首次 render 若尚未拿到消息快照，UI 也能订阅并回放当前会话。

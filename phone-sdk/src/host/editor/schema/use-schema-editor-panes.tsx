@@ -8,6 +8,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useExtensionContext } from "@avg-studio/sdk";
+import { builtinEditorPage } from "./builtin-editor-page";
 
 import type {
   PhoneEditorCustomPanes,
@@ -111,7 +112,8 @@ export function useSchemaEditorPanes(
     [ctx, schema, bumpRevision],
   );
 
-  const isDesktopAppsPage = page?.id === "desktop-apps";
+  const builtinPage = builtinEditorPage(schema.sectionId, page?.id, schema.settingsModuleId);
+  const isDesktopAppsPage = builtinPage === "desktop";
   const status = page?.status ?? "ready";
   const isReady = status === "ready";
   const previewKind = page?.preview ?? "placeholder";
@@ -120,7 +122,7 @@ export function useSchemaEditorPanes(
 
   // Hook 必须无条件调用
   const desktopCatalog = useDesktopCatalogEditor(values, revision);
-  const chatArray = useChatArrayPagePanes(page?.id, values, revision);
+  const chatArray = useChatArrayPagePanes(builtinPage === "chat" ? page?.id : undefined, values, revision);
 
   const chatFriendsForPreview = useMemo(() => {
     void revision;
@@ -170,6 +172,10 @@ export function useSchemaEditorPanes(
         description="即将推出：此页面的属性编辑。"
       />
     );
+  } else if (customPanes) {
+    left = customPanes.left;
+    center = customPanes.center;
+    right = customPanes.right;
   } else if (isDesktopAppsPage) {
     left = desktopCatalog.left;
     center = desktopCatalog.center;
@@ -178,10 +184,6 @@ export function useSchemaEditorPanes(
     left = chatArray.left;
     center = chatArray.center;
     right = chatArray.right;
-  } else if (customPanes) {
-    left = customPanes.left;
-    center = customPanes.center;
-    right = customPanes.right;
   } else {
     left = (
       <PhoneContentList

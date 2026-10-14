@@ -28,6 +28,7 @@ bootstrapPhonePluginApps(
     registerPhoneAlbumPhoneApp,
     registerPhoneCallApp,
   ),
+  __PHONE_HOST_EXTENSION_ID__,
 );
 
 export {

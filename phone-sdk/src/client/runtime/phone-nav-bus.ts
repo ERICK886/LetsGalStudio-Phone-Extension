@@ -12,6 +12,7 @@
  */
 
 import { getPhoneSdkSlot } from "./slot";
+import { notifyListeners } from "./notify-listeners";
 import type { NavigateRequest } from "./types";
 
 /**
@@ -19,14 +20,13 @@ import type { NavigateRequest } from "./types";
  *
  * @param request 目标应用 id、序号与可选 payload
  */
-export function publishPhoneNavigate(request: NavigateRequest): void {
+export function publishPhoneNavigate(request: NavigateRequest, owner?: object): void {
   const slot = getPhoneSdkSlot();
   slot.phoneNavigatePending = request;
+  slot.phoneNavigateOwner = owner;
   const listeners = slot.phoneNavigateListeners;
   if (listeners) {
-    for (const listener of listeners) {
-      listener(request);
-    }
+    notifyListeners(listeners, request);
   }
 }
 
@@ -48,7 +48,7 @@ export function subscribePhoneNavigate(
   slot.phoneNavigateListeners.add(listener);
   const pending = slot.phoneNavigatePending;
   if (pending) {
-    listener(pending);
+    notifyListeners([listener], pending);
   }
   return () => {
     slot.phoneNavigateListeners?.delete(listener);
@@ -78,38 +78,41 @@ export function clearPhoneNavigatePending(expectedSeq?: number): boolean {
   }
   if (!slot.phoneNavigatePending) return false;
   delete slot.phoneNavigatePending;
+  delete slot.phoneNavigateOwner;
   return true;
 }
 
 /**
  * 发出手机关闭事件，唤醒所有等待中的 waiter 并清空 waiter 集合。
  *
- * @remarks 一次性：emit 后 waiter 集合清空，后续 `waitForPhoneClosed` 调用立即 resolve。
+ * @remarks 只唤醒本次关闭之前注册的 waiter；后续调用等待下一次关闭。
  */
-export function emitPhoneClosed(): void {
+export function emitPhoneClosed(owner?: object): void {
   const slot = getPhoneSdkSlot();
-  clearPhoneNavigatePending();
+  if (!owner || !slot.phoneNavigateOwner || slot.phoneNavigateOwner === owner) {
+    clearPhoneNavigatePending();
+  }
   const waiters = slot.phoneClosedWaiters;
   if (waiters) {
-    slot.phoneClosedWaiters = new Set();
-    for (const resolve of waiters) {
-      resolve();
-    }
+    const completing = [...waiters].filter((waiter) => {
+      const waiterOwner = slot.phoneClosedWaiterOwners?.get(waiter);
+      return !owner || !waiterOwner || waiterOwner === owner;
+    });
+    for (const waiter of completing) waiters.delete(waiter);
+    notifyListeners(completing, undefined);
   }
 }
 
 /**
  * 等待手机关闭；一次性 waiter，`emitPhoneClosed` 时被唤醒。
  *
- * @returns 在下一次（或已发生的）`emitPhoneClosed` 后 resolve
+ * @returns 在下一次 `emitPhoneClosed` 或 signal abort 后 resolve
  *
  * @remarks
- * - 若 `emitPhoneClosed` 已先于本调用发生，本调用立即 resolve（waiter 集合为空，
- *   但 emit 后无 pending 标记，故采用“无 waiter 即立即 resolve”语义需调用方保证
- *   顺序；当前实现仅在 emit 时唤醒已注册 waiter，未注册的调用需等到下次 emit）。
+ * - 不重放历史关闭事件；调用方须先注册等待，再发起可能触发关闭的操作。
  * - 多次调用各自得到独立 waiter，一并唤醒。
  */
-export function waitForPhoneClosed(signal?: AbortSignal): Promise<void> {
+export function waitForPhoneClosed(signal?: AbortSignal, owner?: object): Promise<void> {
   const slot = getPhoneSdkSlot();
   return new Promise<void>((resolve) => {
     if (signal?.aborted) {
@@ -124,10 +127,15 @@ export function waitForPhoneClosed(signal?: AbortSignal): Promise<void> {
       if (settled) return;
       settled = true;
       slot.phoneClosedWaiters?.delete(finish);
+      slot.phoneClosedWaiterOwners?.delete(finish);
       signal?.removeEventListener("abort", finish);
       resolve();
     };
     slot.phoneClosedWaiters.add(finish);
+    if (owner) {
+      slot.phoneClosedWaiterOwners ??= new WeakMap();
+      slot.phoneClosedWaiterOwners.set(finish, owner);
+    }
     signal?.addEventListener("abort", finish, { once: true });
   });
 }

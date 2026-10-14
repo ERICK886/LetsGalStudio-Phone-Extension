@@ -6,6 +6,9 @@
  * @version 0.5.1
  */
 
+import { createAnimatedClose } from "../runtime/animated-close";
+
+
 import React, {
   useCallback,
   useEffect,
@@ -69,6 +72,7 @@ import {
   subscribePhoneAppBadges,
   subscribePhoneCloseLock,
   subscribePhoneNavigate,
+  emitPhoneClosed,
   toPhoneAppId,
   type PhoneAppBadge,
   type PhoneSafeAreaInsets,
@@ -124,6 +128,11 @@ import {
   appReorderDebug,
 } from "./app-reorder";
 import { InPhoneAppContent } from "./in-phone-app";
+
+function reportPhoneCloseError(error: unknown): void {
+  console.warn("[phone] close interrupted", error);
+}
+
 
 /**
  * 手机程序 UI 的状态编排根组件。
@@ -314,7 +323,8 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
   const appRefs = useRef(new Map<string, HTMLButtonElement>());
   const storyListRef = useRef<HTMLElement | null>(null);
   const messageTimer = useRef<number | undefined>();
-  const closeTimer = useRef<number | undefined>();
+  const phoneUiMounted = useRef(true);
+  const closeTask = useRef<ReturnType<typeof createAnimatedClose>>();
   const closePromise = useRef<Promise<void> | null>(null);
   /** 最新 openInPhoneAppById，供订阅回调读取而无需重新订阅。 */
   const openInPhoneAppByIdRef = useRef<(phoneAppId: string, originAppId?: string) => void>(() => {});
@@ -543,15 +553,26 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
     return () => window.cancelAnimationFrame(frame);
   }, [messageMode, displayStoryMessages.length]);
 
-  useEffect(() => () => {
+  useEffect(() => {
+    phoneUiMounted.current = true;
+    return () => {
+    phoneUiMounted.current = false;
+    // React StrictMode replays effects without removing the UI. Only notify if
+    // it remains unmounted; a started hide owns its own completion notification.
+    queueMicrotask(() => {
+      if (!phoneUiMounted.current && !closeTask.current?.isHiding()) {
+        emitPhoneClosed(ctx.flow.signal);
+      }
+    });
     if (messageTimer.current !== undefined) window.clearTimeout(messageTimer.current);
-    if (closeTimer.current !== undefined) window.clearTimeout(closeTimer.current);
+    closeTask.current?.dispose();
     if (appDragTimer.current !== undefined) window.clearTimeout(appDragTimer.current);
     if (suppressAppClickTimer.current !== undefined) window.clearTimeout(suppressAppClickTimer.current);
     if (appDropSettleTimer.current !== undefined) window.clearTimeout(appDropSettleTimer.current);
     mouseDragListenerCleanup.current?.();
     mouseDragListenerCleanup.current = undefined;
-  }, []);
+    };
+  }, [ctx.flow.signal]);
 
   useEffect(() => {
     if (!playerCustomizationEnabled && editorOpen) setEditorOpen(false);
@@ -1061,22 +1082,21 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
     setActiveInPhoneAppId(null);
     setClosing(true);
     const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
-    closePromise.current = new Promise<void>((resolve) => {
-      closeTimer.current = window.setTimeout(() => {
-        closeTimer.current = undefined;
-        try {
-          closePhone();
-        } finally {
-          resolve();
-        }
-      }, reduceMotion ? 0 : PHONE_CLOSE_ANIMATION_MS);
+    closeTask.current = createAnimatedClose(closePhone, reduceMotion ? 0 : PHONE_CLOSE_ANIMATION_MS);
+    closePromise.current = closeTask.current.promise.catch((error: unknown) => {
+      if (phoneUiMounted.current) {
+        setClosing(false);
+        closePromise.current = null;
+        closeTask.current = undefined;
+      }
+      throw error;
     });
     return closePromise.current;
   }, [closePhone]);
 
   /** 给内页传入稳定引用，避免手机父状态变化导致第三方 APP 无意义重渲染。 */
   const closePhoneFromInApp = useCallback(() => {
-    void closeWithAnimation();
+    void closeWithAnimation().catch(reportPhoneCloseError);
   }, [closeWithAnimation]);
 
   /**
@@ -1088,12 +1108,14 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
     const request = (options?: { force?: boolean }): Promise<void> =>
       closeWithAnimation(options?.force === true);
     slot.requestAnimatedClosePhone = request;
+    slot.animatedCloseSignal = ctx.flow.signal;
     return () => {
       if (slot.requestAnimatedClosePhone === request) {
         delete slot.requestAnimatedClosePhone;
+        delete slot.animatedCloseSignal;
       }
     };
-  }, [closeWithAnimation]);
+  }, [closeWithAnimation, ctx]);
 
   /**
    * 根据桌面图标位置计算内页开合动画的 transform-origin（相对屏幕百分比）。
@@ -1180,7 +1202,7 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
 
     const result = advanceStoryMessage?.();
     if (!result) return false;
-    if (result === "close") void closeWithAnimation();
+    if (result === "close") void closeWithAnimation().catch(reportPhoneCloseError);
     return true;
   }, [advanceStoryMessage, closeWithAnimation]);
 
@@ -1327,13 +1349,13 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
       if (event.key === "Escape") {
         event.preventDefault();
         event.stopPropagation();
-        void closeWithAnimation();
+        void closeWithAnimation().catch(reportPhoneCloseError);
       } else if (event.key === "Enter" || event.key === " ") {
         const result = advanceStoryMessage?.();
         if (result) {
           event.preventDefault();
           event.stopPropagation();
-          if (result === "close") void closeWithAnimation();
+          if (result === "close") void closeWithAnimation().catch(reportPhoneCloseError);
         }
       }
       return;
@@ -1379,7 +1401,7 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
     if (event.key === "Escape") {
       event.preventDefault();
       event.stopPropagation();
-      void closeWithAnimation();
+      void closeWithAnimation().catch(reportPhoneCloseError);
     }
   };
 
@@ -1390,7 +1412,7 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
   };
 
   const handleOutsidePointerDown = (event: PointerEvent<HTMLDivElement>) => {
-    if (event.target === event.currentTarget) void closeWithAnimation();
+    if (event.target === event.currentTarget) void closeWithAnimation().catch(reportPhoneCloseError);
   };
 
   const updateAppOverride = (
@@ -1644,7 +1666,7 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
                   className="phone-round-button"
                   aria-label="关闭手机"
                   title="关闭手机"
-                  onClick={() => void closeWithAnimation()}
+                  onClick={() => void closeWithAnimation().catch(reportPhoneCloseError)}
                   disabled={Boolean(activeInPhoneAppId)}
                   tabIndex={activeInPhoneAppId ? -1 : undefined}
                 >
@@ -2163,4 +2185,3 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
     </div>
   );
 };
-

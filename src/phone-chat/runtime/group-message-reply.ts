@@ -3,6 +3,9 @@
  * @description “群成员发送消息”组合执行：写入成员消息，并可附带玩家回复门闩。
  */
 
+import { getChatRuntimeKey } from "./runtime-scope";
+
+
 import type { ExtensionContext } from "@avg-studio/sdk";
 
 import {
@@ -29,7 +32,7 @@ export async function executeGroupMemberMessage(
   const messages = parseFriendMessagesFromParams(params);
   if (!groupId || !senderCharacterId || messages.length === 0) return;
 
-  await sendGroupMessages({ groupId, senderCharacterId, messages });
+  await sendGroupMessages({ groupId, senderCharacterId, messages }, getChatRuntimeKey(ctx));
   const replies = parseRepliesFromParams(params);
   const requireReply =
     replies.length > 0 && coerceMethodBoolean(params.requireReply, true);

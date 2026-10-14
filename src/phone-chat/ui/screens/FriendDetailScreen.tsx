@@ -6,6 +6,9 @@
  * @version 0.1.0
  */
 
+import { getChatRuntimeKey } from "../../runtime/runtime-scope";
+
+
 import { useExtensionContext } from "@avg-studio/sdk";
 import React from "react";
 
@@ -27,7 +30,7 @@ export interface FriendDetailScreenProps {
 export function FriendDetailScreen(props: FriendDetailScreenProps) {
   const ctx = useExtensionContext();
   const view = useCharacterView(ctx, props.friendCharacterId);
-  const settings = getCachedAuthorSettings();
+  const settings = getCachedAuthorSettings(getChatRuntimeKey(ctx));
 
   const rows = settings.attributeFields.map((field) => {
     const key = resolveAttributeVariableKey(

@@ -110,28 +110,28 @@ export function useChatArrayPagePanes(
 
   const friends = useMemo(() => {
     void revision;
-    return readEditableChatFriends(ctx);
-  }, [ctx, revision]);
+    return isChatArrayPage(pageId) ? readEditableChatFriends(ctx) : [];
+  }, [ctx, revision, pageId]);
 
   const attributes = useMemo(() => {
     void revision;
-    return readEditableChatAttributes(ctx);
-  }, [ctx, revision]);
+    return isChatArrayPage(pageId) ? readEditableChatAttributes(ctx) : [];
+  }, [ctx, revision, pageId]);
 
   const groups = useMemo(() => {
     void revision;
-    return readEditableChatGroups(ctx);
-  }, [ctx, revision]);
+    return isChatArrayPage(pageId) ? readEditableChatGroups(ctx) : [];
+  }, [ctx, revision, pageId]);
 
   const presets = useMemo(() => {
     void revision;
-    return readEditableChatRolePresets(ctx);
-  }, [ctx, revision]);
+    return isChatArrayPage(pageId) ? readEditableChatRolePresets(ctx) : [];
+  }, [ctx, revision, pageId]);
 
   const avatars = useMemo(() => {
     void revision;
-    return readEditableChatAvatarAssets(ctx);
-  }, [ctx, revision]);
+    return isChatArrayPage(pageId) ? readEditableChatAvatarAssets(ctx) : [];
+  }, [ctx, revision, pageId]);
 
   useEffect(() => {
     if (friends.length === 0) {

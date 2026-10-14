@@ -16,7 +16,7 @@ pnpm install
 pnpm watch                 # 监听构建 → dist/index.mjs
 ```
 
-在 Studio 中**仅启用本扩展**即可看到手机壳并打开内页。入口为 `src/index.tsx`，导出 `PhoneExtension` / `ToastExtension`。
+在 Studio 中**仅启用本扩展**即可看到手机壳并打开内页。入口为 `src/index.tsx`，导出 `PhoneExtension` / `PhoneHudExtension` / `ToastExtension` / `PhoneEditorExtension`。
 
 ## 分发标准内页包
 

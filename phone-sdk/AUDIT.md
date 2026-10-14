@@ -1,6 +1,6 @@
 # 手机宿主 SDK 完整性检查
 
-检查日期：2026-09-27。范围：本仓 `phone-sdk/`、扩展入口、构建配置、CLI 宿主模板和相关 README。SDK 仓库版本 0.5.26；扩展版本 1.3.2；CLI 版本 0.3.7。以下第 1–6 节保留首次检查快照；后续发布准备的复查见第 7 节。未运行真实 Studio Preview。
+检查日期：2026-09-27。范围：本仓 `phone-sdk/`、扩展入口、构建配置、CLI 宿主模板和相关 README。SDK 仓库版本 0.5.26；扩展版本 1.3.2；CLI 版本 0.3.7。以下第 1–6 节保留首次检查快照；后续发布准备的复查见第 7 节，2026-09-30 工作区修复见第 8 节。未运行真实 Studio Preview。
 
 ## 结论
 
@@ -205,3 +205,20 @@ sha512-GtqB4qbGVQQjh0nxuoO2O/bsiuSCpLBGTfsaF2qSepSSW1Armsb/gAqAPdKmkP17zJS2mGWDM
 ```
 
 - [npm 0.5.26](https://www.npmjs.com/package/@ink-zenly/phone-sdk/v/0.5.26)。CLI 未发布；未进行 Git 提交、推送或 Studio 同步。以上测试、构建与 registry 结果仅对应本次复查。
+
+
+## 8. 2026-09-30 工作区修复（未发布）
+
+本节覆盖当前源码，前文缺陷和计数为历史快照，不代表本节修复后的状态。扩展、SDK 和 CLI 版本号均未修改。
+
+- 注册顺序：重新注册清除同 ID 的待注销项；引导回调按归属共存，支持同归属热重载替换与幂等清理。
+- 异常隔离：导航发布/回放及关闭锁通知逐监听器捕获异常，获取锁仍能返回释放句柄。
+- 关闭生命周期：控制器与 Studio 适配分离；显示失败清理其 waiter，先订阅再显示；动画关闭等待隐藏完成，中途卸载结束动画等待；unmount-phone 发送关闭通知。隐藏失败不再伪装成成功关闭。
+- 绑定所有权：标准宿主保存并释放 host/navigation 的 disposer；旧绑定不会删除新绑定。导航序号跨 bundle 共享，关闭通知按 flow.signal 归属清理，避免旧会话误清新 pending 或唤醒新 waiter。
+- 聊天数据：存档、设置缓存、消息总线与回复等待按 Preview 的 flow.signal 隔离，并通过全局槽跨 bundle 共享；方法、UI 和卸载路径同步接入。绑定 save 只读，不回灌旧内存；存档字段格式不变。
+- 编辑器：保留 character 和 phone-call 声明；允许无标量字段的自定义面板；聊天 schema 采用应用注册值，旧内置页面适配器只在所属分区生效，自定义面板优先。已有聊天编辑器导出保留兼容，未拆成独立包。
+- 公开入口和模板：公开 OpenPhoneAppPosition；default/minimal 均导出宿主四模块，并传入稳定的 bootstrap 归属。
+
+验证：SDK/内页扫描 52 个测试文件，223 项通过；CLI 扫描 11 个测试文件，38 项通过。根工程 pnpm run build 通过。使用当前 SDK tarball 分别生成 default/minimal 临时宿主，以自身 package.json 离线安装依赖后构建通过；未使用仓库 node_modules 链接替代安装。TypeScript 仍只有 sdk/index.ts:22 缺少 ./extension-inspector 的 TS2307，未改动合同副本。
+
+限制：未执行真实 Studio 剧本 Preview，快捷键/触屏/skip/seek/暂停恢复仍需实际验证。全局 SDK 桥仍是单活动导航宿主；角标、关闭锁等未升级为完整多宿主协议，第三方应用 ID 仍需全局唯一。未同步、重启、提交、推送或发布。

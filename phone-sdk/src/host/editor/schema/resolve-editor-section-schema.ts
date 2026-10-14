@@ -9,7 +9,6 @@
 import { listRegisteredPhoneApps } from "../../../client/runtime/register";
 import type { PhoneEditorSectionSchema } from "../../../client/runtime/types";
 import { buildSectionSchemaFromStyleEditor } from "./build-section-schema-from-style-editor";
-import { CHAT_APP_EDITOR_SCHEMA } from "./chat-app-editor-schema";
 import { PHONE_HOST_EDITOR_SCHEMA } from "./phone-host-editor-schema";
 
 /**
@@ -48,11 +47,6 @@ export function resolveEditorSectionSchema(
 ): PhoneEditorSectionSchema {
   if (sectionId === "phone") {
     return PHONE_HOST_EDITOR_SCHEMA;
-  }
-
-  // 优先使用内置聊天 schema（与 register 声明一致，避免重复拷贝漂移）
-  if (sectionId === "phone-chat" || sectionId === CHAT_APP_EDITOR_SCHEMA.sectionId) {
-    return CHAT_APP_EDITOR_SCHEMA;
   }
 
   const app = listRegisteredPhoneApps().find((item) => item.id === sectionId);

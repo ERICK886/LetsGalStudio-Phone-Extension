@@ -3,6 +3,9 @@
  * @description 单聊 / 群聊消息、待回复、未读与好友状态编排。
  */
 
+import { getChatRuntimeKey } from "./runtime-scope";
+
+
 import type { ExtensionContext } from "@avg-studio/sdk";
 
 import {
@@ -53,9 +56,9 @@ function pendingFields(
       };
 }
 
-function upsertPendingReplies(pending: ChatPendingReplies): void {
+function upsertPendingReplies(pending: ChatPendingReplies, runtimeKey?: object): void {
   const conversationId = conversationIdForPending(pending);
-  const state = readChatState();
+  const state = readChatState(runtimeKey);
   patchChatState(
     {
       pendingReplies: [
@@ -65,12 +68,12 @@ function upsertPendingReplies(pending: ChatPendingReplies): void {
         pending,
       ],
     },
-    "upsert-pending-replies",
+    "upsert-pending-replies", runtimeKey,
   );
 }
 
-function removePendingReplies(conversationId: string): ChatPendingReplies | undefined {
-  const state = readChatState();
+function removePendingReplies(conversationId: string, runtimeKey?: object): ChatPendingReplies | undefined {
+  const state = readChatState(runtimeKey);
   const removed = state.pendingReplies.find(
     (item) => conversationIdForPending(item) === conversationId,
   );
@@ -81,7 +84,7 @@ function removePendingReplies(conversationId: string): ChatPendingReplies | unde
         (item) => conversationIdForPending(item) !== conversationId,
       ),
     },
-    "remove-pending-replies",
+    "remove-pending-replies", runtimeKey,
   );
   return removed;
 }
@@ -91,7 +94,8 @@ function settleReplacedPending(
   ctx: ExtensionContext,
   conversationId: string,
 ): void {
-  const previous = readChatState().pendingReplies.find(
+  const runtimeKey = getChatRuntimeKey(ctx);
+  const previous = readChatState(runtimeKey).pendingReplies.find(
     (item) => conversationIdForPending(item) === conversationId,
   );
   if (!previous) return;
@@ -105,56 +109,56 @@ function settleReplacedPending(
     return;
   }
 
-  resolveReplyWait(previous.waitToken);
-  removePendingReplies(conversationId);
-  emitChatBus({ type: "replies-changed", conversationId });
+  resolveReplyWait(previous.waitToken, runtimeKey);
+  removePendingReplies(conversationId, runtimeKey);
+  emitChatBus({ type: "replies-changed", conversationId }, runtimeKey);
 }
 
 export async function sendConversationMessages(options: {
   target: ChatConversationTarget;
   messages: readonly AppendMessageInput[];
-}): Promise<void> {
+}, runtimeKey?: object): Promise<void> {
   const conversationId = conversationIdForTarget(options.target);
   if (!conversationId || options.messages.length === 0) return;
 
-  const viewing = isViewingConversation(conversationId);
-  const state = readChatState();
+  const viewing = isViewingConversation(conversationId, runtimeKey);
+  const state = readChatState(runtimeKey);
   const { threads, appended } = appendMessagesToConversation(
     state.threads,
     options.target,
     options.messages,
     { bumpUnread: !viewing },
   );
-  patchChatState({ threads }, "send-conversation-messages");
+  patchChatState({ threads }, "send-conversation-messages", runtimeKey);
   if (appended.length > 0) {
-    emitChatBus({ type: "messages-appended", conversationId, messages: appended });
+    emitChatBus({ type: "messages-appended", conversationId, messages: appended }, runtimeKey);
   }
-  syncChatDesktopBadge();
+  syncChatDesktopBadge(runtimeKey);
 }
 
 export async function sendFriendMessages(options: {
   friendCharacterId: string;
   messages: readonly AppendMessageInput[];
-}): Promise<void> {
+}, runtimeKey?: object): Promise<void> {
   await sendConversationMessages({
     target: {
       kind: "direct",
       friendCharacterId: options.friendCharacterId.trim(),
     },
     messages: options.messages,
-  });
+  }, runtimeKey);
 }
 
 export async function sendGroupMessages(options: {
   groupId: string;
   senderCharacterId: string;
   messages: readonly AppendMessageInput[];
-}): Promise<void> {
+}, runtimeKey?: object): Promise<void> {
   const groupId = options.groupId.trim();
   const senderCharacterId = options.senderCharacterId.trim();
   if (!groupId || !senderCharacterId) return;
 
-  const group = getChatGroup(groupId);
+  const group = getChatGroup(groupId, runtimeKey);
   if (group && !group.memberCharacterIds.includes(senderCharacterId)) {
     console.warn(
       `[phone-chat] 群 ${groupId} 收到不在当前成员列表中的发送者 ${senderCharacterId}`,
@@ -167,7 +171,7 @@ export async function sendGroupMessages(options: {
       ...message,
       ...(message.direction === "incoming" ? { senderCharacterId } : {}),
     })),
-  });
+  }, runtimeKey);
 }
 
 export async function awaitConversationReply(
@@ -181,6 +185,7 @@ export async function awaitConversationReply(
     onPendingWritten?: () => void | Promise<void>;
   },
 ): Promise<void> {
+  const runtimeKey = getChatRuntimeKey(ctx);
   const conversationId = conversationIdForTarget(options.target);
   if (!conversationId || options.replies.length === 0) return;
 
@@ -197,34 +202,34 @@ export async function awaitConversationReply(
   if (!options.allowWait) {
     const first = options.replies[0];
     if (!first) return;
-    upsertPendingReplies(basePending);
+    upsertPendingReplies(basePending, runtimeKey);
     selectPlayerReply(ctx, first.id, conversationId);
     return;
   }
 
   const waitForReply = options.waitForReply !== false;
   if (!waitForReply) {
-    upsertPendingReplies(basePending);
-    emitChatBus({ type: "replies-changed", conversationId });
+    upsertPendingReplies(basePending, runtimeKey);
+    emitChatBus({ type: "replies-changed", conversationId }, runtimeKey);
     return;
   }
 
-  const wait = createReplyWait(conversationId, ctx.flow.signal);
-  upsertPendingReplies({ ...basePending, waitToken: wait.token });
-  emitChatBus({ type: "replies-changed", conversationId });
+  const wait = createReplyWait(conversationId, ctx.flow.signal, runtimeKey);
+  upsertPendingReplies({ ...basePending, waitToken: wait.token }, runtimeKey);
+  emitChatBus({ type: "replies-changed", conversationId }, runtimeKey);
 
   try {
     if (options.onPendingWritten) await options.onPendingWritten();
   } catch (error) {
-    removePendingReplies(conversationId);
-    resolveReplyWait(wait.token);
-    emitChatBus({ type: "replies-changed", conversationId });
+    removePendingReplies(conversationId, runtimeKey);
+    resolveReplyWait(wait.token, runtimeKey);
+    emitChatBus({ type: "replies-changed", conversationId }, runtimeKey);
     throw error;
   }
   await wait.promise;
   if (ctx.flow.signal.aborted) {
-    removePendingReplies(conversationId);
-    emitChatBus({ type: "replies-changed", conversationId });
+    removePendingReplies(conversationId, runtimeKey);
+    emitChatBus({ type: "replies-changed", conversationId }, runtimeKey);
   }
 }
 
@@ -239,6 +244,7 @@ export async function awaitPlayerReply(
     onPendingWritten?: () => void | Promise<void>;
   },
 ): Promise<void> {
+  const runtimeKey = getChatRuntimeKey(ctx);
   await awaitConversationReply(ctx, {
     ...options,
     target: {
@@ -259,27 +265,28 @@ export async function awaitGroupReply(
     onPendingWritten?: () => void | Promise<void>;
   },
 ): Promise<void> {
+  const runtimeKey = getChatRuntimeKey(ctx);
   await awaitConversationReply(ctx, {
     ...options,
     target: { kind: "group", groupId: options.groupId.trim() },
   });
 }
 
-export function addFriend(characterId: string): void {
+export function addFriend(characterId: string, runtimeKey?: object): void {
   const id = characterId.trim();
   if (!id) return;
-  const state = readChatState();
+  const state = readChatState(runtimeKey);
   const friendsRemoved = state.friendsRemoved.filter((item) => item !== id);
   const friendsExtra = state.friendsExtra.includes(id)
     ? state.friendsExtra
     : [...state.friendsExtra, id];
-  patchChatState({ friendsExtra, friendsRemoved }, "add-friend");
+  patchChatState({ friendsExtra, friendsRemoved }, "add-friend", runtimeKey);
 }
 
-export function removeFriend(characterId: string): void {
+export function removeFriend(characterId: string, runtimeKey?: object): void {
   const id = characterId.trim();
   if (!id) return;
-  const state = readChatState();
+  const state = readChatState(runtimeKey);
   const friendsExtra = state.friendsExtra.filter((item) => item !== id);
   const friendsRemoved = state.friendsRemoved.includes(id)
     ? state.friendsRemoved
@@ -288,12 +295,12 @@ export function removeFriend(characterId: string): void {
   const pendingReplies = state.pendingReplies.filter(
     (pending) => conversationIdForPending(pending) !== conversationId,
   );
-  resolveReplyWaitsForConversation(conversationId);
+  resolveReplyWaitsForConversation(conversationId, runtimeKey);
   patchChatState(
     { friendsExtra, friendsRemoved, pendingReplies },
-    "remove-friend",
+    "remove-friend", runtimeKey,
   );
-  emitChatBus({ type: "replies-changed", conversationId });
+  emitChatBus({ type: "replies-changed", conversationId }, runtimeKey);
 }
 
 export function selectPlayerReply(
@@ -301,7 +308,8 @@ export function selectPlayerReply(
   replyId: string,
   conversationId?: string,
 ): boolean {
-  const state = readChatState();
+  const runtimeKey = getChatRuntimeKey(ctx);
+  const state = readChatState(runtimeKey);
   const requestedId = conversationId?.trim();
   const pendingIndex = state.pendingReplies.findIndex((pending) => {
     if (requestedId && conversationIdForPending(pending) !== requestedId) {
@@ -317,7 +325,7 @@ export function selectPlayerReply(
   const target = parseConversationId(targetId);
   if (!option || !target) return false;
 
-  const viewing = isViewingConversation(targetId);
+  const viewing = isViewingConversation(targetId, runtimeKey);
   const { threads, appended } = appendMessagesToConversation(
     state.threads,
     target,
@@ -341,9 +349,9 @@ export function selectPlayerReply(
 
   patchChatState(
     { threads: nextThreads, pendingReplies },
-    "select-reply",
+    "select-reply", runtimeKey,
   );
-  resolveReplyWait(pending.waitToken);
+  resolveReplyWait(pending.waitToken, runtimeKey);
   applyReplyEffects(ctx, option.effects);
 
   if (appended.length > 0) {
@@ -351,28 +359,28 @@ export function selectPlayerReply(
       type: "messages-appended",
       conversationId: targetId,
       messages: appended,
-    });
+    }, runtimeKey);
   }
-  emitChatBus({ type: "replies-changed", conversationId: targetId });
-  syncChatDesktopBadge();
+  emitChatBus({ type: "replies-changed", conversationId: targetId }, runtimeKey);
+  syncChatDesktopBadge(runtimeKey);
   return true;
 }
 
-export function markConversationOpened(conversationId: string): void {
+export function markConversationOpened(conversationId: string, runtimeKey?: object): void {
   const id = conversationId.trim();
   if (!parseConversationId(id)) return;
-  const threads = clearConversationUnread(readChatState().threads, id);
-  patchChatState({ threads }, "open-chat");
-  syncChatDesktopBadge();
+  const threads = clearConversationUnread(readChatState(runtimeKey).threads, id);
+  patchChatState({ threads }, "open-chat", runtimeKey);
+  syncChatDesktopBadge(runtimeKey);
 }
 
-export function markChatOpened(friendCharacterId: string): void {
-  markConversationOpened(directConversationId(friendCharacterId));
+export function markChatOpened(friendCharacterId: string, runtimeKey?: object): void {
+  markConversationOpened(directConversationId(friendCharacterId), runtimeKey);
 }
 
-export function listVisibleFriendIds(): string[] {
-  const settings = getCachedAuthorSettings();
-  const state = readChatState();
+export function listVisibleFriendIds(runtimeKey?: object): string[] {
+  const settings = getCachedAuthorSettings(runtimeKey);
+  const state = readChatState(runtimeKey);
   return resolveFriendIds(
     settings.defaultFriends,
     state.friendsExtra,
@@ -380,45 +388,45 @@ export function listVisibleFriendIds(): string[] {
   );
 }
 
-export function listChatGroups(): ChatGroupDefinition[] {
-  const settings = getCachedAuthorSettings();
+export function listChatGroups(runtimeKey?: object): ChatGroupDefinition[] {
+  const settings = getCachedAuthorSettings(runtimeKey);
   return resolveGroupDefinitions(
     settings.defaultGroups,
-    readChatState().groupMemberOverrides,
+    readChatState(runtimeKey).groupMemberOverrides,
   );
 }
 
-export function getChatGroup(groupId: string): ChatGroupDefinition | undefined {
-  return findGroupDefinition(listChatGroups(), groupId);
+export function getChatGroup(groupId: string, runtimeKey?: object): ChatGroupDefinition | undefined {
+  return findGroupDefinition(listChatGroups(runtimeKey), groupId);
 }
 
 /** 将角色加入作者已定义的群聊；重复加入为无操作。 */
 export function joinGroupMember(
   groupId: string,
-  characterId: string,
+  characterId: string, runtimeKey?: object,
 ): boolean {
-  return updateGroupMember(groupId, characterId, true);
+  return updateGroupMember(groupId, characterId, true, runtimeKey);
 }
 
 /** 将角色移出作者已定义的群聊；重复退出为无操作。 */
 export function leaveGroupMember(
   groupId: string,
-  characterId: string,
+  characterId: string, runtimeKey?: object,
 ): boolean {
-  return updateGroupMember(groupId, characterId, false);
+  return updateGroupMember(groupId, characterId, false, runtimeKey);
 }
 
 function updateGroupMember(
   rawGroupId: string,
   rawCharacterId: string,
-  shouldJoin: boolean,
+  shouldJoin: boolean, runtimeKey?: object,
 ): boolean {
   const groupId = rawGroupId.trim();
   const characterId = rawCharacterId.trim();
   if (!groupId || !characterId) return false;
 
   const authoredGroup = findGroupDefinition(
-    getCachedAuthorSettings().defaultGroups,
+    getCachedAuthorSettings(runtimeKey).defaultGroups,
     groupId,
   );
   if (!authoredGroup) {
@@ -426,13 +434,13 @@ function updateGroupMember(
     return false;
   }
 
-  const currentGroup = getChatGroup(groupId);
+  const currentGroup = getChatGroup(groupId, runtimeKey);
   const isMember = Boolean(
     currentGroup?.memberCharacterIds.includes(characterId),
   );
   if (isMember === shouldJoin) return false;
 
-  const state = readChatState();
+  const state = readChatState(runtimeKey);
   const existing = state.groupMemberOverrides.find(
     (item) => item.groupId === groupId,
   );
@@ -466,17 +474,17 @@ function updateGroupMember(
 
   patchChatState(
     { groupMemberOverrides },
-    shouldJoin ? "join-group-member" : "leave-group-member",
+    shouldJoin ? "join-group-member" : "leave-group-member", runtimeKey,
   );
   return true;
 }
 
-export function currentOpenConversationId(): string | null {
-  return getOpenConversationId();
+export function currentOpenConversationId(runtimeKey?: object): string | null {
+  return getOpenConversationId(runtimeKey);
 }
 
-export function currentOpenChatFriendId(): string | null {
-  const target = parseConversationId(getOpenConversationId() ?? "");
+export function currentOpenChatFriendId(runtimeKey?: object): string | null {
+  const target = parseConversationId(getOpenConversationId(runtimeKey) ?? "");
   return target?.kind === "direct" ? target.friendCharacterId : null;
 }
 

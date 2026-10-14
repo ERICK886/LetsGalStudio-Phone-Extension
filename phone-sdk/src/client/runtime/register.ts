@@ -116,6 +116,7 @@ const FIELD_TYPES = new Set<PhoneEditorFieldType>([
   "shortcut",
   "boolean",
   "number",
+  "character",
 ]);
 
 /**
@@ -272,6 +273,7 @@ function normalizeEditorPages(
     const preview =
       item.preview === "desktop" ||
       item.preview === "chat" ||
+      item.preview === "phone-call" ||
       item.preview === "placeholder"
         ? item.preview
         : undefined;
@@ -325,6 +327,7 @@ export function registerPhoneApp(app: PhoneAppRegistration): void {
   if (!normalized) return;
 
   const slot = getPhoneSdkSlot();
+  slot.unregisterQueue = slot.unregisterQueue.filter((id) => id !== normalized.id);
   if (slot.host) {
     slot.host.registerApp(normalized);
     phoneSdkDebug("registerPhoneApp → 已写入宿主", {

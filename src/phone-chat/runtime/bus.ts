@@ -6,6 +6,9 @@
  * @version 0.1.0
  */
 
+import { getChatScopedState } from "./runtime-scope";
+
+
 import type { ChatMessage, ChatSaveState } from "../types/index";
 
 export type ChatBusEvent =
@@ -22,10 +25,9 @@ export type ChatBusEvent =
 
 type Listener = (event: ChatBusEvent) => void;
 
-const listeners = new Set<Listener>();
-
-/** 当前 UI 打开的统一会话键（用于判断是否 bump 未读 / 播动画）。 */
-let openConversationId: string | null = null;
+function runtimeFor(runtimeKey?: object): { listeners: Set<Listener>; openConversationId: string | null } {
+  return getChatScopedState("bus", runtimeKey, () => ({ listeners: new Set<Listener>(), openConversationId: null }));
+}
 
 /**
  * 订阅总线事件。
@@ -33,7 +35,8 @@ let openConversationId: string | null = null;
  * @param listener - 回调
  * @returns 取消订阅函数
  */
-export function subscribeChatBus(listener: Listener): () => void {
+export function subscribeChatBus(listener: Listener, runtimeKey?: object): () => void {
+  const { listeners } = runtimeFor(runtimeKey);
   listeners.add(listener);
   return () => {
     listeners.delete(listener);
@@ -45,7 +48,8 @@ export function subscribeChatBus(listener: Listener): () => void {
  *
  * @param event - 事件
  */
-export function emitChatBus(event: ChatBusEvent): void {
+export function emitChatBus(event: ChatBusEvent, runtimeKey?: object): void {
+  const { listeners } = runtimeFor(runtimeKey);
   for (const listener of listeners) {
     try {
       listener(event);
@@ -60,15 +64,15 @@ export function emitChatBus(event: ChatBusEvent): void {
  *
  * @param friendCharacterId - 好友 ID 或 null
  */
-export function setOpenConversationId(conversationId: string | null): void {
-  openConversationId = conversationId?.trim() || null;
+export function setOpenConversationId(conversationId: string | null, runtimeKey?: object): void {
+  runtimeFor(runtimeKey).openConversationId = conversationId?.trim() || null;
 }
 
 /**
  * @returns 当前打开的聊天好友 ID
  */
-export function getOpenConversationId(): string | null {
-  return openConversationId;
+export function getOpenConversationId(runtimeKey?: object): string | null {
+  return runtimeFor(runtimeKey).openConversationId;
 }
 
 /**
@@ -76,8 +80,8 @@ export function getOpenConversationId(): string | null {
  *
  * @param friendCharacterId - 好友 ID
  */
-export function isViewingConversation(conversationId: string): boolean {
-  return openConversationId === conversationId.trim();
+export function isViewingConversation(conversationId: string, runtimeKey?: object): boolean {
+  return runtimeFor(runtimeKey).openConversationId === conversationId.trim();
 }
 
 /** 供类型导出，避免未使用告警。 */

@@ -13,6 +13,9 @@
  * - Studio 方法 target：`ink.zenly.ext-7a9373/phone-chat/<method-id>`
  */
 
+import { getChatRuntimeKey } from "./runtime/runtime-scope";
+
+
 import {
   defineSave,
   Extension,
@@ -39,7 +42,7 @@ import {
   cacheAuthorSettings,
   readAuthorSettings,
 } from "./runtime/settings";
-import { bindChatSave } from "./runtime/store";
+import { bindChatSave, disposeChatStore } from "./runtime/store";
 import { emitChatBus } from "./runtime/bus";
 import { syncChatDesktopBadge } from "./runtime/desktop-badge";
 import { resolveReplyWaitsForFriend } from "./runtime/reply-wait";
@@ -86,13 +89,15 @@ export class ChatController extends Extension {
    * @param ctx - 本模块扩展上下文
    */
   static onRegister(ctx: ExtensionContext): void {
-    settingsRegistrationCleanups.get(ctx)?.();
-    cacheAuthorSettings(readAuthorSettings(ctx));
+    if (ctx.flow.signal.aborted) return;
+    const registrationKey = getChatRuntimeKey(ctx);
+    settingsRegistrationCleanups.get(registrationKey)?.();
+    cacheAuthorSettings(readAuthorSettings(ctx), getChatRuntimeKey(ctx));
     const unsubscribers: Array<() => void> = [];
     for (const key of CHAT_SETTINGS_KEYS) {
       const unsubscribe = ctx.settings.subscribe(key, () => {
-        cacheAuthorSettings(readAuthorSettings(ctx));
-        emitChatBus({ type: "state-changed", reason: `settings:${key}` });
+        cacheAuthorSettings(readAuthorSettings(ctx), getChatRuntimeKey(ctx));
+        emitChatBus({ type: "state-changed", reason: `settings:${key}` }, getChatRuntimeKey(ctx));
       });
       unsubscribers.push(unsubscribe);
     }
@@ -108,16 +113,18 @@ export class ChatController extends Extension {
           console.warn("[phone-chat] 释放设置订阅失败", error);
         }
       }
-      resolveReplyWaitsForFriend();
-      if (settingsRegistrationCleanups.get(ctx) === cleanup) {
-        settingsRegistrationCleanups.delete(ctx);
+      resolveReplyWaitsForFriend(undefined, getChatRuntimeKey(ctx));
+      disposeChatStore(getChatRuntimeKey(ctx));
+      ctx.flow.signal.removeEventListener("abort", cleanup);
+      if (settingsRegistrationCleanups.get(registrationKey) === cleanup) {
+        settingsRegistrationCleanups.delete(registrationKey);
       }
     };
-    settingsRegistrationCleanups.set(ctx, cleanup);
+    settingsRegistrationCleanups.set(registrationKey, cleanup);
     ctx.flow.signal.addEventListener("abort", cleanup, { once: true });
 
     try {
-      syncChatDesktopBadge();
+      syncChatDesktopBadge(getChatRuntimeKey(ctx));
     } catch (error) {
       console.warn("[phone-chat] 初始同步桌面角标失败", error);
     }
@@ -127,8 +134,8 @@ export class ChatController extends Extension {
    * 实例初始化时绑定本模块 save。
    */
   onInit(): void {
-    bindChatSave(this.save as Parameters<typeof bindChatSave>[0]);
-    syncChatDesktopBadge();
+    bindChatSave(this.save as Parameters<typeof bindChatSave>[0], getChatRuntimeKey(this.context));
+    syncChatDesktopBadge(getChatRuntimeKey(this.context));
   }
 
 }
@@ -173,6 +180,6 @@ export { resolveReplyWaitsForFriend } from "./runtime/reply-wait";
  *
  * @returns void
  */
-export function releaseChatWaitsOnUnload(): void {
-  resolveReplyWaitsForFriend();
+export function releaseChatWaitsOnUnload(runtimeKey?: object): void {
+  resolveReplyWaitsForFriend(undefined, runtimeKey);
 }

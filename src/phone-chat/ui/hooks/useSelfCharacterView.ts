@@ -9,6 +9,9 @@
  * 空 selfCharacterId 时不调用 `useCharacter("")`；用 `useAll()` 订阅资产变更。
  */
 
+import { getChatRuntimeKey } from "../../runtime/runtime-scope";
+
+
 import type { ExtensionContext } from "@avg-studio/sdk";
 
 import {
@@ -27,6 +30,6 @@ export function useSelfCharacterView(
   ctx: ExtensionContext,
 ): SelfCharacterView {
   ctx.character.useAll();
-  const selfId = getCachedAuthorSettings().selfCharacterId;
+  const selfId = getCachedAuthorSettings(getChatRuntimeKey(ctx)).selfCharacterId;
   return resolveSelfCharacterView(ctx, selfId);
 }

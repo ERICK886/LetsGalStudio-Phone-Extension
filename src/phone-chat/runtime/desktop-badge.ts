@@ -29,8 +29,8 @@ import { readChatState } from "./store";
  * - `total === 0` → `clearPhoneAppBadge`
  * - 依赖 phone-sdk ≥ 0.5.4；宿主桌面须绑定 `phoneAppId = phone-chat`
  */
-export function syncChatDesktopBadge(): number {
-  const threads = readChatState().threads ?? [];
+export function syncChatDesktopBadge(runtimeKey?: object): number {
+  const threads = readChatState(runtimeKey).threads ?? [];
   const total = threads.reduce(
     (sum, thread) => sum + (Number(thread.unreadCount) || 0),
     0,

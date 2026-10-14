@@ -362,6 +362,8 @@ export interface PhoneSdkGlobalSlot {
    * 或其它包挂上此钩子，宿主仅在安装后调用一次，便于热重载后重新 `registerPhoneApp`。
    */
   pluginDevReregister?: () => void;
+  /** Re-registration callbacks keyed by caller ownership (stable key supports HMR). */
+  pluginRegistrars?: Map<object | string, { register: () => void }>;
   /** 宿主最近一次发布的安全区；未发布时为 `undefined` */
   safeAreaInsets?: PhoneSafeAreaInsets;
   /** 可选：宿主安装的导航控制器（`openPhoneApp` / `closePhoneApp` 等） */
@@ -370,6 +372,8 @@ export interface PhoneSdkGlobalSlot {
    * 由手机 UI 挂载时注册的动画关闭回调；卸载时清除。
    * `closePhoneApp` 优先调用此回调以复用关闭动画。
    */
+  /** Flow that owns the current animated close callback. */
+  animatedCloseSignal?: AbortSignal;
   requestAnimatedClosePhone?: (options?: ClosePhoneAppOptions) => Promise<void>;
   /** 内页设置后，宿主忽略关闭手机及返回桌面请求（例如必须处理的来电）。 */
   phoneCloseLocked?: boolean;
@@ -384,10 +388,14 @@ export interface PhoneSdkGlobalSlot {
    * 由 `publishPhoneNavigate` 写入，`subscribePhoneNavigate` 订阅时回放。
    */
   phoneNavigatePending?: NavigateRequest;
+  phoneNavigateOwner?: object;
+  /** Monotonic across bundles and host replacements. */
+  phoneNavigateSequence?: number;
   /** 导航总线：当前订阅者集合；publish 时遍历通知。 */
   phoneNavigateListeners?: Set<(req: NavigateRequest) => void>;
   /** 导航总线：等待手机关闭的一次性 waiter 集合；`emitPhoneClosed` 时全部唤醒并清空。 */
   phoneClosedWaiters?: Set<() => void>;
+  phoneClosedWaiterOwners?: WeakMap<() => void, object>;
   /**
    * 桌面 APP 角标表（key = phoneAppId）；仅内存，不写存档。
    * 由 `setPhoneAppBadge` / `clearPhoneAppBadge` 维护。

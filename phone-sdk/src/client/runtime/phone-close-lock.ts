@@ -4,6 +4,7 @@
  */
 
 import { getPhoneSdkSlot } from "./slot";
+import { notifyListeners } from "./notify-listeners";
 
 /** 返回当前是否存在任一手机关闭锁。 */
 export function isPhoneCloseLocked(): boolean {
@@ -33,7 +34,7 @@ export function clearPhoneCloseLocks(): void {
   delete slot.phoneCloseLockTokens;
   slot.phoneCloseLocked = false;
   if (wasLocked) {
-    for (const listener of slot.phoneCloseLockListeners ?? []) listener();
+    notifyListeners(slot.phoneCloseLockListeners ?? [], undefined);
   }
 }
 
@@ -51,7 +52,7 @@ export function acquirePhoneCloseLock(): () => void {
   tokens.add(token);
   slot.phoneCloseLocked = true;
   if (!wasLocked) {
-    for (const listener of slot.phoneCloseLockListeners ?? []) listener();
+    notifyListeners(slot.phoneCloseLockListeners ?? [], undefined);
   }
 
   let released = false;
@@ -67,6 +68,6 @@ export function acquirePhoneCloseLock(): () => void {
     delete current.phoneCloseLockTokens;
     current.phoneCloseLocked = false;
     if (!wasLocked) return;
-    for (const listener of current.phoneCloseLockListeners ?? []) listener();
+    notifyListeners(current.phoneCloseLockListeners ?? [], undefined);
   };
 }

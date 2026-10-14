@@ -13,6 +13,9 @@
  * - 每个执行体先调用 `bindChatSave(this.save)`。
  */
 
+import { getChatRuntimeKey } from "./runtime/runtime-scope";
+
+
 import {
   type ExtensionContext,
   method,
@@ -50,8 +53,8 @@ import {
  * @param ctx - 扩展上下文
  */
 function prepareRuntime(instanceSave: unknown, ctx: ExtensionContext): void {
-  bindChatSave(instanceSave as Parameters<typeof bindChatSave>[0]);
-  cacheAuthorSettings(readAuthorSettings(ctx));
+  bindChatSave(instanceSave as Parameters<typeof bindChatSave>[0], getChatRuntimeKey(ctx));
+  cacheAuthorSettings(readAuthorSettings(ctx), getChatRuntimeKey(ctx));
 }
 
 /**
@@ -81,7 +84,7 @@ async function executeSendFriendMessages(
   await sendFriendMessages({
     friendCharacterId,
     messages,
-  });
+  }, getChatRuntimeKey(ctx));
 
   // schema 默认打开；仅当明确为 false（含字符串 "false"）时跳过。
   // 未打开时绝不能 waitUntilClose，否则会卡在等待关手机。
@@ -512,15 +515,15 @@ export const chatJoinGroupMethod = method({
   },
   run(ctx, params) {
     prepareRuntime(this.save, ctx);
-    joinGroupMember(String(params.groupId ?? ""), String(params.member ?? ""));
+    joinGroupMember(String(params.groupId ?? ""), String(params.member ?? ""), getChatRuntimeKey(ctx));
   },
   runImmediately(ctx, params) {
     prepareRuntime(this.save, ctx);
-    joinGroupMember(String(params.groupId ?? ""), String(params.member ?? ""));
+    joinGroupMember(String(params.groupId ?? ""), String(params.member ?? ""), getChatRuntimeKey(ctx));
   },
   skip(ctx, params) {
     prepareRuntime(this.save, ctx);
-    joinGroupMember(String(params.groupId ?? ""), String(params.member ?? ""));
+    joinGroupMember(String(params.groupId ?? ""), String(params.member ?? ""), getChatRuntimeKey(ctx));
   },
 });
 
@@ -543,15 +546,15 @@ export const chatLeaveGroupMethod = method({
   },
   run(ctx, params) {
     prepareRuntime(this.save, ctx);
-    leaveGroupMember(String(params.groupId ?? ""), String(params.member ?? ""));
+    leaveGroupMember(String(params.groupId ?? ""), String(params.member ?? ""), getChatRuntimeKey(ctx));
   },
   runImmediately(ctx, params) {
     prepareRuntime(this.save, ctx);
-    leaveGroupMember(String(params.groupId ?? ""), String(params.member ?? ""));
+    leaveGroupMember(String(params.groupId ?? ""), String(params.member ?? ""), getChatRuntimeKey(ctx));
   },
   skip(ctx, params) {
     prepareRuntime(this.save, ctx);
-    leaveGroupMember(String(params.groupId ?? ""), String(params.member ?? ""));
+    leaveGroupMember(String(params.groupId ?? ""), String(params.member ?? ""), getChatRuntimeKey(ctx));
   },
 });
 
@@ -574,15 +577,15 @@ export const chatAddFriendMethod = method({
   },
   run(ctx, params) {
     prepareRuntime(this.save, ctx);
-    addFriend(String(params.friend ?? ""));
+    addFriend(String(params.friend ?? ""), getChatRuntimeKey(ctx));
   },
   runImmediately(ctx, params) {
     prepareRuntime(this.save, ctx);
-    addFriend(String(params.friend ?? ""));
+    addFriend(String(params.friend ?? ""), getChatRuntimeKey(ctx));
   },
   skip(ctx, params) {
     prepareRuntime(this.save, ctx);
-    addFriend(String(params.friend ?? ""));
+    addFriend(String(params.friend ?? ""), getChatRuntimeKey(ctx));
   },
 });
 
@@ -606,14 +609,14 @@ export const chatRemoveFriendMethod = method({
   },
   run(ctx, params) {
     prepareRuntime(this.save, ctx);
-    removeFriend(String(params.friend ?? ""));
+    removeFriend(String(params.friend ?? ""), getChatRuntimeKey(ctx));
   },
   runImmediately(ctx, params) {
     prepareRuntime(this.save, ctx);
-    removeFriend(String(params.friend ?? ""));
+    removeFriend(String(params.friend ?? ""), getChatRuntimeKey(ctx));
   },
   skip(ctx, params) {
     prepareRuntime(this.save, ctx);
-    removeFriend(String(params.friend ?? ""));
+    removeFriend(String(params.friend ?? ""), getChatRuntimeKey(ctx));
   },
 });

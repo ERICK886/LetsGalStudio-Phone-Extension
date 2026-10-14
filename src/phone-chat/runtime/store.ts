@@ -22,6 +22,7 @@ import type {
 } from "../types/index";
 import { normalizeGroupMemberOverrides } from "../domain/groups";
 import { normalizeReplyEffectOperator } from "../domain/effects";
+import { deleteChatScopedState, getChatScopedState } from "./runtime-scope";
 import { emitChatBus } from "./bus";
 
 /**
@@ -37,50 +38,33 @@ export type ChatSaveMap = {
 
 type ChatSaveApi = SaveAPI<ChatSaveMap>;
 
-let saveApi: ChatSaveApi | null = null;
+interface ChatStoreRuntime {
+  saveApi: ChatSaveApi | null;
+  memoryState: ChatSaveState;
+}
+function runtimeFor(runtimeKey?: object): ChatStoreRuntime {
+  return getChatScopedState("store", runtimeKey, () => ({
+    saveApi: null,
+    memoryState: { friendsExtra: [], friendsRemoved: [], groupMemberOverrides: [], threads: [], pendingReplies: [] },
+  }));
+}
 
-/** save 未绑定时的内存兜底。 */
-let memoryState: ChatSaveState = {
-  friendsExtra: [],
-  friendsRemoved: [],
-  groupMemberOverrides: [],
-  threads: [],
-  pendingReplies: [],
-};
+/** Binding a save is read-only. An empty save is authoritative, including after rollback. */
+export function bindChatSave(api: ChatSaveApi | SaveAPI<Record<string, unknown>>, runtimeKey?: object): void {
+  const runtime = runtimeFor(runtimeKey);
+  runtime.saveApi = api as ChatSaveApi;
+  runtime.memoryState = readFromApi(runtime.saveApi);
+}
 
-/**
- * 绑定本模块 `this.save`。
- *
- * @param api - this.save 或兼容适配器
- */
-export function bindChatSave(api: ChatSaveApi | SaveAPI<any>): void {
-  saveApi = api as ChatSaveApi;
-  const fromSave = readFromApi(saveApi);
-  const saveEmpty =
-    fromSave.friendsExtra.length === 0 &&
-    fromSave.friendsRemoved.length === 0 &&
-    fromSave.groupMemberOverrides.length === 0 &&
-    fromSave.threads.length === 0 &&
-    fromSave.pendingReplies.length === 0;
-  const memoryDirty =
-    memoryState.friendsExtra.length > 0 ||
-    memoryState.friendsRemoved.length > 0 ||
-    memoryState.groupMemberOverrides.length > 0 ||
-    memoryState.threads.length > 0 ||
-    memoryState.pendingReplies.length > 0;
-
-  if (saveEmpty && memoryDirty) {
-    writeToApi(saveApi, memoryState);
-  } else {
-    memoryState = fromSave;
-  }
+export function disposeChatStore(runtimeKey: object): void {
+  deleteChatScopedState("store", runtimeKey);
 }
 
 /**
  * @returns 是否已绑定 save
  */
-export function hasChatSave(): boolean {
-  return saveApi !== null;
+export function hasChatSave(runtimeKey?: object): boolean {
+  return runtimeFor(runtimeKey).saveApi !== null;
 }
 
 /**
@@ -88,12 +72,13 @@ export function hasChatSave(): boolean {
  *
  * @returns ChatSaveState
  */
-export function readChatState(): ChatSaveState {
-  if (!saveApi) {
-    return cloneState(memoryState);
+export function readChatState(runtimeKey?: object): ChatSaveState {
+  const runtime = runtimeFor(runtimeKey);
+  if (!runtime.saveApi) {
+    return cloneState(runtime.memoryState);
   }
-  const next = readFromApi(saveApi);
-  memoryState = next;
+  const next = readFromApi(runtime.saveApi);
+  runtime.memoryState = next;
   return cloneState(next);
 }
 
@@ -107,8 +92,10 @@ export function readChatState(): ChatSaveState {
 export function patchChatState(
   patch: Partial<ChatSaveState>,
   reason: string,
+  runtimeKey?: object,
 ): ChatSaveState {
-  const prev = readChatState();
+  const runtime = runtimeFor(runtimeKey);
+  const prev = readChatState(runtimeKey);
   const next: ChatSaveState = {
     friendsExtra: patch.friendsExtra
       ? [...patch.friendsExtra]
@@ -125,12 +112,12 @@ export function patchChatState(
       : prev.pendingReplies,
   };
 
-  memoryState = next;
-  if (saveApi) {
-    writeToApi(saveApi, next);
+  runtime.memoryState = next;
+  if (runtime.saveApi) {
+    writeToApi(runtime.saveApi, next);
   }
 
-  emitChatBus({ type: "state-changed", reason });
+  emitChatBus({ type: "state-changed", reason }, runtimeKey);
   return cloneState(next);
 }
 

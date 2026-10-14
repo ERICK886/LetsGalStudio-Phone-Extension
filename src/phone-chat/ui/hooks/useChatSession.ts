@@ -6,6 +6,10 @@
  * @version 0.1.0
  */
 
+import { getChatRuntimeKey } from "../../runtime/runtime-scope";
+import { useExtensionContext } from "@avg-studio/sdk";
+
+
 import {
   useCallback,
   useEffect,
@@ -44,6 +48,8 @@ import {
  * ```
  */
 export function useChatSession() {
+  const ctx = useExtensionContext();
+  const runtimeKey = getChatRuntimeKey(ctx);
   const [screen, setScreen] = useState<ChatScreen>({
     kind: "tabs",
     tab: "chats",
@@ -93,7 +99,7 @@ export function useChatSession() {
           : "";
       if (parseConversationId(explicitConversationId)) {
         openConversation(explicitConversationId);
-        clearPhoneNavigatePending();
+        clearPhoneNavigatePending(req.seq);
         return;
       }
       const friendId =
@@ -101,16 +107,16 @@ export function useChatSession() {
           ? payload.friendCharacterId.trim()
           : "";
       if (friendId) openChat(friendId);
-      clearPhoneNavigatePending();
+      clearPhoneNavigatePending(req.seq);
     });
   }, [openChat, openConversation]);
 
   useEffect(() => {
     return () => {
       // 返回桌面 / 关闭手机不能解除「必须回复」；只在扩展真正卸载时释放等待。
-      setOpenConversationId(null);
+      setOpenConversationId(null, runtimeKey);
     };
-  }, []);
+  }, [runtimeKey]);
 
   useEffect(() => {
     return subscribeChatBus((event: ChatBusEvent) => {
@@ -136,8 +142,8 @@ export function useChatSession() {
         }
       }
       refresh();
-    });
-  }, [refresh, screen]);
+    }, runtimeKey);
+  }, [refresh, screen, runtimeKey]);
 
   useEffect(() => {
     const timers = animationTimersRef.current;
@@ -149,16 +155,16 @@ export function useChatSession() {
 
   useEffect(() => {
     if (screen.kind === "chat") {
-      setOpenConversationId(screen.conversationId);
-      markConversationOpened(screen.conversationId);
+      setOpenConversationId(screen.conversationId, runtimeKey);
+      markConversationOpened(screen.conversationId, runtimeKey);
       refresh();
       return () => {
-        setOpenConversationId(null);
+        setOpenConversationId(null, runtimeKey);
       };
     }
-    setOpenConversationId(null);
+    setOpenConversationId(null, runtimeKey);
     return undefined;
-  }, [screen, refresh]);
+  }, [screen, refresh, runtimeKey]);
 
   useEffect(() => {
     if (screen.kind !== "chat") return;
@@ -167,8 +173,8 @@ export function useChatSession() {
     el.scrollTop = el.scrollHeight;
   }, [screen, tick, animatingIds]);
 
-  const state = useMemo(() => readChatState(), [tick]);
-  const friendIds = useMemo(() => listVisibleFriendIds(), [tick]);
+  const state = useMemo(() => readChatState(runtimeKey), [tick, runtimeKey]);
+  const friendIds = useMemo(() => listVisibleFriendIds(runtimeKey), [tick, runtimeKey]);
 
   return {
     screen,

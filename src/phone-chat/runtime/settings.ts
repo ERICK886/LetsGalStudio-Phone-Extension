@@ -10,6 +10,9 @@
  * 内页在宿主 Phone 中渲染时勿直接 settings.get；用 cache + getCached。
  */
 
+import { getChatScopedState } from "./runtime-scope";
+
+
 import type { ExtensionContext } from "@avg-studio/sdk";
 import { normalizeGroupDefinitions } from "../domain/groups";
 import type { ChatAttributeField, ChatGroupDefinition } from "../types/index";
@@ -122,15 +125,17 @@ export function readAuthorSettings(ctx: ExtensionContext): ChatAuthorSettings {
   };
 }
 
-let cachedSettings: ChatAuthorSettings = { ...DEFAULTS };
+function runtimeFor(runtimeKey?: object): { cachedSettings: ChatAuthorSettings } {
+  return getChatScopedState("settings", runtimeKey, () => ({ cachedSettings: { ...DEFAULTS } }));
+}
 
 /**
  * 在方法 / onRegister 中缓存设置，供内页 UI 读取。
  *
  * @param settings - 规范化设置
  */
-export function cacheAuthorSettings(settings: ChatAuthorSettings): void {
-  cachedSettings = {
+export function cacheAuthorSettings(settings: ChatAuthorSettings, runtimeKey?: object): void {
+  runtimeFor(runtimeKey).cachedSettings = {
     ...settings,
     defaultFriends: [...settings.defaultFriends],
     defaultGroups: settings.defaultGroups.map((group) => ({
@@ -146,7 +151,8 @@ export function cacheAuthorSettings(settings: ChatAuthorSettings): void {
  *
  * @returns ChatAuthorSettings 拷贝
  */
-export function getCachedAuthorSettings(): ChatAuthorSettings {
+export function getCachedAuthorSettings(runtimeKey?: object): ChatAuthorSettings {
+  const { cachedSettings } = runtimeFor(runtimeKey);
   return {
     ...cachedSettings,
     defaultFriends: [...cachedSettings.defaultFriends],

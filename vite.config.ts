@@ -116,7 +116,7 @@ export default defineConfig({
 
         "@avg-studio/sdk",
 
-        // phone-sdk 需打进本扩展 bundle，以便安装宿主；第三方独立扩展构建时应将其 external。
+        // phone-sdk 需打进本扩展 bundle，以便安装宿主；第三方独立扩展同样打入 bundle，通过全局桥共享运行状态。
       ],
     },
 

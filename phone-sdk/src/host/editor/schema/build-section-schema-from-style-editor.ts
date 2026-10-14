@@ -24,13 +24,12 @@ export function buildSectionSchemaFromStyleEditor(
   if (
     meta &&
     Array.isArray(meta.pages) &&
-    meta.pages.length > 0 &&
-    Array.isArray(meta.contentItems)
+    meta.pages.length > 0
   ) {
     return {
       sectionId: app.id,
       settingsModuleId: meta.settingsModuleId?.trim() || app.id,
-      contentItems: [...meta.contentItems],
+      contentItems: [...(meta.contentItems ?? [])],
       pages: [...meta.pages],
       resolveCustomPanes: meta.resolveCustomPanes,
     };

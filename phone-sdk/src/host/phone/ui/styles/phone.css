@@ -1,3 +1,9 @@
+[data-phone-root],
+[data-phone-root] * {
+  /* 禁用 Android WebView 的默认触摸高亮，按压反馈由各控件样式提供。 */
+  -webkit-tap-highlight-color: transparent;
+}
+
 [data-phone-root] {
   --phone-accent: #79c7ff;
   --phone-shell: #11151f;

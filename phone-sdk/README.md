@@ -1,6 +1,6 @@
 # @ink-zenly/phone-sdk
 
-LetsGal 游戏内手机的宿主 SDK。本文对应 **0.5.26**（2026-09-27）。
+LetsGal 游戏内手机的宿主 SDK。本文描述仓库 **0.5.26** 源码，包含 2026-09-30 的未发布修复；不能据此认为 npm 同版本已经包含这些改动。
 
 SDK 提供手机桌面、内页容器、HUD、Toast、作者编辑器与跨 bundle 桥接。聊天、相册、电话等业务内页由扩展工程注册，SDK 不内置这些 APP。
 
@@ -58,7 +58,7 @@ export { default } from "@ink-zenly/phone-sdk";
 | `ToastExtension` | `phone-toast` | APP 管理等操作提示 |
 | `PhoneEditorExtension` | `phone-editor` | 作者编辑器，不作为手机内页注册 |
 
-业务应用有自己的设置/存档/剧情方法时，还须导出相应 Extension 类；registerPhoneApp 不自动导出业务控制器。当前 CLI default/minimal 模板只导出 PhoneExtension/ToastExtension，需要 HUD/编辑器时按上例补齐。
+业务应用有自己的设置/存档/剧情方法时，还须导出相应 Extension 类；registerPhoneApp 不自动导出业务控制器。当前 CLI default/minimal 模板均导出上述四个宿主模块。
 
 ### Vite 构建契约
 
@@ -116,7 +116,7 @@ export function registerShopPhoneApp(): void {
 
 同包宿主使用根入口 bootstrap 清单。独立扩展通常在自身 Extension.onRegister 中注册，并在卸载生命周期调用 unregisterPhoneApp。注册和订阅均应有明确清理归属。
 
-宿主未就绪时注册排队，同 ID 注册覆盖。getRegisteredPhoneApp 在安装前返回 undefined，listRegisteredPhoneApps 此时返回队列。当前“注册 → 注销 → 再注册”在安装时仍被注销，尚需修复。
+宿主未就绪时注册排队，同 ID 注册覆盖。getRegisteredPhoneApp 在安装前返回 undefined，listRegisteredPhoneApps 此时返回队列。安装按同 ID 的最后一次操作生效，支持“注册 → 注销 → 再注册”。
 
 PhoneAppRenderProps 包含 appId、closeApp、closePhone、safeAreaInsets。closeApp 回桌面，closePhone 关外壳，均为 `() => void`，不能据返回值确认异步隐藏完成。安全区为 CSS 像素，宿主也提供 `--phone-safe-top/right/bottom/left` CSS 变量。
 
@@ -178,8 +178,8 @@ await closePhoneApp({ animated: false });
 - closePhoneApp 默认播放关闭动画；animated:false 直接请求隐藏；无导航宿主立即返回。
 - 有关闭锁时普通关闭直接返回；void 结果不能区分关闭完成和被锁拦截。
 - force:true 清除所有锁，仅用于强制交互完成后的宿主收尾；普通内页不应设置。
-- 多个锁需逐个释放，释放函数幂等。当前锁监听器抛异常可能使获取过程无法返回释放函数，回调不得抛异常。
-- 动画 Promise 在关闭计时器触发后完成，不保证异步隐藏已经结束；动画中途 UI 卸载可能留下未结束的 Promise。严格的关闭后剧情流程应使用无动画路径，并验证宿主行为。
+- 多个锁需逐个释放，释放函数幂等。锁监听器逐个隔离异常；单个回调失败不会阻断令牌返回或后续通知。
+- 动画关闭等待异步隐藏完成；动画尚未结束便卸载时拒绝该次关闭 Promise，调用方不得继续依赖关闭成功的剧情。隐藏失败同样 reject。无动画关闭等待隐藏完成；unmount-phone 通知对应会话的关闭等待者。
 - waitForPhoneClosed(signal?) 等待下一次通知；在关闭之后调用不会立即完成。emitPhoneClosed 清 pending、唤醒当前全部 waiter，不按应用/Preview 区分。
 
 ## 5. 作者编辑器 schema
@@ -205,13 +205,13 @@ styleEditor: {
 
 - 必填 id/group/label/fieldType/defaultValue；defaultValue 一律字符串，boolean 用 true/false 字符串。
 - settingKey 默认等于 id；settingsModuleId 覆盖分区；allowEmpty 保留空串。
-- 支持 string/color/enum/asset/shortcut/boolean/number；string 可 multiline，enum 用 enumOptions。
+- 支持 string/color/enum/asset/shortcut/boolean/number/character；string 可 multiline，enum 用 enumOptions。
 - assetKind 支持 image/audio/video/any，省略按图片；音频显示标识与试听控件。
 - number 可 min/max/正数 step；通用编辑器写入真实 number 并限制边界。
 - dependsOn:{contentItemId,equals} 控制是否可编辑。
-- 类型声明还有 character，但当前注册规范化会丢弃，不能视为完整支持。
+- character 在注册时保留，并交给角色选择控件渲染。
 
-pages 支持 ready/comingSoon，contentItemIds 引用分区字段。类型的 preview 有 desktop/chat/phone-call/placeholder，当前注册仅保留 desktop/chat/placeholder；电话 APP 使用自定义三栏，因此不证明通用 phone-call 预览已接通。
+pages 支持 ready/comingSoon，contentItemIds 引用分区字段。preview 支持 desktop/chat/phone-call/placeholder，注册与通用预览分支保持一致。仅使用自定义面板的页面可以省略 contentItems。
 
 resolveCustomPanes({pageId,values,revision,bump}) 返回 {left,center,right} 或 null，null 回落通用界面。values 为字符串快照，写入成功调用 bump。数组类业务配置可自定义三栏并使用业务 settings bridge。
 
@@ -266,7 +266,7 @@ preferences/appAvailability 为 shared 存档列表。phoneMounted 是运行状�
 
 plugin 类型：ClosePhoneAppOptions、NavigateRequest、OpenPhoneAppOptions、OpenPhoneAppResult、OpenPhoneAppWaitUntil、PhoneAppBadge、PhoneAppRegistration、PhoneAppRenderProps、PhoneAppStyleEditorMeta、PhoneNavigationController、PhoneSafeAreaInsets、PhoneSdkGlobalSlot、PhoneSdkHost、PhoneSdkRenderPropsAccessReport、StudioProgramRef、PhoneSdkDiagSnapshot、PhonePluginAppRegistrar，以及上述七个 PhoneEditor 类型。
 
-OpenPhoneAppPosition 内部有定义，尚未单独公开导出；可用 `NonNullable<OpenPhoneAppOptions["position"]>` 作为类型别名。
+OpenPhoneAppPosition 已从 `/plugin` 公开导出，也可用 `NonNullable<OpenPhoneAppOptions["position"]>`。
 
 ### 角标
 
@@ -283,7 +283,7 @@ clearPhoneAppBadge("shop");
 
 PhoneSdkHost 实现 registerApp/unregisterApp/getApp/listApps；installPhoneSdkHost(host) 返回只解除 host 引用的 dispose，不清注册表或解绑导航。只安装注册表不够让 openPhoneApp 生效，还需 slot.navigation 的 PhoneNavigationController；标准 PhoneExtension 自动绑定，自定义宿主自行负责 ctx、通知、abort、清理。
 
-当前没有成对的公开导航安装/卸载辅助函数。同一 globalThis 共享 host/navigation/pending/关闭锁，未提供宿主实例、Preview 或版本协商隔离。现有 onRegister 的 abort 清理也未成对释放 host/navigation，需要进一步完善。
+当前没有成对的公开导航安装/卸载辅助函数。同一 globalThis 共享 host/navigation/pending/关闭锁，未提供宿主实例、Preview 或版本协商隔离。标准 onRegister 已成对清理 host/navigation，旧绑定卸载不会删除新绑定；显示失败、解绑或 abort 均清理本次关闭等待。
 
 ## 8. 调试与验收
 
@@ -309,4 +309,12 @@ node ./node_modules/typescript/bin/tsc --noEmit
 pnpm run build
 ```
 
-仍待完善：模板导出、队列顺序、监听器异常、类型规范化、绑定卸载/关闭等待、Studio SDK 合同完整性。0.5.26 的本次发布准备补齐依赖声明并更新 HUD schema 测试；这些运行时限制未在此次发布中修复。
+2026-09-30 工作区已修复模板导出、注册顺序、锁/导航监听器异常、schema 规范化及绑定/关闭等待问题，尚未发布。Studio SDK 合同完整性与真实剧本 Preview 验证仍未完成；全局桥仍采用单活动导航宿主，不承诺并行独立手机实例或版本协商。
+
+### 引导回调的归属
+
+`bootstrapPhonePluginApps(registerAll, owner?)` 立即注册，并返回幂等的回调注销函数。多个 bundle 的回调可以共存；传入稳定的扩展包 ID 可在热重载时替换同一归属的旧回调。旧注销函数不会移除新回调。注销回调不等于注销应用，应用仍需调用 unregisterPhoneApp。
+
+导航的 publishPhoneNavigate(request, owner?)、waitForPhoneClosed(signal?, owner?)、emitPhoneClosed(owner?) 可带同一会话标识；标准宿主使用 flow.signal，避免旧会话关闭误清新 pending 或唤醒新等待。无 owner 的旧调用保留广播兼容语义。
+
+聊天 schema 由应用注册声明，SDK 不再优先覆盖它；兼容的聊天数组页与桌面目录页适配器仅在所属分区生效，自定义面板优先。已有聊天编辑器导出继续保留，尚未拆成独立 editor 包。

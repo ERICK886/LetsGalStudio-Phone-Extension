@@ -19,6 +19,7 @@ export type {
   ClosePhoneAppOptions,
   NavigateRequest,
   OpenPhoneAppOptions,
+  OpenPhoneAppPosition,
   OpenPhoneAppResult,
   OpenPhoneAppWaitUntil,
   PhoneAppBadge,

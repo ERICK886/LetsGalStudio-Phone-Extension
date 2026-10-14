@@ -1,3 +1,4 @@
+import { getChatRuntimeKey } from "./runtime/runtime-scope";
 import assert from "node:assert/strict";
 import { beforeEach, describe, it } from "node:test";
 import type { ExtensionContext, SaveAPI } from "@avg-studio/sdk";
@@ -53,7 +54,7 @@ describe("group member message replies", () => {
     const controller = new AbortController();
     const ctx = createContext(controller.signal);
     const save = createSave();
-    bindChatSave(save);
+    bindChatSave(save, getChatRuntimeKey(ctx));
     cacheAuthorSettings({
       selfCharacterId: "",
       defaultFriends: [],
@@ -71,7 +72,7 @@ describe("group member message replies", () => {
       emptyChatsHint: "暂无聊天",
       emptyFriendsHint: "暂无好友",
       appTitle: "聊天",
-    });
+    }, getChatRuntimeKey(ctx));
 
     const running = executeGroupMemberMessage(
       ctx,
@@ -91,7 +92,7 @@ describe("group member message replies", () => {
     );
     await new Promise<void>((resolve) => globalThis.setTimeout(resolve, 0));
 
-    const waitingState = readChatState();
+    const waitingState = readChatState(getChatRuntimeKey(ctx));
     const conversationId = groupConversationId("club");
     const pending = waitingState.pendingReplies.find(
       (item) => item.conversationId === conversationId,
@@ -110,7 +111,7 @@ describe("group member message replies", () => {
     await running;
     assert.equal(isPhoneCloseLocked(), false);
 
-    const messages = readChatState().threads[0]!.messages;
+    const messages = readChatState(getChatRuntimeKey(ctx)).threads[0]!.messages;
     assert.equal(messages[0]!.senderCharacterId, "alice");
     assert.equal(messages[0]!.direction, "incoming");
     assert.equal(messages[1]!.text, "我会去");

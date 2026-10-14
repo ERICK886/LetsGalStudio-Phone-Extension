@@ -17,7 +17,7 @@ import {
 } from "@ink-zenly/phone-sdk/plugin";
 import { {{registerFnName}} } from "./{{appId}}";
 
-bootstrapPhonePluginApps(definePhonePluginRegistry({{registerFnName}}));
+bootstrapPhonePluginApps(definePhonePluginRegistry({{registerFnName}}), "{{extensionId}}");
 
-export { PhoneExtension, ToastExtension } from "@ink-zenly/phone-sdk";
+export { PhoneExtension, PhoneHudExtension, ToastExtension, PhoneEditorExtension } from "@ink-zenly/phone-sdk";
 export { default } from "@ink-zenly/phone-sdk";

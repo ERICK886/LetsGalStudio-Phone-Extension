@@ -6,6 +6,9 @@
  * @version 0.1.1
  */
 
+import { getChatRuntimeKey } from "../runtime/runtime-scope";
+
+
 import { useExtensionContext } from "@avg-studio/sdk";
 import type { PhoneAppRenderProps } from "@ink-zenly/phone-sdk/plugin";
 import React, { useEffect } from "react";
@@ -69,7 +72,7 @@ export function ChatApp(props: PhoneAppRenderProps) {
 
   const { closeApp, safeAreaInsets } = props;
   const ctx = useExtensionContext();
-  const settings = getCachedAuthorSettings();
+  const settings = getCachedAuthorSettings(getChatRuntimeKey(ctx));
 
   // hooks 规则：无条件在组件顶部同时计算两种 padding
   const fullPaddingStyle = useSafeAreaStyle(safeAreaInsets);
@@ -81,7 +84,7 @@ export function ChatApp(props: PhoneAppRenderProps) {
 
   // 宿主打开内页会先 clear 桌面角标；若仍有未读则立刻再 set。
   useEffect(() => {
-    syncChatDesktopBadge();
+    syncChatDesktopBadge(getChatRuntimeKey(ctx));
   }, []);
 
   const { screen, state, friendIds, animatingIds, logRef } = session;

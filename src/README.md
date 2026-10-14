@@ -1,4 +1,4 @@
-﻿# 内页插件与宿主开发指南
+# 内页插件与宿主开发指南
 
 > 面向开发者：在本仓或脚手架工程中开发手机内页、使用 CLI / phone-sdk。  
 > 作者侧「如何使用手机」（挂载、设置、消息、Toast）见根目录 [README.md](../README.md)。  
@@ -44,7 +44,7 @@
 
 ```text
 LetsGal Studio SDK          >= 1.9.0
-本仓扩展                    1.3.2
+本仓扩展                    1.3.3
 @ink-zenly/phone-sdk        0.5.26（npm / 仓库；本地 CLI 生成 ^0.5.26）
 @ink-zenly/create-phone-app 0.3.7
 ```
@@ -787,3 +787,8 @@ globalThis.__LetsGalPhoneSdkDiag__ = true;
 
 迁移后停用旧独立包，仅启用本扩展即可。Fragment 方法 `target` 前缀由旧包 id 改为 `ink.zenly.ext-7a9373/phone-chat/…` 或 `…/phone-album/…`。
 作者设置面板会分别出现「手机」「手机聊天」「手机相册」等模块项，各自配置。
+
+
+## 2026-09-30 聊天运行时作用域
+
+聊天方法和 UI 通过 `getChatRuntimeKey(ctx)` 使用当前 Preview 的 flow.signal；store/settings/bus/reply-wait 通过全局共享槽按该作用域隔离，避免跨 bundle 丢状态和跨 Preview 串存档。相关辅助函数的末尾参数为 runtimeKey；旧无参数调用仅用于兼容独立调用，不应在新业务路径中使用。绑定 save 只读取，不把旧内存自动写入空存档；新游戏、回退或重新绑定以存档当前值为准。存档字段和格式未变。

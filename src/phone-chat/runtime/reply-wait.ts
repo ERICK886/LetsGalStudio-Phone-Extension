@@ -6,6 +6,9 @@
  * @version 0.1.0
  */
 
+import { getChatScopedState } from "./runtime-scope";
+
+
 import { nextId } from "../domain/id";
 import { directConversationId } from "../domain/conversations";
 import { acquirePhoneCloseLock } from "@ink-zenly/phone-sdk/plugin";
@@ -15,7 +18,9 @@ interface WaitEntry {
   conversationId: string;
 }
 
-const waits = new Map<string, WaitEntry>();
+function waitsFor(runtimeKey?: object): Map<string, WaitEntry> {
+  return getChatScopedState("waits", runtimeKey, () => new Map<string, WaitEntry>());
+}
 
 /**
  * 注册一次等待；返回 token。
@@ -23,10 +28,11 @@ const waits = new Map<string, WaitEntry>();
  * @param conversationId - 统一会话键
  * @returns token 与 Promise
  */
-export function createReplyWait(conversationId: string, signal?: AbortSignal): {
+export function createReplyWait(conversationId: string, signal?: AbortSignal, runtimeKey?: object): {
   token: string;
   promise: Promise<void>;
 } {
+  const waits = waitsFor(runtimeKey);
   const token = nextId("wait");
   const releasePhoneCloseLock = acquirePhoneCloseLock();
   let resolvePromise: () => void = () => undefined;
@@ -56,7 +62,8 @@ export function createReplyWait(conversationId: string, signal?: AbortSignal): {
  *
  * @param token - createReplyWait 返回的 token
  */
-export function resolveReplyWait(token: string | undefined): void {
+export function resolveReplyWait(token: string | undefined, runtimeKey?: object): void {
+  const waits = waitsFor(runtimeKey);
   if (!token) return;
   const entry = waits.get(token);
   if (!entry) return;
@@ -69,7 +76,8 @@ export function resolveReplyWait(token: string | undefined): void {
  *
  * @param conversationId - 统一会话键；空则解除全部
  */
-export function resolveReplyWaitsForConversation(conversationId?: string): void {
+export function resolveReplyWaitsForConversation(conversationId?: string, runtimeKey?: object): void {
+  const waits = waitsFor(runtimeKey);
   const target = conversationId?.trim();
   for (const [token, entry] of [...waits.entries()]) {
     if (!target || entry.conversationId === target) {
@@ -80,8 +88,9 @@ export function resolveReplyWaitsForConversation(conversationId?: string): void 
 }
 
 /** 解除全部等待；保留旧导出名供卸载路径兼容。 */
-export function resolveReplyWaitsForFriend(friendCharacterId?: string): void {
+export function resolveReplyWaitsForFriend(friendCharacterId?: string, runtimeKey?: object): void {
   resolveReplyWaitsForConversation(
     friendCharacterId ? directConversationId(friendCharacterId) : undefined,
+    runtimeKey,
   );
 }

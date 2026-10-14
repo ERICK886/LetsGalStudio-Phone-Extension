@@ -14,15 +14,24 @@ type PhoneOpenLifecycleResult = "opened" | "failed";
  */
 export async function resolvePhoneOpenLifecycle(
   waitUntil: PhoneOpenWaitMode,
-  waitForClose: () => Promise<void>,
+  waitForClose: (signal: AbortSignal) => Promise<void>,
   showFailure: Promise<"failed"> | null,
+  signal?: AbortSignal,
 ): Promise<PhoneOpenLifecycleResult> {
   if (waitUntil === "none") return "opened";
-
-  const phoneClosed = waitForClose().then(() => "opened" as const);
-  return showFailure
-    ? await Promise.race([phoneClosed, showFailure])
-    : await phoneClosed;
+  const waiting = new AbortController();
+  const cancel = () => waiting.abort();
+  if (signal?.aborted) cancel();
+  else signal?.addEventListener("abort", cancel, { once: true });
+  try {
+    const phoneClosed = waitForClose(waiting.signal).then(() => "opened" as const);
+    return showFailure
+      ? await Promise.race([phoneClosed, showFailure])
+      : await phoneClosed;
+  } finally {
+    cancel();
+    signal?.removeEventListener("abort", cancel);
+  }
 }
 
 /** `closePhoneApp` 默认播放动画，仅显式传入 `false` 时立即关闭。 */
