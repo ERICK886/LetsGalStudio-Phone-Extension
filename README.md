@@ -2,7 +2,7 @@
 
 > 扩展包 ID：`ink.zenly.ext-7a9373`｜ 程序界面：`phone`、`phone-toast`  
 > 扩展版本：`1.3.4` ｜ 需要 LetsGal Studio SDK：`>=1.9.0`
-> 对齐：`@ink-zenly/phone-sdk@0.5.27`（已发布 npm，2026-10-14 核实）｜ `@ink-zenly/create-phone-app@0.3.7`
+> 对齐：`@ink-zenly/phone-sdk@0.5.27`（已发布 npm，2026-10-14 核实）｜ `@ink-zenly/create-phone-app@0.3.8`
 
 这是一个**游戏里的手机**：剧情里挂上之后，玩家可以打开桌面、点 APP、看聊天消息，还能收到简单的提示（Toast）。
 

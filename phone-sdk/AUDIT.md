@@ -1,6 +1,6 @@
 # 手机宿主 SDK 完整性检查
 
-检查日期：2026-09-27。范围：本仓 `phone-sdk/`、扩展入口、构建配置、CLI 宿主模板和相关 README。SDK 仓库版本 0.5.26；扩展版本 1.3.2；CLI 版本 0.3.7。以下第 1–6 节保留首次检查快照；后续发布准备的复查见第 7 节，2026-09-30 工作区修复见第 8 节，0.5.27 发布验证见第 9 节。未运行真实 Studio Preview。
+检查日期：2026-09-27。范围：本仓 `phone-sdk/`、扩展入口、构建配置、CLI 宿主模板和相关 README。SDK 仓库版本 0.5.26；扩展版本 1.3.2；CLI 版本 0.3.7。以下第 1–6 节保留首次检查快照；后续发布准备的复查见第 7 节，2026-09-30 工作区修复见第 8 节，0.5.27 发布验证见第 9 节，CLI 0.3.8 发布验证见第 10 节。未运行真实 Studio Preview。
 
 ## 结论
 
@@ -225,7 +225,7 @@ sha512-GtqB4qbGVQQjh0nxuoO2O/bsiuSCpLBGTfsaF2qSepSSW1Armsb/gAqAPdKmkP17zJS2mGWDM
 
 ## 9. 0.5.27 发布验证（2026-10-14）
 
-- SDK 从 0.5.26 升为 0.5.27，包含第 8 节 SDK 修复及 Android WebView 默认触摸高亮调整。扩展清单与根 package.json 同步升为 1.3.4；CLI 保持 0.3.7，本次未发布 CLI。
+- SDK 从 0.5.26 升为 0.5.27，包含第 8 节 SDK 修复及 Android WebView 默认触摸高亮调整。扩展清单与根 package.json 同步升为 1.3.4；SDK 发布时 CLI 仍为 0.3.7；随后按用户确认的范围追加 CLI 0.3.8 发布，见第 10 节。
 - 本次发布前已验证提交 37a8adf 的 SDK/内页 52 个测试文件、223 项测试及 CLI 11 个测试文件、38 项测试全部通过。此次仅更新版本和说明，未再次修改运行时代码。
 - 插件 1.3.4 的根 Vite 构建通过。SDK 0.5.27 tarball 在新建 default/minimal 宿主中分别离线安装和构建通过；生成的 SDK 范围为 ^0.5.27，验证时替换为待发布 tarball，不借用仓库 node_modules。
 - tarball 共 115 个文件、207208 字节；公开入口与新增运行时文件齐全，未打入测试文件。依赖与 peerDependencies 保持原发布契约。
@@ -239,3 +239,23 @@ sha512-X104mOTftV074/F1ffRP4l5mkhuN4koPlE6TMz0bIVHrcZfdoYVy10Q7QDFjjBw6qO7cuWzQX
 ```
 
 发布页：[npm 0.5.27](https://www.npmjs.com/package/@ink-zenly/phone-sdk/v/0.5.27)。限制：未执行真实 Studio 剧本 Preview，未同步或重启 Studio。
+
+## 10. CLI 0.3.8 发布验证（2026-10-14）
+
+- CLI 升为 0.3.8，独立安装的 SDK 版本兜底从 ^0.5.5 更新为 ^0.5.27；包含第 8 节 default/minimal 完整宿主导出和 bootstrap 归属修复。扩展维持本次已升级的 1.3.4，SDK 0.5.27 不重复发布。
+- 命令行 --version 和帮助页统一从 package.json 读取版本，消除固定输出 0.3.2 的问题。发布 files 明确排除测试文件；README 从最后可读的 Git 原文 3f9fbfb 恢复，再按当前入口更新版本、参数和独立运行说明。
+- CLI 扫描 11 个测试文件，38 项全部通过。TypeScript 使用 cli/tsconfig.json 并显式允许源码已有的 .ts 导入后缀：当前有 4 项错误，原 HEAD 有 5 项；本次没有新增诊断，并消除了旧版本读取处的 TS2339。剩余为三处 citty showUsage 泛型不匹配 TS2345，以及 template.test.ts 的 TS2554；不能视为完整类型检查通过。
+- 待发布 tarball 在独立临时项目中安装；实际 bin 的 --version、四类 --help 均成功，非法 app-id 返回 1 且没有创建目标目录。没有借用仓库 node_modules。
+- 通过已安装 CLI 分别生成 default/minimal，依赖范围均为 ^0.5.27，四个宿主导出和捆绑 SDK 均存在；从 npm 官方源安装的实际 SDK 均为 0.5.27。default 添加第二个内页后构建通过，minimal 构建通过；pack 从 default 抽离第二个内页后，自行安装、构建并生成 dist/index.mjs，包 ID 与程序 ID 分别核对通过。
+- 根项目 CLI 依赖和 pnpm 锁文件已更新为 0.3.8，冻结锁文件校验通过；依赖版本与已发布 integrity 一致，其他包版本及平台元数据保留。根 node_modules 未重装，独立工程安装验证见上。
+- 发布产物含 69 个文件、66469 字节；bin、模板、vendor 合同和运行依赖齐全，无测试文件。npm 官方源已可查询 0.3.8，latest 为 0.3.8，发布时间为 2026-10-14 15:28:57（北京时间）；registry dist.integrity 与重新下载的官方 tarball 均匹配验证产物。
+
+限制：没有执行真实 Studio 剧本 Preview，也没有同步或重启 Studio。第 9 节根工程类型检查限制仍存在。
+
+已发布 CLI tarball 的 SHA-512：
+
+```text
+sha512-WpNzltyC2aWiI/bhefHEaJ1pE+2isVgRUFCZUImq1FwCm9kz6MJW/JE6BQq0BuKUBvoAQ1IAO4Lselh24OH21g==
+```
+
+发布页：[CLI npm 0.3.8](https://www.npmjs.com/package/@ink-zenly/create-phone-app/v/0.3.8)。本节仅更新已发布 SDK 的仓库说明，未改动 SDK 运行时代码或重发 0.5.27。

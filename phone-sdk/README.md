@@ -28,7 +28,7 @@ openPhoneApp → 导航 pending → 手机 UI → registration.render
 
 ### 依赖
 
-本仓联调使用 `"@ink-zenly/phone-sdk": "file:phone-sdk"`；独立工程使用 `@ink-zenly/phone-sdk@^0.5.27`。CLI 本地解析本包版本为 `^0.5.27`；已发布 CLI 0.3.7 的兜底版本为 `^0.5.5`，旧脚手架工程请显式更新 SDK 依赖。
+本仓联调使用 `"@ink-zenly/phone-sdk": "file:phone-sdk"`；独立工程使用 `@ink-zenly/phone-sdk@^0.5.27`。CLI 0.3.8 的独立安装兜底与本仓解析均为 `^0.5.27`；旧 CLI 0.3.7 使用 `^0.5.5`，旧脚手架工程请显式更新 SDK 依赖。
 
 宿主需 React 18、React DOM、Studio SDK、Vite 和 React 插件。本包声明 React/React DOM/Studio SDK 为 peerDependencies，声明 `@chakra-ui/react`、`@emotion/react` 为 dependencies；安装宿主时提供这些 peers，编辑器依赖由包管理器安装。独立安装构建应使用打出的 SDK 包验证，不能只依赖本仓根工程的依赖。
 

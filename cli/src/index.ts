@@ -3,9 +3,10 @@
  * @description create-phone-app CLI 入口（citty）：create / add / pack 子命令与无参向导。
  * @author 池水三两升
  * @date 2026-08-01
- * @version 0.3.2
+ * @version 0.3.8
  */
 
+import { readFileSync } from "node:fs";
 import { defineCommand, runCommand, showUsage } from "citty";
 
 import { runAdd } from "./commands/add.ts";
@@ -16,6 +17,10 @@ import {
   promptCreateOptions,
   promptWizardMode,
 } from "./prompts.ts";
+
+const { version: cliVersion } = JSON.parse(
+  readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+) as { version: string };
 
 /**
  * 判断当前 argv 是否显式包含已知子命令名。
@@ -178,7 +183,7 @@ const packCmd = defineCommand({
 const main = defineCommand({
   meta: {
     name: "create-phone-app",
-    version: "0.3.2",
+    version: cliVersion,
     description:
       "Scaffold LetsGal phone host + in-app plugins (create / add / pack)",
   },
@@ -233,10 +238,7 @@ async function start(): Promise<void> {
     }
 
     if (rawArgs.length === 1 && rawArgs[0] === "--version") {
-      const meta =
-        typeof main.meta === "function" ? await main.meta() : main.meta;
-
-      console.log(meta?.version ?? "0.3.2");
+      console.log(cliVersion);
       return;
     }
 
