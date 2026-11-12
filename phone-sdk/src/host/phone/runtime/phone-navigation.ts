@@ -8,6 +8,8 @@ export function createPhoneNavigationController(ctx: ExtensionContext, signal = 
   return createNavigationController(ctx, signal, {
     getState: () => getPhoneRuntime(ctx),
     activate: () => activatePhoneRuntime(ctx, getPhoneRuntime(ctx)),
+    expand: () => getPhoneRuntime(ctx).presentation.set("open"),
+    isClosing: () => getPhoneRuntime(ctx).presentation.getSnapshot() === "closing",
     hide: () => hidePhoneUi(ctx),
   });
 }

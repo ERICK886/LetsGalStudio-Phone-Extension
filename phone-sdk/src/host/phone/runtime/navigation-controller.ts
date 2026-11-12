@@ -21,6 +21,9 @@ import {
 export interface PhoneNavigationRuntime {
   getState(): { phoneMounted: boolean; storyMessageSessionVisible: boolean };
   activate(): void;
+  /** A docked phone is mounted but needs to expand before navigation. */
+  expand?(): void;
+  isClosing?(): boolean;
   hide(): Promise<void>;
 }
 
@@ -37,8 +40,6 @@ export function createNavigationController(
       if (signal.aborted) return "unavailable";
       const state = runtime.getState();
       const slot = getPhoneSdkSlot();
-      if (options.position) slot.phonePositionOverride = options.position;
-      else clearPhonePositionOverride(slot);
       phoneSdkDebug("宿主收到打开内页请求", {
         event: "host-navigation-enter",
         appId: options.appId,
@@ -46,7 +47,7 @@ export function createNavigationController(
         storyMessageSessionVisible: state.storyMessageSessionVisible,
         phoneUiVisible: ctx.ui.isVisible("phone"),
       });
-      if (state.storyMessageSessionVisible) {
+      if (state.storyMessageSessionVisible || runtime.isClosing?.()) {
         console.warn("[phone] openPhoneApp: 消息手机占用中，已跳过");
         phoneSdkDebug("宿主阻止打开内页", {
           reason: "story-message-session",
@@ -54,6 +55,8 @@ export function createNavigationController(
         });
         return "blocked";
       }
+      if (options.position) slot.phonePositionOverride = options.position;
+      else clearPhonePositionOverride(slot);
       runtime.activate();
 
       // 先发布、后挂载：首次 React render 可直接命中目标 APP，避免先画桌面再切内页。
@@ -63,6 +66,7 @@ export function createNavigationController(
         ...(options.payload ? { payload: options.payload } : {}),
       };
       publishPhoneNavigate(navigateRequest, owner);
+      runtime.expand?.();
 
       let failShow: () => void = () => undefined;
       const phoneShowFailure = new Promise<"failed">((resolve) => { failShow = () => resolve("failed"); });
@@ -81,9 +85,8 @@ export function createNavigationController(
             // 程序化打开的内页同样需要接管输入；强制来电、聊天回复等
             // 都依赖玩家点击。false 会让 Studio 把整层当作不可交互展示层。
             interactable: true,
-            // 明确关闭根容器指针穿透；不能依赖宿主版本的默认值，否则来电按钮
-            // 可见但点击可能继续落到底层剧情画面。
-            pointerEventsPassthrough: false,
+            // 展开时由手机根节点接管输入，停靠后释放手机以外的剧情区域。
+            pointerEventsPassthrough: true,
           });
 
           // 某些 Studio / SDK 版本会让 ui.show() 的 Promise 持续到 UI 被关闭。
@@ -123,17 +126,18 @@ export function createNavigationController(
     async closePhoneApp(options: ClosePhoneAppOptions = {}): Promise<void> {
       if (signal.aborted) return;
       if (!options.force && isPhoneCloseLocked()) return;
-      clearPhonePositionOverride(getPhoneSdkSlot());
       const animated = getPhoneSdkSlot().requestAnimatedClosePhone;
       if (animated && getPhoneSdkSlot().animatedCloseSignal === owner && shouldAnimatePhoneClose(options.animated)) {
         await animated(options);
+        clearPhonePositionOverride(getPhoneSdkSlot());
         return;
       }
 
-      if (!ctx.ui.isVisible("phone")) { emitPhoneClosed(owner); return; }
+      if (!ctx.ui.isVisible("phone")) { clearPhonePositionOverride(getPhoneSdkSlot()); emitPhoneClosed(owner); return; }
 
       try {
         await runtime.hide();
+        clearPhonePositionOverride(getPhoneSdkSlot());
       } catch (error) {
         console.error("[phone] closePhoneApp: 隐藏手机失败", error);
         throw error;

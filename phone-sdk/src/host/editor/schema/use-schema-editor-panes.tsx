@@ -201,7 +201,7 @@ export function useSchemaEditorPanes(
 
     if (previewKind === "desktop") {
       center = (
-        <PhoneAppearancePreview values={values} refreshToken={revision} />
+        <PhoneAppearancePreview values={values} refreshToken={revision} dockPreview={page?.id === "phone-hud"} />
       );
     } else if (previewKind === "chat" && page?.id === "story-message-behavior") {
       center = (

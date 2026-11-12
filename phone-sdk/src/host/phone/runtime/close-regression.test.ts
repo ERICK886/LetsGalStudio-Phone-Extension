@@ -51,6 +51,15 @@ it("unmount during animation settles the close without invoking the stale callba
   assert.equal(calls, 0);
 });
 
+it("transition completion and its fallback timer close only once", async () => {
+  let calls = 0;
+  const task = createAnimatedClose(() => { calls++; }, 20);
+  task.finish(); task.finish();
+  await task.promise;
+  await new Promise(resolve => setTimeout(resolve, 30));
+  assert.equal(calls, 1);
+});
+
 it("failed show removes its close waiter", async () => {
   const { controller } = harness(() => Promise.reject(new Error("show failed")));
   assert.equal(await controller.openPhoneApp({ appId: "shop" }), "failed");

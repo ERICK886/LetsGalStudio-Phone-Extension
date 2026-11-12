@@ -4,9 +4,12 @@ export function createAnimatedClose(close: () => void | Promise<void>, delay: nu
   let settled = false;
   let timer: ReturnType<typeof globalThis.setTimeout>;
   let rejectClose: (error: Error) => void = () => undefined;
+  let finish: () => void = () => undefined;
   const promise = new Promise<void>((resolve, reject) => {
     rejectClose = reject;
-    timer = globalThis.setTimeout(() => {
+    finish = () => {
+      if (started || settled) return;
+      globalThis.clearTimeout(timer);
       started = true;
       void Promise.resolve().then(close).then(() => {
         settled = true;
@@ -15,10 +18,13 @@ export function createAnimatedClose(close: () => void | Promise<void>, delay: nu
         settled = true;
         reject(error);
       });
-    }, delay);
+    };
+    timer = globalThis.setTimeout(finish, delay);
   });
   return {
     promise,
+    /** A real transitionend may finish before the fallback timer. */
+    finish: () => finish(),
     isHiding: () => started && !settled,
     dispose() {
       // close() itself can synchronously unmount the component. Its hide Promise

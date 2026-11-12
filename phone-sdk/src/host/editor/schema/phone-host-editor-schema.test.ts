@@ -78,35 +78,11 @@ describe("PHONE_HOST_EDITOR_SCHEMA", () => {
     assert.equal(page?.status, "ready");
     assert.equal(page?.preview, "desktop");
     assert.deepEqual(items.map((item) => item.id), [
-      "showPhoneHudButton",
-      "phoneHudButtonType",
-      "phoneHudText",
-      "phoneHudIconPreset",
-      "phoneHudIcon",
-      "phoneHudImage",
-      "phoneHudStylePreset",
-      "phoneHudBackgroundImage",
-      "phoneHudBackgroundColor",
-      "phoneHudTextColor",
-      "phoneHudBorderColor",
-      "phoneHudBorderWidth",
-      "phoneHudBorderRadius",
-      "phoneHudPosition",
-      "phoneHudOffsetX",
-      "phoneHudOffsetY",
-      "phoneHudSize",
-      "phoneHudWidth",
-      "phoneHudContentSize",
+      "showPhoneHudButton", "phoneHudScale", "phoneHudPeekHeight",
+      "phoneHudPosition", "phoneHudOffsetX", "phoneHudOffsetY",
     ]);
-    assert.equal(items.find((item) => item.id === "phoneHudPosition")?.enumOptions?.length, 8);
-    const byId = new Map(items.map((item) => [item.id, item]));
-    assert.deepEqual(byId.get("phoneHudButtonType")?.enumOptions?.map((item) => item.value), ["icon", "text", "image"]);
-    for (const [id, type] of [["phoneHudText", "text"], ["phoneHudIcon", "icon"], ["phoneHudImage", "image"]] as const) {
-      assert.deepEqual(byId.get(id)?.dependsOn, { contentItemId: "phoneHudButtonType", equals: type });
-    }
-    for (const id of ["phoneHudBackgroundColor", "phoneHudTextColor", "phoneHudBorderColor"]) {
-      assert.deepEqual(byId.get(id)?.dependsOn, { contentItemId: "phoneHudStylePreset", equals: "custom" });
-    }
+    assert.equal(items.find((item) => item.id === "phoneHudPosition")?.enumOptions?.length, 9);
+    assert.equal(items.find((item) => item.id === "phoneHudPosition")?.defaultValue, "follow-phone");
     for (const item of items.filter((entry) => entry.fieldType === "number")) {
       assert.ok(Number.isFinite(item.min) && Number.isFinite(item.max), `missing numeric bounds for ${item.id}`);
       assert.ok(Number(item.defaultValue) >= item.min! && Number(item.defaultValue) <= item.max!, `default outside bounds for ${item.id}`);

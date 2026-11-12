@@ -143,6 +143,45 @@
   animation: phone-shell-exit 220ms cubic-bezier(0.4, 0, 1, 1) both;
 }
 
+/* Dock/open use the same mounted shell, with one reversible geometric transition. */
+[data-phone-root][data-phone-dock-enabled="true"] {
+  animation: none;
+  transition: background-color 320ms ease;
+}
+
+[data-phone-root][data-phone-dock-enabled="true"] .phone-viewport-fit {
+  transform-origin: top left;
+  transition-property: transform;
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+[data-phone-root][data-phone-dock-enabled="true"] .phone-shell {
+  animation: none;
+  transform: none;
+  opacity: 1;
+}
+
+[data-phone-root][data-phone-docked="true"] {
+  background: transparent;
+  pointer-events: none;
+}
+
+[data-phone-root][data-phone-docked="true"] .phone-shell {
+  pointer-events: auto;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+[data-phone-root][data-phone-docked="true"] .phone-screen {
+  pointer-events: none;
+}
+
+[data-phone-root][data-phone-docked="true"] .phone-shell:focus-visible {
+  outline: 3px solid var(--phone-accent);
+  outline-offset: -3px;
+}
+
 @keyframes phone-backdrop-enter {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -179,6 +218,10 @@
   [data-phone-root],
   [data-phone-root] .phone-shell {
     animation-duration: 1ms !important;
+  }
+  [data-phone-root][data-phone-dock-enabled="true"],
+  [data-phone-root][data-phone-dock-enabled="true"] .phone-viewport-fit {
+    transition-duration: 0ms !important;
   }
 }
 

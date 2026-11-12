@@ -35,7 +35,7 @@ const compiledModule = { exports: {} };
 new Function("require", "module", "exports", compiled.outputFiles[0].text)(require, compiledModule, compiledModule.exports);
 const { PhoneExtension, getPhoneRuntime } = compiledModule.exports as typeof import("./phone-extension.tsx");
 
-function harness(longLivedShow = false) {
+function harness(longLivedShow = false, dockEnabled = false) {
   const cycle = new AbortController();
   let visible = false;
   let shows = 0;
@@ -44,7 +44,7 @@ function harness(longLivedShow = false) {
     flow: { signal: cycle.signal },
     getHost: () => ({}),
     settings: {
-      get: (key: string) => key === "chatRolePresets" ? [{ id: "alice", characterId: "alice" }] : undefined,
+      get: (key: string) => key === "chatRolePresets" ? [{ id: "alice", characterId: "alice" }] : key === "showPhoneHudButton" ? dockEnabled : undefined,
       subscribe: () => () => {},
     },
     input: { registerAction: () => {}, onAction: () => () => {} },
@@ -100,4 +100,28 @@ it("flow abort settles an active story sequence without requiring another click"
   await pending;
   assert.equal(h.runtime.pendingStorySequence, undefined);
   assert.equal(h.runtime.storyMessageSessionVisible, false);
+});
+
+it("HUD, manual reopen and story messages reuse the same mounted phone", async () => {
+  const h = harness(true, true);
+  PhoneExtension.onRegister(h.ctx);
+  assert.equal(h.shows(), 1);
+  assert.equal(h.runtime.presentation.getSnapshot(), "docked");
+  h.runtime.openPhoneFromHud?.();
+  assert.equal(h.runtime.presentation.getSnapshot(), "open");
+  assert.equal(h.shows(), 1);
+  await h.instance.render().props.closePhone();
+  assert.equal(h.ctx.ui.isVisible("phone"), true);
+  assert.equal(h.runtime.presentation.getSnapshot(), "docked");
+  const story = PhoneExtension.showMessage.run.call(h.instance, h.ctx, { presetId: "alice", message: "常驻手机里的消息" } as never);
+  await new Promise(resolve => setTimeout(resolve, 20));
+  assert.equal(h.runtime.presentation.getSnapshot(), "open");
+  assert.equal(h.shows(), 1);
+  await h.instance.render().props.closePhone();
+  await story;
+  assert.equal(h.runtime.presentation.getSnapshot(), "docked");
+  h.runtime.openPhoneFromHud?.();
+  assert.equal(h.runtime.presentation.getSnapshot(), "open");
+  assert.equal(h.shows(), 1);
+  h.cycle.abort();
 });

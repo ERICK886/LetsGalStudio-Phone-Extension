@@ -8,6 +8,9 @@
 
 import React, {
   useMemo,
+  useLayoutEffect,
+  useRef,
+  useState,
   type CSSProperties,
 } from "react";
 import { useExtensionContext } from "@avg-studio/sdk";
@@ -15,11 +18,11 @@ import { useExtensionContext } from "@avg-studio/sdk";
 import phoneCss from "../../phone/ui/styles/phone.css?inline";
 import { firstGlyph, resolveAssetUrl } from "../../phone/ui/asset-utils";
 import { sanitizeBackgroundCss } from "../../phone/catalog";
-import { resolvePhoneHudConfig } from "../../phone/phone-hud-config";
 import { useTheme, FONT_SIZE_DEFAULT } from "../theme/theme-provider";
 import { readPhonePreviewApps } from "./phone-preview-catalog";
 import { PhonePreviewStatusBar } from "./phone-preview-status-bar";
 import previewOverrideCss from "./phone-editor-preview.css?inline";
+import { computePhoneDockLayout, PHONE_DOCK_TRANSITION_MS } from "../../phone/ui/phone-dock-layout";
 
 /**
  * PhoneAppearancePreview 属性。
@@ -31,6 +34,7 @@ export interface PhoneAppearancePreviewProps {
    * 外部刷新令牌（如 catalogApps 变更）；变化时重读桌面应用。
    */
   refreshToken?: number | string;
+  dockPreview?: boolean;
 }
 
 /**
@@ -52,11 +56,6 @@ function popupLabel(value: string): string {
   return map[value] ?? value;
 }
 
-function previewNumber(value: string | undefined, fallback: number, min: number, max: number): number {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? Math.min(max, Math.max(min, parsed)) : fallback;
-}
-
 /**
  * 中栏高保真静态桌面预览。
  *
@@ -71,12 +70,42 @@ function previewNumber(value: string | undefined, fallback: number, min: number,
 export function PhoneAppearancePreview({
   values,
   refreshToken = 0,
+  dockPreview = false,
 }: PhoneAppearancePreviewProps): React.ReactElement {
   const ctx = useExtensionContext();
   const { tokens } = useTheme();
   const stylePreset =
     values.phoneStylePreset === "android" ? "android" : "apple";
   const title = (values.phoneTitle ?? "").trim() || "手机";
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState({ width: 0, height: 0 });
+  const [expanded, setExpanded] = useState(false);
+  const [motionReady, setMotionReady] = useState(false);
+  const measured = size.width > 0 && size.height > 0;
+  useLayoutEffect(() => {
+    if (!measured) { setMotionReady(false); return; }
+    let nextFrame = 0;
+    const frame = window.requestAnimationFrame(() => {
+      nextFrame = window.requestAnimationFrame(() => setMotionReady(true));
+    });
+    return () => { window.cancelAnimationFrame(frame); window.cancelAnimationFrame(nextFrame); };
+  }, [measured]);
+  useLayoutEffect(() => {
+    const root = viewportRef.current;
+    if (!root || !dockPreview) return;
+    const measure = () => setSize({ width: root.clientWidth, height: root.clientHeight });
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(root);
+    return () => observer.disconnect();
+  }, [dockPreview]);
+  const collapsed = dockPreview && !expanded && values.showPhoneHudButton !== "false";
+  const dock = computePhoneDockLayout({
+    ...size, stylePreset, openPosition: values.popupPosition || "bottom-right",
+    dockPosition: values.phoneHudPosition,
+    scale: values.phoneHudScale, peek: values.phoneHudPeekHeight,
+    offsetX: values.phoneHudOffsetX, offsetY: values.phoneHudOffsetY,
+  });
 
   const apps = useMemo(
     () => readPhonePreviewApps(ctx),
@@ -89,47 +118,6 @@ export function PhoneAppearancePreview({
   );
 
   const backgroundCss = sanitizeBackgroundCss(values.backgroundCss);
-  const hudVisible = values.showPhoneHudButton !== "false";
-  const hudIconUrl = useMemo(
-    () => resolveAssetUrl(ctx, values.phoneHudIcon || undefined),
-    [ctx, values.phoneHudIcon],
-  );
-  const hudImageUrl = useMemo(
-    () => resolveAssetUrl(ctx, values.phoneHudImage || undefined),
-    [ctx, values.phoneHudImage],
-  );
-  const hudBackgroundImageUrl = useMemo(
-    () => resolveAssetUrl(ctx, values.phoneHudBackgroundImage || undefined),
-    [ctx, values.phoneHudBackgroundImage],
-  );
-  const hudConfig = resolvePhoneHudConfig({
-    buttonType: values.phoneHudButtonType,
-    text: values.phoneHudText,
-    iconPreset: values.phoneHudIconPreset,
-    stylePreset: values.phoneHudStylePreset,
-    backgroundColor: values.phoneHudBackgroundColor,
-    textColor: values.phoneHudTextColor,
-    borderColor: values.phoneHudBorderColor,
-    borderWidth: values.phoneHudBorderWidth,
-    borderRadius: values.phoneHudBorderRadius,
-    size: values.phoneHudSize,
-    width: values.phoneHudWidth,
-    contentSize: values.phoneHudContentSize,
-  });
-  const hudPosition = values.phoneHudPosition || "bottom-right";
-  const hudOffsetX = previewNumber(values.phoneHudOffsetX, 0, -1000, 1000);
-  const hudOffsetY = previewNumber(values.phoneHudOffsetY, 0, -1000, 1000);
-  const hudTop = hudPosition.startsWith("top-");
-  const hudBottom = hudPosition.startsWith("bottom-");
-  const hudLeft = hudPosition.endsWith("-left");
-  const hudRight = hudPosition.endsWith("-right");
-  const hudCenter = hudPosition.endsWith("-center");
-  const hudMiddle = hudPosition.startsWith("middle-");
-  const hudTransform = [
-    hudCenter ? "translateX(-50%)" : "",
-    hudMiddle ? "translateY(-50%)" : "",
-  ].filter(Boolean).join(" ") || undefined;
-
   const screenStyle: CSSProperties = useMemo(() => {
     const color = values.backgroundColor || "#172036";
     if (backgroundCss) {
@@ -165,95 +153,39 @@ export function PhoneAppearancePreview({
         position: "relative",
       }}
     >
-      {hudVisible ? (
-        <button
-          type="button"
-          aria-label="手机 HUD 按钮预览"
-          tabIndex={-1}
-          style={{
-            position: "absolute",
-            zIndex: 20,
-            width: hudConfig.width > 0
-              ? hudConfig.width
-              : hudConfig.buttonType === "text"
-                ? "auto"
-                : hudConfig.height,
-            minWidth: hudConfig.buttonType === "text" ? hudConfig.height : undefined,
-            height: hudConfig.height,
-            top: hudTop ? 16 + hudOffsetY : hudMiddle ? `calc(50% + ${hudOffsetY}px)` : undefined,
-            bottom: hudBottom ? 16 - hudOffsetY : undefined,
-            left: hudLeft ? 16 + hudOffsetX : hudCenter ? `calc(50% + ${hudOffsetX}px)` : undefined,
-            right: hudRight ? 16 - hudOffsetX : undefined,
-            transform: hudTransform,
-            padding: hudConfig.buttonType === "text"
-              ? `0 ${Math.max(10, Math.round(hudConfig.height * 0.28))}px`
-              : 0,
-            border: `${hudConfig.borderWidth}px solid ${hudConfig.borderColor}`,
-            borderRadius: hudConfig.borderRadius,
-            backgroundColor: hudConfig.backgroundColor,
-            backgroundImage: hudBackgroundImageUrl
-              ? `url(${JSON.stringify(hudBackgroundImageUrl)})`
-              : undefined,
-            backgroundPosition: "center",
-            backgroundRepeat: "no-repeat",
-            backgroundSize: "cover",
-            boxShadow: hudConfig.boxShadow,
-            color: hudConfig.textColor,
-            backdropFilter: hudConfig.backdropBlur > 0 ? `blur(${hudConfig.backdropBlur}px)` : undefined,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            pointerEvents: "none",
-            overflow: "hidden",
-            whiteSpace: "nowrap",
-            boxSizing: "border-box",
-          }}
-        >
-          {hudConfig.buttonType === "text" ? (
-            <span style={{ fontSize: hudConfig.contentSize, fontWeight: 600, lineHeight: 1 }}>
-              {hudConfig.text}
-            </span>
-          ) : hudConfig.buttonType === "image" ? (
-            hudImageUrl || hudIconUrl ? (
-              <img
-                src={hudImageUrl || hudIconUrl}
-                alt=""
-                style={{ width: "100%", height: "100%", objectFit: "cover" }}
-              />
-            ) : (
-              <span aria-hidden="true" style={{ fontSize: hudConfig.contentSize, lineHeight: 1 }}>
-                {hudConfig.iconGlyph}
-              </span>
-            )
-          ) : hudIconUrl ? (
-            <img
-              src={hudIconUrl}
-              alt=""
-              style={{ width: hudConfig.contentSize, height: hudConfig.contentSize, objectFit: "contain" }}
-            />
-          ) : (
-            <span aria-hidden="true" style={{ fontSize: hudConfig.contentSize, lineHeight: 1 }}>
-              {hudConfig.iconGlyph}
-            </span>
-          )}
-        </button>
-      ) : null}
       <div
+        ref={viewportRef}
         data-phone-root="phone-editor-preview"
-        data-phone-editor-preview=""
+        data-phone-editor-preview={dockPreview ? undefined : ""}
+        data-phone-dock-enabled={dockPreview ? "true" : undefined}
+        data-phone-docked={collapsed ? "true" : "false"}
         data-phone-style-preset={stylePreset}
-        data-phone-position="center"
+        data-phone-position={dockPreview ? values.popupPosition || "bottom-right" : "center"}
         data-phone-closing="false"
         data-phone-message-mode="false"
         data-phone-in-app="false"
         data-phone-in-app-phase="idle"
-        style={{ ...rootStyle, flex: "1 1 auto", minHeight: 0 }}
+        style={{ ...rootStyle, flex: "1 1 auto", minHeight: 0, ...(dockPreview ? { position: "relative", width: "100%", background: "transparent", visibility: measured ? "visible" : "hidden" } as CSSProperties : {}) }}
       >
         <style>{phoneCss}</style>
         <style>{previewOverrideCss}</style>
 
-        <section className="phone-shell" aria-label={`${title}（预览）`}>
-          <div className="phone-screen" style={screenStyle}>
+        <div className={dockPreview ? "phone-viewport-fit" : undefined} style={dockPreview ? {
+          width: dock.fit.width, height: dock.fit.height,
+          transform: collapsed ? dock.transform : "translate3d(0, 0, 0) scale(1)",
+          transitionDuration: motionReady ? `${PHONE_DOCK_TRANSITION_MS}ms` : "0ms",
+        } : { display: "contents" }}>
+        <div className={dockPreview ? "phone-viewport-scale" : undefined} style={dockPreview ? {
+          width: dock.fit.designWidth, height: dock.fit.designHeight, transform: `scale(${dock.fit.scale})`,
+        } : { display: "contents" }}>
+        <section className="phone-shell" aria-label={dockPreview ? expanded ? "关闭手机" : "打开手机" : `${title}（预览）`}
+          role={dockPreview ? "button" : undefined} tabIndex={dockPreview ? 0 : undefined}
+          onClick={dockPreview ? () => setExpanded((value) => !value) : undefined}
+          onKeyDown={dockPreview ? (event) => {
+            if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setExpanded((value) => !value); }
+          } : undefined}
+        >
+          <div className="phone-screen" style={{ ...screenStyle, ...(dockPreview ? { pointerEvents: "none" } as CSSProperties : {}) }}>
             <PhonePreviewStatusBar stylePreset={stylePreset} />
 
             <div className="phone-toolbar">
@@ -330,6 +262,8 @@ export function PhoneAppearancePreview({
             </button>
           </div>
         </section>
+        </div>
+        </div>
       </div>
 
       <div

@@ -11,6 +11,8 @@ LetsGal 游戏内手机的宿主 SDK。本文对应 **0.5.28**（2026-10-23）�
 
 SDK 提供手机桌面、内页容器、HUD、Toast、作者编辑器与跨 bundle 桥接。聊天、相册、电话等业务内页由扩展工程注册，SDK 不内置这些 APP。
 
+工作区新增的常驻手机、刷新定位和兼容说明见 [常驻手机与视口停靠](docs/docked-phone.md)；该调整尚未发布到 npm。
+
 ## 1. 入口与架构
 
 | 公开入口 | 用途 | 源码 |
@@ -28,7 +30,7 @@ extension.json → Vite → 扩展入口
                        └─ bootstrapPhonePluginApps → registerPhoneApp
 PhoneExtension.onRegister → 安装注册表宿主 + 绑定手机模块 ctx
 openPhoneApp → 导航 pending → 手机 UI → registration.render
-关闭手机 → 隐藏容器 → emitPhoneClosed → 释放关闭等待
+关闭手机 → 收回停靠（禁用常驻时隐藏容器）→ emitPhoneClosed → 释放关闭等待
 ```
 
 ## 2. 创建完整手机宿主
@@ -61,7 +63,7 @@ export { default } from "@ink-zenly/phone-sdk";
 | 模块 | 程序 ID | 职责 |
 | --- | --- | --- |
 | `PhoneExtension`，也是 default | `phone` | 桌面、内页、设置、存档、剧情方法、快捷键 |
-| `PhoneHudExtension` | `phone-hud` | 挂载后显示的触屏打开按钮 |
+| `PhoneHudExtension` | `phone-hud` | 保留兼容 ID；当前源码由 phone 自身提供停靠入口 |
 | `ToastExtension` | `phone-toast` | APP 管理等操作提示 |
 | `PhoneEditorExtension` | `phone-editor` | 作者编辑器，不作为手机内页注册 |
 

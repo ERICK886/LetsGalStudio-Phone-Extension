@@ -21,6 +21,7 @@ import { bindPhoneNavigationController } from "../runtime/phone-navigation";
 import { emitPhoneClosed, getPhoneSdkSlot, registerPhoneRuntimeCycle } from "@ink-zenly/phone-sdk/plugin";
 import { clearPhonePositionOverride } from "../runtime/phone-navigation-lifecycle";
 import { PHONE_HUD_SETTING_KEYS } from "../phone-hud-config";
+import { createPhonePresentation, type PhonePresentation } from "../runtime/phone-presentation";
 import { PhoneUI } from "../ui/phone-ui";
 import { resolveAssetUrl } from "../ui/asset-utils";
 import { enqueueToast } from "../../toast/core/toast-runtime";
@@ -705,6 +706,8 @@ export type PhoneStoryAdvanceResult =
   | false;
 
 export interface PhoneUIProps extends ExtensionProps {
+  presentation?: PhonePresentation;
+  openPhone?: () => void;
   loadPreferences: () => readonly PlayerPhonePreferences[];
   savePreferences: (value: readonly PlayerPhonePreferences[]) => void;
   /** 剧情控制的已安装/可用覆盖；独立于玩家个性化设置。 */
@@ -731,6 +734,7 @@ interface PendingStorySequence {
 }
 
 interface PhoneRuntime {
+  readonly presentation: PhonePresentation;
   readonly debugScopeId: number;
   activeStoryMessages: readonly PhoneStoryMessage[];
   activeStoryPopupPosition: PhonePopupPosition;
@@ -833,6 +837,7 @@ export function getPhoneRuntime(ctx: ExtensionContext): PhoneRuntime {
   }
 
   const runtime: PhoneRuntime = {
+    presentation: createPhonePresentation(),
     debugScopeId: nextPhoneRuntimeDebugScopeId++,
     activeStoryMessages: [],
     activeStoryPopupPosition: "bottom-right",
@@ -1025,44 +1030,17 @@ function schedulePendingRecalls(runtime: PhoneRuntime): void {
   });
 }
 
-/** 启用一个 Preview 的手机能力；不自动打开 UI，也不改动任何存档数据。 */
-function boundedSetting(ctx: ExtensionContext, key: string, fallback: number, min: number, max: number): number {
-  const value = Number(ctx.settings.get(key));
-  return Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : fallback;
-}
-
+/** Keep the real phone mounted as an edge dock when the host is active. */
 function showPhoneHudUi(ctx: ExtensionContext, runtime: PhoneRuntime): void {
-  if (!runtime.phoneMounted || ctx.settings.get<boolean>("showPhoneHudButton") === false || !runtime.openPhoneFromHud) return;
-  const icon = ctx.settings.get<string>("phoneHudIcon");
-  const image = ctx.settings.get<string>("phoneHudImage");
-  const backgroundImage = ctx.settings.get<string>("phoneHudBackgroundImage");
-  void ctx.ui.show("phone-hud", {
-    visible: true,
-    buttonType: ctx.settings.get<string>("phoneHudButtonType") || "icon",
-    text: ctx.settings.get<string>("phoneHudText") || "打开手机",
-    iconPreset: ctx.settings.get<string>("phoneHudIconPreset") || "phone",
-    iconUrl: resolveAssetUrl(ctx, icon),
-    imageUrl: resolveAssetUrl(ctx, image),
-    backgroundImageUrl: resolveAssetUrl(ctx, backgroundImage),
-    stylePreset: ctx.settings.get<string>("phoneHudStylePreset") || "dark-glass",
-    backgroundColor: ctx.settings.get<string>("phoneHudBackgroundColor"),
-    textColor: ctx.settings.get<string>("phoneHudTextColor"),
-    borderColor: ctx.settings.get<string>("phoneHudBorderColor"),
-    borderWidth: boundedSetting(ctx, "phoneHudBorderWidth", 1, 0, 12),
-    borderRadius: boundedSetting(ctx, "phoneHudBorderRadius", 16, 0, 120),
-    position: ctx.settings.get<string>("phoneHudPosition") || "bottom-right",
-    offsetX: boundedSetting(ctx, "phoneHudOffsetX", 0, -1000, 1000),
-    offsetY: boundedSetting(ctx, "phoneHudOffsetY", 0, -1000, 1000),
-    size: boundedSetting(ctx, "phoneHudSize", 56, 24, 240),
-    width: boundedSetting(ctx, "phoneHudWidth", 0, 0, 400),
-    contentSize: boundedSetting(ctx, "phoneHudContentSize", 0, 0, 200),
-    onOpen: runtime.openPhoneFromHud,
-  }, {
+  if (ctx.flow.signal.aborted || !runtime.phoneMounted || ctx.settings.get<boolean>("showPhoneHudButton") === false || ctx.ui.isVisible("phone")) return;
+  runtime.presentation.set("docked", false);
+  // HUD is the phone itself. The Host stays transparent outside the exposed shell.
+  void Promise.resolve(ctx.ui.show("phone", undefined, {
     size: "(100%, 100%)",
     position: "(0, 0)",
     interactable: true,
     pointerEventsPassthrough: true,
-  });
+  })).catch((error: unknown) => console.error("[phone] 停靠手机挂载失败", error));
 }
 
 export function activatePhoneRuntime(ctx: ExtensionContext, runtime: PhoneRuntime): void {
@@ -1074,15 +1052,20 @@ export function activatePhoneRuntime(ctx: ExtensionContext, runtime: PhoneRuntim
 }
 
 /**
- * 隐藏当前 Preview 的手机 UI；未显示时为 no-op。
+ * 收起当前 Preview 的手机；启用常驻时保留同一个 UI，否则释放容器。
  *
  * @param ctx 手机扩展的 ExtensionContext
  *
  * @remarks
- * `closePhone` 等待本函数完成，确保 `phone` 容器被释放，
+ * `closePhone` 在收起动画完成后调用本函数，提交停靠状态或释放容器，
  * 随后再 `emitPhoneClosed` 唤醒等待中的 `openPhoneApp` 调用方。
  */
 export async function hidePhoneUi(ctx: ExtensionContext): Promise<void> {
+  const runtime = getPhoneRuntime(ctx);
+  if (!ctx.flow.signal.aborted && runtime.phoneMounted && ctx.settings.get<boolean>("showPhoneHudButton") !== false) {
+    runtime.presentation.set("docked", false);
+    return;
+  }
   if (!ctx.ui.isVisible("phone")) return;
   try {
     await ctx.ui.hide("phone");
@@ -1190,19 +1173,16 @@ async function showStoryMessageUi(
   const signal = ctx.flow.signal;
   const isCurrent = () => !signal.aborted && runtime.pendingStorySequence?.debugId === sequenceId;
   let showFailure: { error: unknown } | undefined;
-  const show = () =>
+  runtime.presentation.set("open");
+  const show = () => ctx.ui.isVisible("phone") ? Promise.resolve() :
     ctx.ui.show(
       "phone",
-      {
-        storyMessages,
-        storyPopupPosition,
-        ...(storyBackground ? { storyBackground } : {}),
-      },
+      undefined,
       {
         size: "(100%, 100%)",
         position: "(0, 0)",
         interactable: true,
-        pointerEventsPassthrough: false,
+        pointerEventsPassthrough: true,
       },
     );
 
@@ -1456,7 +1436,7 @@ async function showStoryMessages(
   const shouldCreateStoryUi = !hasStorySession;
   const continuingSession =
     appendToExisting && runtime.activeStoryMessages.length > 0;
-  if (!hasStorySession && uiVisible) await ctx.ui.hide("phone");
+  // Reuse the docked/open shell; the story subscription supplies current content.
   if (!isCurrent()) {
     runtimeDebug(runtime, "sequence-request-cancelled-unmounted", {
       stage: "after-hide",
@@ -2094,7 +2074,7 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
 
     const openPhone = () => {
       const runtime = getPhoneRuntime(ctx);
-      const uiVisible = ctx.ui.isVisible("phone");
+      const uiVisible = ctx.ui.isVisible("phone") && runtime.presentation.getSnapshot() !== "docked";
       runtimeDebug(runtime, "open-action-received", {
         phoneMounted: runtime.phoneMounted,
         opening: runtime.opening,
@@ -2127,6 +2107,8 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
       // 普通快捷键 / HUD 打开必须使用作者设置的方位，不能沿用来电等
       // `openPhoneApp({ position })` 留下的单次临时覆盖。
       clearPhonePositionOverride(getPhoneSdkSlot());
+      runtime.presentation.set("open");
+      if (ctx.ui.isVisible("phone")) return;
 
       const mountEpoch = runtime.phoneMountEpoch;
       let settled = false;
@@ -2144,13 +2126,13 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
       };
 
       runtime.opening = true;
-      void ctx.ui.hide("phone-hud");
       try {
         runtimeDebug(runtime, "open-show-start", { mountEpoch });
         const shown = ctx.ui.show("phone", undefined, {
           size: "(100%, 100%)",
           position: "(0, 0)",
           interactable: true,
+          pointerEventsPassthrough: true,
         });
         openingTimer = globalThis.setTimeout(() => {
           runtimeDebug(runtime, "open-show-timeout", {
@@ -2191,7 +2173,7 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
         ctx.settings.subscribe(key, () => {
           if (ctx.flow.signal.aborted) return;
           if (ctx.settings.get<boolean>("showPhoneHudButton") === false) {
-            void ctx.ui.hide("phone-hud");
+            if (runtime.presentation.getSnapshot() === "docked") void ctx.ui.hide("phone");
           } else {
             showPhoneHudUi(ctx, runtime);
           }
@@ -2322,6 +2304,8 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
     return {
       component: PhoneUI,
       props: {
+        presentation: runtime.presentation,
+        openPhone: () => runtime.openPhoneFromHud?.(),
         // 延迟到 React mount 后再访问 this.save，兼容宿主在 render 后注入 save proxy。
         loadPreferences: () =>
           (this.save as unknown as SaveAPI<PhoneSaveMap>).get("preferences"),
@@ -2343,7 +2327,7 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
           runtime.activeStoryPopupPosition = "bottom-right";
           runtime.activeStoryBackground = undefined;
           publishStoryMessages(runtime);
-          // 关闭动画已由 UI 播放完毕（closeWithAnimation）；此处释放 phone 容器，
+          // 关闭动画已播放完毕；此处提交停靠状态（或在关闭常驻时释放容器），
           // 再唤醒等待中的 openPhoneApp 调用方。hide 与 emit 串行，避免在 UI 仍可见时提前返回。
           await hidePhoneUi(this.context).finally(() => {
             // 容器隐藏后才放行下一组，防止旧 close 把刚打开的新消息手机一并关掉。

@@ -32,6 +32,8 @@ import { InPhoneAppBoundary } from "./components/in-phone-app-boundary";
 import { PhoneStoryMessageItem } from "./components/story-message-item";
 import { firstGlyph, readImage, resolveAssetUrl } from "./asset-utils";
 import { computePhoneViewportFit } from "./phone-viewport-fit";
+import { computePhoneDockLayout, PHONE_DOCK_TRANSITION_MS } from "./phone-dock-layout";
+import { PHONE_HUD_SETTING_KEYS } from "../phone-hud-config";
 import {
   catalogFromSettingsRows,
   emptyPreferences,
@@ -133,6 +135,9 @@ function reportPhoneCloseError(error: unknown): void {
   console.warn("[phone] close interrupted", error);
 }
 
+const subscribeStaticPresentation = () => () => undefined;
+const getStaticPresentation = () => "open" as const;
+
 
 /**
  * 手机程序 UI 的状态编排根组件。
@@ -142,6 +147,8 @@ function reportPhoneCloseError(error: unknown): void {
  * 作者关闭玩家个性化时会忽略而非删除既有 shared 偏好；关闭动画复用同一个 Promise，保证目标动作只会在手机关闭后启动。
  */
 export const PhoneUIContent: React.FC<PhoneUIProps> = ({
+  presentation,
+  openPhone,
   loadPreferences,
   savePreferences,
   loadAppAvailability,
@@ -154,12 +161,26 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
   advanceStoryMessage,
 }) => {
   const ctx = useExtensionContext();
+  const presentationMode = useSyncExternalStore(
+    presentation?.subscribe ?? subscribeStaticPresentation,
+    presentation?.getSnapshot ?? getStaticPresentation,
+    presentation?.getSnapshot ?? getStaticPresentation,
+  );
+  const docked = presentationMode === "docked";
+  const dockEnabled = Boolean(presentation) && ctx.settings.get<boolean>("showPhoneHudButton") !== false;
+  const [, updateDockSettings] = useState(0);
+  useEffect(() => {
+    const cleanups = [...PHONE_HUD_SETTING_KEYS, "popupPosition", "phoneStylePreset"].map((key) =>
+      ctx.settings.subscribe(key, () => updateDockSettings((revision) => revision + 1)));
+    return () => cleanups.forEach((cleanup) => cleanup());
+  }, [ctx]);
   const phoneCloseLocked = useSyncExternalStore(
     subscribePhoneCloseLock,
     isPhoneCloseLocked,
     isPhoneCloseLocked,
   );
   useEffect(() => {
+    if (presentationMode !== "open") return;
     // 手机出现时必须退出已有快进，并在事件到达 AVG 全局快捷键前截断 Ctrl。
     ctx.dialogue.setSkipMode(false);
     const blockCtrlFastForward = (event: globalThis.KeyboardEvent) => {
@@ -174,7 +195,7 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
       globalThis.window.removeEventListener("keydown", blockCtrlFastForward, true);
       globalThis.window.removeEventListener("keyup", blockCtrlFastForward, true);
     };
-  }, [ctx]);
+  }, [ctx, presentationMode]);
   const [displayStoryMessages, setDisplayStoryMessages] = useState<readonly PhoneStoryMessage[]>(
     () => storyMessages ?? [],
   );
@@ -307,11 +328,23 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
   const homeButtonRef = useRef<HTMLButtonElement | null>(null);
   const phoneScreenRef = useRef<HTMLDivElement | null>(null);
   const phoneRootRef = useRef<HTMLDivElement | null>(null);
+  const phoneShellRef = useRef<HTMLElement | null>(null);
+  const [hostSize, setHostSize] = useState({ width: 0, height: 0 });
+  const [dockMotionReady, setDockMotionReady] = useState(false);
+  const hostMeasured = hostSize.width > 0 && hostSize.height > 0;
+  useLayoutEffect(() => {
+    if (!hostMeasured) { setDockMotionReady(false); return; }
+    let nextFrame = 0;
+    const frame = window.requestAnimationFrame(() => {
+      nextFrame = window.requestAnimationFrame(() => setDockMotionReady(true));
+    });
+    return () => { window.cancelAnimationFrame(frame); window.cancelAnimationFrame(nextFrame); };
+  }, [hostMeasured]);
   const [viewportFit, setViewportFit] = useState(() =>
     computePhoneViewportFit(
       phoneStylePreset,
-      Number.POSITIVE_INFINITY,
-      Number.POSITIVE_INFINITY,
+      0,
+      0,
     ),
   );
   const [draggedAppId, setDraggedAppId] = useState<string>();
@@ -397,7 +430,7 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
       cancelled = true;
       if (retryTimer !== undefined) window.clearTimeout(retryTimer);
     };
-  }, [loadPreferences, loadAppAvailability]);
+  }, [loadPreferences, loadAppAvailability, docked]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setClock(new Date()), 30_000);
@@ -420,6 +453,8 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
       const verticalPadding =
         (Number.parseFloat(computed.paddingTop) || 0) +
         (Number.parseFloat(computed.paddingBottom) || 0);
+      setHostSize((previous) => previous.width === root.clientWidth && previous.height === root.clientHeight
+        ? previous : { width: root.clientWidth, height: root.clientHeight });
       const next = computePhoneViewportFit(
         phoneStylePreset,
         root.clientWidth - horizontalPadding,
@@ -602,10 +637,10 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
   }, [catalog.actions, selectedActionId]);
 
   useEffect(() => {
-    if (!editorOpen && focusedAppId) {
+    if (!docked && !editorOpen && focusedAppId) {
       appRefs.current.get(focusedAppId)?.focus({ preventScroll: true });
     }
-  }, [editorOpen, focusedAppId]);
+  }, [docked, editorOpen, focusedAppId]);
 
   const showMessage = (text: string) => {
     setMessage(text);
@@ -1031,14 +1066,38 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
             backgroundImage: `linear-gradient(rgba(4, 8, 16, .08), rgba(4, 8, 16, .24)), url(${JSON.stringify(wallpaperUrl)})`,
           }
         : { background: defaultBackgroundColor ?? "#172036" };
+  const collapseToDock = dockEnabled && (docked || closing);
+  const configuredDockPosition = ctx.settings.get<string>("phoneHudPosition");
+  const dockLayout = computePhoneDockLayout({
+    ...hostSize,
+    stylePreset: phoneStylePreset,
+    openPosition: messageMode ? displayStoryPopupPosition : popupPosition,
+    // Temporary script/story positions only affect the expanded phone.
+    dockPosition: !configuredDockPosition || configuredDockPosition === "follow-phone"
+      ? normalizePhonePopupPosition(ctx.settings.get<string>("popupPosition")) === "center"
+        ? "bottom-center" : normalizePhonePopupPosition(ctx.settings.get<string>("popupPosition"))
+      : configuredDockPosition,
+    scale: ctx.settings.get("phoneHudScale"),
+    peek: ctx.settings.get("phoneHudPeekHeight"),
+    offsetX: ctx.settings.get("phoneHudOffsetX"),
+    offsetY: ctx.settings.get("phoneHudOffsetY"),
+  });
+  useLayoutEffect(() => {
+    // The real screen stays mounted, but hidden app controls must not receive Tab/click.
+    if (phoneScreenRef.current) phoneScreenRef.current.inert = docked || closing;
+    if (docked && phoneScreenRef.current?.contains(document.activeElement)) {
+      phoneShellRef.current?.focus({ preventScroll: true });
+    }
+  }, [docked, closing]);
   const rootStyle = {
+    ...(dockEnabled && !hostMeasured ? { visibility: "hidden" } : {}),
     "--phone-accent": activePreferences.accentColor ?? defaultAccentColor ?? "#79c7ff",
     "--phone-shell": activePreferences.shellColor ?? defaultShellColor ?? "#11151f",
     "--phone-in-app-origin-x": inAppOrigin.x,
     "--phone-in-app-origin-y": inAppOrigin.y,
-    ...(messageMode
+    ...(docked ? { pointerEvents: "none" } : messageMode
       ? { pointerEvents: awaitingStoryAdvance && !closing ? "auto" : "none" }
-      : {}),
+      : { pointerEvents: "auto" }),
   } as CSSProperties;
 
   /**
@@ -1076,15 +1135,23 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
    * 多次调用会返回同一个 Promise，防止动画期间重复隐藏 UI 或重复启动应用；系统启用“减少动态效果”时立即完成。
    */
   const closeWithAnimation = useCallback((force = false): Promise<void> => {
+    if (presentation?.getSnapshot() === "docked") return Promise.resolve();
     if (!force && isPhoneCloseLocked()) return Promise.resolve();
     if (closePromise.current) return closePromise.current;
 
-    setActiveInPhoneAppId(null);
     setClosing(true);
+    presentation?.set("closing");
     const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
-    closeTask.current = createAnimatedClose(closePhone, reduceMotion ? 0 : PHONE_CLOSE_ANIMATION_MS);
-    closePromise.current = closeTask.current.promise.catch((error: unknown) => {
+    closeTask.current = createAnimatedClose(closePhone, reduceMotion ? 0 : dockEnabled ? PHONE_DOCK_TRANSITION_MS + 80 : PHONE_CLOSE_ANIMATION_MS);
+    closePromise.current = closeTask.current.promise.then(() => {
       if (phoneUiMounted.current) {
+        setClosing(false);
+        closePromise.current = null;
+        closeTask.current = undefined;
+      }
+    }).catch((error: unknown) => {
+      if (phoneUiMounted.current) {
+        presentation?.set("open");
         setClosing(false);
         closePromise.current = null;
         closeTask.current = undefined;
@@ -1092,7 +1159,7 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
       throw error;
     });
     return closePromise.current;
-  }, [closePhone]);
+  }, [closePhone, dockEnabled, presentation]);
 
   /** 给内页传入稳定引用，避免手机父状态变化导致第三方 APP 无意义重渲染。 */
   const closePhoneFromInApp = useCallback(() => {
@@ -1412,7 +1479,11 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
   };
 
   const handleOutsidePointerDown = (event: PointerEvent<HTMLDivElement>) => {
-    if (event.target === event.currentTarget) void closeWithAnimation().catch(reportPhoneCloseError);
+    event.stopPropagation();
+    if (event.target === event.currentTarget) {
+      event.preventDefault();
+      void closeWithAnimation().catch(reportPhoneCloseError);
+    }
   };
 
   const updateAppOverride = (
@@ -1552,23 +1623,35 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
       data-phone-style-preset={phoneStylePreset}
       data-phone-position={messageMode ? displayStoryPopupPosition : popupPosition}
       data-phone-closing={closing ? "true" : "false"}
+      data-phone-dock-enabled={dockEnabled ? "true" : "false"}
+      data-phone-docked={collapseToDock ? "true" : "false"}
       data-phone-message-mode={messageMode ? "true" : "false"}
       data-phone-in-app={activeInPhoneAppId && !messageMode ? "true" : "false"}
       data-phone-in-app-phase={!messageMode ? inAppPhase : "idle"}
       data-phone-awaiting-advance={awaitingStoryAdvance ? "true" : "false"}
       style={rootStyle}
-      onKeyDownCapture={handleKeyDown}
-      onWheelCapture={handleWheelCapture}
-      onPointerDownCapture={messageMode ? handleStoryAdvancePointerDown : undefined}
-      onMouseDownCapture={messageMode ? suppressStoryMouseEvent : undefined}
-      onClickCapture={messageMode ? suppressStoryMouseEvent : undefined}
-      onPointerDown={messageMode ? undefined : handleOutsidePointerDown}
+      onKeyDownCapture={docked ? undefined : handleKeyDown}
+      onWheelCapture={docked ? undefined : handleWheelCapture}
+      onPointerDownCapture={!docked && messageMode ? handleStoryAdvancePointerDown : undefined}
+      onMouseDownCapture={!docked && messageMode ? suppressStoryMouseEvent : undefined}
+      onClickCapture={!docked && messageMode ? suppressStoryMouseEvent : undefined}
+      onClick={!docked && !messageMode ? (event) => event.stopPropagation() : undefined}
+      onPointerDown={docked || messageMode ? undefined : handleOutsidePointerDown}
     >
       <style>{phoneCss}</style>
       <div
         className="phone-viewport-fit"
+        onTransitionEnd={(event) => {
+          if (closing && event.target === event.currentTarget && event.propertyName === "transform") closeTask.current?.finish();
+        }}
         data-phone-viewport-scale={viewportFit.scale.toFixed(4)}
-        style={{ width: viewportFit.width, height: viewportFit.height }}
+        style={{
+          width: viewportFit.width, height: viewportFit.height,
+          ...(dockEnabled ? {
+            transform: collapseToDock ? dockLayout.transform : "translate3d(0, 0, 0) scale(1)",
+            transitionDuration: dockMotionReady && presentation?.shouldAnimate() !== false ? `${PHONE_DOCK_TRANSITION_MS}ms` : "0ms",
+          } : {}),
+        }}
       >
         <div
           className="phone-viewport-scale"
@@ -1579,12 +1662,21 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
           }}
         >
           <section
+            ref={phoneShellRef}
             className="phone-shell"
-            role={messageMode ? "status" : "dialog"}
-            aria-modal={messageMode ? undefined : true}
-            aria-label={messageMode ? "手机剧情消息" : phoneTitle ?? "手机"}
+            role={docked ? "button" : messageMode ? "status" : "dialog"}
+            tabIndex={docked ? 0 : undefined}
+            aria-expanded={dockEnabled ? !docked : undefined}
+            aria-modal={docked || messageMode ? undefined : true}
+            aria-label={docked ? "打开手机" : messageMode ? "手机剧情消息" : phoneTitle ?? "手机"}
+            onPointerDownCapture={docked ? (event) => { event.stopPropagation(); event.preventDefault(); } : undefined}
+            onClickCapture={docked ? (event) => { event.stopPropagation(); event.preventDefault(); openPhone?.(); } : undefined}
+            onKeyDown={docked ? (event) => {
+              if (event.key !== "Enter" && event.key !== " ") return;
+              event.preventDefault(); event.stopPropagation(); openPhone?.();
+            } : undefined}
           >
-            <div className="phone-screen" ref={phoneScreenRef} style={screenStyle}>
+            <div className="phone-screen" ref={phoneScreenRef} style={screenStyle} aria-hidden={docked || closing ? true : undefined}>
           <header className="phone-status" ref={statusBarRef}>
             <time>{clock.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time>
             <span className="phone-status-icons" aria-hidden="true">
