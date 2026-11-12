@@ -11,7 +11,8 @@
  * - 仅依赖 `@ink-zenly/phone-sdk/plugin`。
  */
 
-import { registerPhoneApp } from "@ink-zenly/phone-sdk/plugin";
+import { Extension, extension, type ExtensionContext } from "@avg-studio/sdk";
+import { bindPhoneAppSettings, registerPhoneApp } from "@ink-zenly/phone-sdk/plugin";
 import { {{pascalName}}App } from "./app";
 
 /**
@@ -42,4 +43,13 @@ export function {{registerFnName}}(): void {
     description: "src/{{appId}} 内页",
     render: (props) => <{{pascalName}}App {...props} />,
   });
+}
+
+/** settings / saveSchema / 方法属于本软件；pack 会原样导出此类。 */
+declare const __PHONE_EXTENSION_ID__: string;
+@extension({ id: PROGRAM_ID, label: "{{titleJs}}", exposeUI: false })
+export class {{pascalName}}Controller extends Extension {
+  static onRegister(ctx: ExtensionContext) {
+    bindPhoneAppSettings(`${__PHONE_EXTENSION_ID__}/${PROGRAM_ID}`, ctx.settings, ctx.flow.signal);
+  }
 }

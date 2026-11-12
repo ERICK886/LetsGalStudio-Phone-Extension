@@ -16,7 +16,9 @@
 /**
  * 扩展包 id（与宿主 `extension.json` 的 `id` 一致）。
  */
-export const EXTENSION_ID = "ink.zenly.ext-7a9373";
+declare const __PHONE_EXTENSION_ID__: string;
+export const EXTENSION_ID = typeof __PHONE_EXTENSION_ID__ !== "undefined"
+  ? __PHONE_EXTENSION_ID__ : "ink.zenly.ext-7a9373";
 
 /**
  * Studio 程序 ID / `registerPhoneApp({ id })` / 宿主 Phone SDK 应用 ID。

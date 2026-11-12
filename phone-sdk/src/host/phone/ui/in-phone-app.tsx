@@ -89,12 +89,12 @@ export function InPhoneAppContentReady(props: {
   const debugBundle = useMemo(
     () =>
       createDebugPhoneAppRenderProps({
-        appId: phoneAppId,
+        appId: registration.id,
         closeApp: onGoHome,
         closePhone: onClosePhone,
         safeAreaInsets,
       }),
-    [phoneAppId, onGoHome, onClosePhone, safeAreaInsets],
+    [registration.id, onGoHome, onClosePhone, safeAreaInsets],
   );
 
   const rendered = useMemo(

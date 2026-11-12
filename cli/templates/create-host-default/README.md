@@ -1,38 +1,16 @@
 # {{title}}
 
-由 [create-phone-app](https://github.com/ink-zenly/ext-7a9373) 生成的 LetsGal Studio **手机宿主扩展**（含首个内页 `src/{{appId}}/`）。
+工程角色：`{{projectKind}}`；扩展 ID：`{{extensionId}}`。
 
-## 依赖说明
+- `src/index.tsx`：导出 Studio 控制器。
+- `src/phone-apps.ts`：注册软件；与控制器导出缺一不可。
+- `src/apps/{{appId}}/`：软件 UI、控制器与 `phone-app.json`。
+- `phone-project.json`：CLI 目录协议。
 
-1. **`@avg-studio/sdk`**：脚手架已将 SDK 拷贝到本工程 **`sdk/`**，并通过 `dependencies` 的 `file:./sdk` 引用（**不要**把 `file:` 写进 `peerDependencies`）。
-2. **`@ink-zenly/phone-sdk`**：模板使用 npm 版本 `{{phoneSdkVersion}}`。
-3. **两层 ID**：宿主扩展包 id（`extension.json.id`）为 **`{{extensionId}}`**；首个内页程序 id 为 **`{{appId}}`**（二者由脚手架分别指定，互不推导）。
-4. **宿主扩展包 id**：`vite.config.ts` 已配置从 `extension.json` define `__PHONE_HOST_EXTENSION_ID__`（phone-sdk ≥0.4.0 需要）。
+`pnpm install` 安装依赖，`pnpm build` 构建，`pnpm watch` 监听源码。
+`create-phone-app add notes --title 便签` 增加软件。
+`create-phone-app doctor` 检查接入，`create-phone-app pack {{appId}}` 准备独立分发包。
 
-## 开发（含完整手机宿主）
-
-```powershell
-pnpm install
-pnpm watch                 # 监听构建 → dist/index.mjs
-```
-
-在 Studio 中**仅启用本扩展**即可看到手机壳并打开内页。入口为 `src/index.tsx`，导出 `PhoneExtension` / `PhoneHudExtension` / `ToastExtension` / `PhoneEditorExtension`。
-
-## 分发标准内页包
-
-若需将 `src/{{appId}}/` 抽离为不含手机壳的标准内页扩展，在宿主工程根目录执行：
-
-```powershell
-pnpm create-phone-app pack {{appId}}
-# 产物在 ./release/
-```
-
-`release/` 仅含内页扩展，需**同时**启用手机宿主扩展（如 `ink.zenly.ext-7a9373`），并在宿主设置中将 `phoneAppId` 设为 **`{{appId}}`**。
-
-## 程序 ID 速查
-
-| 项 | 值 |
-|----|-----|
-| 扩展清单 id | `{{extensionId}}` |
-| 手机内页 app-id | `{{appId}}` |
-| npm 包名 | `{{packageName}}` |
+独立软件模式需要同时启用手机宿主。桌面应用引用可填 `{{extensionId}}/{{appId}}`。
+应用设置与存档放在软件控制器，不要因注册或重新挂载重置。
+SDK 新版与 CLI 必须配套；本仓开发时自动使用本地 SDK，发布前按 CLI 文档检查版本。

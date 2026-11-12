@@ -32,11 +32,11 @@ export function computePhoneViewportFit(
   availableHeight: number,
 ): PhoneViewportFit {
   const design = PHONE_VIEWPORT_DESIGN_SIZE[stylePreset];
-  const safeWidth = Number.isFinite(availableWidth) && availableWidth > 0
-    ? availableWidth
+  const safeWidth = Number.isFinite(availableWidth)
+    ? Math.max(0, availableWidth)
     : design.width;
-  const safeHeight = Number.isFinite(availableHeight) && availableHeight > 0
-    ? availableHeight
+  const safeHeight = Number.isFinite(availableHeight)
+    ? Math.max(0, availableHeight)
     : design.height;
   const scale = Math.min(1, safeWidth / design.width, safeHeight / design.height);
 

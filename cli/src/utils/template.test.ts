@@ -79,7 +79,7 @@ describe("copyTemplateDir", () => {
     );
     assert.equal(readFileSync(join(destDir, "readme.md"), "utf8"), "# Demo");
     assert.equal(
-      readFileSync(join(destDir, "logo.bin"), "binary").toString("binary"),
+      readFileSync(join(destDir, "logo.bin"), "binary"),
       "\x00\x01\x02{{appId}}",
     );
 

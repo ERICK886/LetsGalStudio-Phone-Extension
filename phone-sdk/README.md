@@ -1,6 +1,13 @@
 # @ink-zenly/phone-sdk
 
-LetsGal 游戏内手机的宿主 SDK。本文对应 **0.5.27**（2026-10-14），包含注册、导航关闭、会话清理和编辑器契约修复。
+## 当前源码新增入口
+
+新增 `/host` 与 `/editor`，保留根入口；插件继续使用 `/plugin`。推荐 `registerPhonePlugin` 统一来源和生命周期，独立软件通过 `bindPhoneAppSettings` 提供自身设置上下文。
+
+完整的新接入文档见 [手机软件接入与调用](docs/plugin-api.md)。以下原有 API/示例作为兼容资料保留；新增接口尚未发布，不能由旧 npm 版本号推断已经可用。
+
+
+LetsGal 游戏内手机的宿主 SDK。本文对应 **0.5.28**（2026-10-23），新增运行周期重新绑定，并修复手机容器缩放与连续剧情消息关闭时序。
 
 SDK 提供手机桌面、内页容器、HUD、Toast、作者编辑器与跨 bundle 桥接。聊天、相册、电话等业务内页由扩展工程注册，SDK 不内置这些 APP。
 
@@ -28,7 +35,7 @@ openPhoneApp → 导航 pending → 手机 UI → registration.render
 
 ### 依赖
 
-本仓联调使用 `"@ink-zenly/phone-sdk": "file:phone-sdk"`；独立工程使用 `@ink-zenly/phone-sdk@^0.5.27`。CLI 0.3.8 的独立安装兜底与本仓解析均为 `^0.5.27`；旧 CLI 0.3.7 使用 `^0.5.5`，旧脚手架工程请显式更新 SDK 依赖。
+本仓联调使用 `"@ink-zenly/phone-sdk": "file:phone-sdk"`；独立工程使用 `@ink-zenly/phone-sdk@^0.5.28`。CLI 0.3.9 的独立安装兜底与本仓解析均为 `^0.5.28`；旧 CLI 0.3.8 使用 `^0.5.27`，旧脚手架工程请显式更新 SDK 依赖。
 
 宿主需 React 18、React DOM、Studio SDK、Vite 和 React 插件。本包声明 React/React DOM/Studio SDK 为 peerDependencies，声明 `@chakra-ui/react`、`@emotion/react` 为 dependencies；安装宿主时提供这些 peers，编辑器依赖由包管理器安装。独立安装构建应使用打出的 SDK 包验证，不能只依赖本仓根工程的依赖。
 
@@ -160,7 +167,7 @@ const off = subscribePhoneNavigate((request) => {
 // 应用卸载时 off()。
 ```
 
-总线仅保留最新 pending，新订阅会同步回放。按 seq 清理可防止误删后来的请求。当前监听器异常未隔离，回调应处理自身错误。seq 是去重序号，不是应用会话 ID。
+总线仅保留最新 pending，新订阅会同步回放。按 seq 清理可防止误删后来的请求。监听器异常逐个隔离，回调仍应处理自身错误。seq 是去重序号，不是应用会话 ID。
 
 ### 关闭与关闭锁
 
@@ -180,7 +187,27 @@ await closePhoneApp({ animated: false });
 - force:true 清除所有锁，仅用于强制交互完成后的宿主收尾；普通内页不应设置。
 - 多个锁需逐个释放，释放函数幂等。锁监听器逐个隔离异常；单个回调失败不会阻断令牌返回或后续通知。
 - 动画关闭等待异步隐藏完成；动画尚未结束便卸载时拒绝该次关闭 Promise，调用方不得继续依赖关闭成功的剧情。隐藏失败同样 reject。无动画关闭等待隐藏完成；unmount-phone 通知对应会话的关闭等待者。
-- waitForPhoneClosed(signal?) 等待下一次通知；在关闭之后调用不会立即完成。emitPhoneClosed 清 pending、唤醒当前全部 waiter，不按应用/Preview 区分。
+- waitForPhoneClosed(signal?, owner?) 等待下一次通知；在关闭之后调用不会立即完成。标准宿主以当前运行周期的 flow.signal 为 owner；emitPhoneClosed(owner) 清理该归属及未指定归属的 pending 和 waiter，不影响其他归属。省略 owner 保留全局通知语义。
+
+### 同一引擎的后续运行周期
+
+Studio 可能只调用一次 onRegister，但在读档或重新开始运行时更换 flow.signal。需要随运行周期重新绑定的资源可使用 `/plugin` 导出的 registerPhoneRuntimeCycle：
+
+```ts
+import { registerPhoneRuntimeCycle } from "@ink-zenly/phone-sdk/plugin";
+
+const dispose = registerPhoneRuntimeCycle(ctx, "shop-runtime", (signal) => {
+  const off = ctx.settings.subscribe("title", () => {
+    if (!signal.aborted) refreshShop(); // 业务自己的刷新逻辑
+  });
+  return off;
+});
+// 扩展卸载或不再需要订阅时调用 dispose()。
+```
+
+此函数立即为未中止的当前 signal 安装一次资源；abort 释放本周期资源，runtime:started 为新的 signal 重新安装。同一 flow 与 owner 的重复注册会替换旧注册，返回的清理函数可重复调用。owner 应使用业务独有的稳定标识。install 必须返回清理函数，异步工作应捕获本次 signal，不能在 await 之后改用下一周期的 signal。
+
+标准手机宿主和聊天模块已接入此机制。聊天在后继周期重新绑定宿主的实时 SaveAPI，以当前存档为准；不会把上一周期的内存快照写回空存档。该接口自 0.5.28 新增。
 
 ## 5. 作者编辑器 schema
 
@@ -261,6 +288,7 @@ preferences/appAvailability 为 shared 存档列表。phoneMounted 是运行状�
 | ID | formatStudioProgramRef、isPhoneAppId、isStudioProgramRefPath、parseStudioProgramRef、toPhoneAppId、toStudioProgramRefPath |
 | 宿主桥接 | getPhoneSdkHost、installPhoneSdkHost、PHONE_SDK_GLOBAL_KEY、getPhoneSdkAppsRegistry、getPhoneSdkSlot |
 | 引导 | addPhonePluginApp、clearPhonePluginApps、definePhonePluginRegistry、registerAllPhonePluginApps、bootstrapPhonePluginApps |
+| 运行周期 | registerPhoneRuntimeCycle |
 | 调试 | PHONE_SDK_DEBUG_FLAG_KEY、PHONE_SDK_DEBUG_PREFIX、createDebugPhoneAppRenderProps、isPhoneSdkDebugEnabled、phoneSdkDebug、phoneSdkDebugWarn |
 | 诊断 | PHONE_SDK_DIAG_FLAG_KEY、PHONE_SDK_DIAG_PREFIX、capturePhoneSdkDiagSnapshot、diagnosePhoneAppLookup、isPhoneSdkDiagEnabled、phoneSdkDiag、phoneSdkDiagWarn |
 
@@ -309,7 +337,7 @@ node ./node_modules/typescript/bin/tsc --noEmit
 pnpm run build
 ```
 
-0.5.27 包含注册顺序、锁/导航监听器异常隔离、schema 规范化、绑定清理与关闭等待修复，并公开 OpenPhoneAppPosition。仓库 CLI 模板已补齐宿主四模块导出。Studio SDK 合同完整性与真实剧本 Preview 验证仍未完成；全局桥仍采用单活动导航宿主，不承诺并行独立手机实例或版本协商。
+0.5.28 在 0.5.27 的注册、关闭等待和编辑器契约修复基础上，新增 registerPhoneRuntimeCycle，修复手机容器缩放、连续剧情消息关闭时序与运行中止清理。仓库 CLI 模板已补齐宿主四模块导出。Studio SDK 合同完整性与真实剧本 Preview 验证仍未完成；全局桥仍采用单活动导航宿主，不承诺并行独立手机实例或版本协商。
 
 ### 引导回调的归属
 

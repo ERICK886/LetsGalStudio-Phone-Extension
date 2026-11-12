@@ -2,7 +2,7 @@ import type {
   PhoneEditorContentItemSchema,
   PhoneEditorPageSchema,
   PhoneEditorSectionSchema,
-} from "@ink-zenly/phone-sdk";
+} from "@ink-zenly/phone-sdk/editor";
 
 export const PHONE_CALL_SETTINGS_MODULE_ID = "phone-call";
 

@@ -1,0 +1,6 @@
+{
+  "schemaVersion": 1,
+  "kind": "{{projectKind}}",
+  "appsDir": "src/apps",
+  "registry": "src/phone-apps.ts"
+}

@@ -1,5 +1,6 @@
+import { bindPhoneAppSettings } from "@ink-zenly/phone-sdk/plugin";
 import { defineSave, Extension, extension, settings, type ExtensionContext } from "@avg-studio/sdk";
-import { PROGRAM_ID } from "./constants";
+import { PROGRAM_ID, EXTENSION_ID } from "./constants";
 import { addPhoneContactMethod, defineOutgoingCallMethod, incomingCallMethod, removePhoneContactMethod } from "./methods";
 import { phoneCallSaveFields } from "./save-fields";
 import { bindPhoneCallSave, releaseIncomingCall } from "./runtime";
@@ -13,6 +14,7 @@ export class PhoneCallExtension extends Extension {
   static settings = settings((s) => buildPhoneCallSettings(s)); static saveSchema = defineSave(phoneCallSaveFields);
   static incomingCall = incomingCallMethod; static defineOutgoingCall = defineOutgoingCallMethod; static addContact = addPhoneContactMethod; static removeContact = removePhoneContactMethod;
   static onRegister(ctx: ExtensionContext) {
+    bindPhoneAppSettings(`${EXTENSION_ID}/${PROGRAM_ID}`, ctx.settings, ctx.flow.signal);
     const scope = phoneCallRuntimeScope(ctx);
     registrationCleanups.get(scope)?.();
     cachePhoneCallSettings(ctx, readPhoneCallSettings(ctx));

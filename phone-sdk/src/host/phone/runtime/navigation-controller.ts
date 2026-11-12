@@ -29,6 +29,7 @@ export function createNavigationController(
   signal: AbortSignal,
   runtime: PhoneNavigationRuntime,
 ): PhoneNavigationController {
+  const owner = ctx.flow.signal;
   return {
     async openPhoneApp(
       options: OpenPhoneAppOptions,
@@ -61,14 +62,14 @@ export function createNavigationController(
         seq: slot.phoneNavigateSequence = (slot.phoneNavigateSequence ?? 0) + 1,
         ...(options.payload ? { payload: options.payload } : {}),
       };
-      publishPhoneNavigate(navigateRequest, ctx.flow.signal);
+      publishPhoneNavigate(navigateRequest, owner);
 
       let failShow: () => void = () => undefined;
       const phoneShowFailure = new Promise<"failed">((resolve) => { failShow = () => resolve("failed"); });
       // Subscribe before show: a synchronous close must not be missed.
       const completion = resolvePhoneOpenLifecycle(
         options.waitUntil,
-        (waitSignal) => waitForPhoneClosed(waitSignal, ctx.flow.signal),
+        (waitSignal) => waitForPhoneClosed(waitSignal, owner),
         phoneShowFailure,
         signal,
       );
@@ -124,12 +125,12 @@ export function createNavigationController(
       if (!options.force && isPhoneCloseLocked()) return;
       clearPhonePositionOverride(getPhoneSdkSlot());
       const animated = getPhoneSdkSlot().requestAnimatedClosePhone;
-      if (animated && getPhoneSdkSlot().animatedCloseSignal === ctx.flow.signal && shouldAnimatePhoneClose(options.animated)) {
+      if (animated && getPhoneSdkSlot().animatedCloseSignal === owner && shouldAnimatePhoneClose(options.animated)) {
         await animated(options);
         return;
       }
 
-      if (!ctx.ui.isVisible("phone")) { emitPhoneClosed(ctx.flow.signal); return; }
+      if (!ctx.ui.isVisible("phone")) { emitPhoneClosed(owner); return; }
 
       try {
         await runtime.hide();
@@ -137,7 +138,7 @@ export function createNavigationController(
         console.error("[phone] closePhoneApp: 隐藏手机失败", error);
         throw error;
       } finally {
-        emitPhoneClosed(ctx.flow.signal);
+        emitPhoneClosed(owner);
       }
     },
   };

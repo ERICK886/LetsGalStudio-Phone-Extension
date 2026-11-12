@@ -8,6 +8,7 @@
 
 import { getChatRuntimeKey } from "../../runtime/runtime-scope";
 import { useExtensionContext } from "@avg-studio/sdk";
+import { restoreChatSaveBinding } from "../../runtime/store";
 
 
 import {
@@ -19,7 +20,7 @@ import {
 } from "react";
 
 import type { ChatScreen, ChatTab } from "../../types/index";
-import { PROGRAM_ID } from "../../constants";
+import { PROGRAM_ID, EXTENSION_ID } from "../../constants";
 import {
   directConversationId,
   parseConversationId,
@@ -34,6 +35,7 @@ import {
 } from "../../runtime/index";
 import {
   clearPhoneNavigatePending,
+  matchesPhoneAppReference,
   subscribePhoneNavigate,
 } from "@ink-zenly/phone-sdk/plugin";
 
@@ -89,7 +91,7 @@ export function useChatSession() {
   // 导航总线会发布/回放最新请求；消费后立即清理，避免下次手动打开时回放旧深链。
   useEffect(() => {
     return subscribePhoneNavigate((req) => {
-      if (req.appId !== PROGRAM_ID) return;
+      if (!matchesPhoneAppReference(req.appId, PROGRAM_ID, EXTENSION_ID)) return;
       const payload = req.payload as
         | { conversationId?: unknown; friendCharacterId?: unknown }
         | undefined;
@@ -110,6 +112,13 @@ export function useChatSession() {
       clearPhoneNavigatePending(req.seq);
     });
   }, [openChat, openConversation]);
+
+  useEffect(() => {
+    // 读档/切章节后没有新聊天方法执行时，也刷新当前存档中的记录。
+    restoreChatSaveBinding(ctx);
+    refresh();
+    return ctx.subscribe("variable:changed", refresh);
+  }, [ctx, runtimeKey, refresh]);
 
   useEffect(() => {
     return () => {

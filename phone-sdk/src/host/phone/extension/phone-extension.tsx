@@ -18,7 +18,7 @@ import {
 } from "../catalog";
 import { installPhoneExtensionSdkHost } from "../runtime/install-host";
 import { bindPhoneNavigationController } from "../runtime/phone-navigation";
-import { emitPhoneClosed, getPhoneSdkSlot } from "@ink-zenly/phone-sdk/plugin";
+import { emitPhoneClosed, getPhoneSdkSlot, registerPhoneRuntimeCycle } from "@ink-zenly/phone-sdk/plugin";
 import { clearPhonePositionOverride } from "../runtime/phone-navigation-lifecycle";
 import { PHONE_HUD_SETTING_KEYS } from "../phone-hud-config";
 import { PhoneUI } from "../ui/phone-ui";
@@ -1079,7 +1079,7 @@ export function activatePhoneRuntime(ctx: ExtensionContext, runtime: PhoneRuntim
  * @param ctx 手机扩展的 ExtensionContext
  *
  * @remarks
- * `closePhone` 在 `this.close()` 之后调用本函数，确保 `phone` 容器被释放，
+ * `closePhone` 等待本函数完成，确保 `phone` 容器被释放，
  * 随后再 `emitPhoneClosed` 唤醒等待中的 `openPhoneApp` 调用方。
  */
 export async function hidePhoneUi(ctx: ExtensionContext): Promise<void> {
@@ -1163,15 +1163,19 @@ const STORY_UI_SUBSCRIPTION_TIMEOUT_MS = 320;
 /** 等待当前 Preview 的 React 手机 UI 建立消息订阅。 */
 async function waitForStoryMessageSubscriber(
   runtime: PhoneRuntime,
+  isCurrent: () => boolean,
+  getShowError: () => { error: unknown } | undefined,
   timeoutMs = STORY_UI_SUBSCRIPTION_TIMEOUT_MS,
 ): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
-  while (runtime.storyMessageListeners.size === 0 && Date.now() < deadline) {
+  while (isCurrent() && !getShowError() && runtime.storyMessageListeners.size === 0 && Date.now() < deadline) {
     await new Promise<void>((resolve) => {
       globalThis.setTimeout(resolve, 16);
     });
   }
-  return runtime.storyMessageListeners.size > 0;
+  const failure = getShowError();
+  if (failure) throw failure.error;
+  return !isCurrent() || runtime.storyMessageListeners.size > 0;
 }
 
 /** 以单次受控重试挂载当前 Preview 的消息手机。 */
@@ -1183,6 +1187,9 @@ async function showStoryMessageUi(
   storyBackground: string | undefined,
   sequenceId: number,
 ): Promise<void> {
+  const signal = ctx.flow.signal;
+  const isCurrent = () => !signal.aborted && runtime.pendingStorySequence?.debugId === sequenceId;
+  let showFailure: { error: unknown } | undefined;
   const show = () =>
     ctx.ui.show(
       "phone",
@@ -1195,11 +1202,23 @@ async function showStoryMessageUi(
         size: "(100%, 100%)",
         position: "(0, 0)",
         interactable: true,
+        pointerEventsPassthrough: false,
       },
     );
 
-  await show();
-  if (await waitForStoryMessageSubscriber(runtime)) return;
+  const mount = () => {
+    // ui.show 在部分宿主上直到关闭才完成；等待订阅建立，不等待 UI 的整个生命周期。
+    void Promise.resolve(show()).catch((error: unknown) => {
+      showFailure = { error };
+      if (isCurrent()) {
+        runtime.storyMessageSessionVisible = false;
+        finishStoryMessageSequence(runtime, "ui-show-failed");
+      }
+      console.error("[phone] 显示剧情消息失败", error);
+    });
+    return waitForStoryMessageSubscriber(runtime, isCurrent, () => showFailure);
+  };
+  if (await mount()) return;
 
   runtimeDebug(runtime, "ui-show-no-subscriber", { sequenceId, attempt: 1 });
   await ctx.ui.hide("phone");
@@ -1207,8 +1226,8 @@ async function showStoryMessageUi(
     globalThis.setTimeout(resolve, 0);
   });
 
-  await show();
-  if (await waitForStoryMessageSubscriber(runtime)) return;
+  if (!isCurrent()) return;
+  if (await mount()) return;
 
   runtimeDebug(runtime, "ui-show-no-subscriber", { sequenceId, attempt: 2 });
   throw new Error("手机剧情消息界面未能完成挂载");
@@ -1351,8 +1370,10 @@ async function showStoryMessages(
   popupPosition: PhonePopupPosition,
   storyBackground: string | undefined,
 ): Promise<void> {
+  const signal = ctx.flow.signal;
   const mountEpoch = runtime.phoneMountEpoch;
-  if (!isCurrentPhoneMount(runtime, mountEpoch)) {
+  const isCurrent = () => !signal.aborted && isCurrentPhoneMount(runtime, mountEpoch);
+  if (!isCurrent()) {
     runtimeDebug(runtime, "sequence-request-ignored-unmounted", {
       messageCount: messages.length,
     });
@@ -1423,7 +1444,7 @@ async function showStoryMessages(
     await pending.promise;
   }
 
-  if (!isCurrentPhoneMount(runtime, mountEpoch)) {
+  if (!isCurrent()) {
     runtimeDebug(runtime, "sequence-request-cancelled-unmounted", {
       stage: "after-queue",
     });
@@ -1436,7 +1457,7 @@ async function showStoryMessages(
   const continuingSession =
     appendToExisting && runtime.activeStoryMessages.length > 0;
   if (!hasStorySession && uiVisible) await ctx.ui.hide("phone");
-  if (!isCurrentPhoneMount(runtime, mountEpoch)) {
+  if (!isCurrent()) {
     runtimeDebug(runtime, "sequence-request-cancelled-unmounted", {
       stage: "after-hide",
     });
@@ -1495,11 +1516,10 @@ async function showStoryMessages(
         runtime.activeStoryBackground,
         debugId,
       );
-      if (!isCurrentPhoneMount(runtime, mountEpoch)) {
+      if (!isCurrent()) {
         runtimeDebug(runtime, "sequence-request-cancelled-unmounted", {
           stage: "after-show",
         });
-        if (ctx.ui.isVisible("phone")) await ctx.ui.hide("phone");
         return;
       }
       runtimeDebug(runtime, "ui-show-complete", { sequenceId: debugId });
@@ -1521,8 +1541,10 @@ async function showStoryMessages(
           ? { name: error.name, message: error.message, stack: error.stack }
           : error,
     });
-    runtime.storyMessageSessionVisible = false;
-    finishStoryMessageSequence(runtime, "show-or-wait-error");
+    if (runtime.pendingStorySequence?.resolve === resolveSequence) {
+      runtime.storyMessageSessionVisible = false;
+      finishStoryMessageSequence(runtime, "show-or-wait-error");
+    }
     throw error;
   } finally {
     const stillOwnsPending =
@@ -2033,7 +2055,10 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
    * 保险计时器会释放 `opening` 锁，避免一次异常显示永久阻塞之后的打开动作。
    */
   static onRegister(ctx: ExtensionContext): void {
-    if (ctx.flow.signal.aborted) return;
+    registerPhoneRuntimeCycle(ctx, "phone-host", () => PhoneExtension.registerRuntime(ctx));
+  }
+
+  private static registerRuntime(ctx: ExtensionContext): () => void {
     const registrationKey = ctx.flow.signal;
     phoneRegistrationCleanups.get(registrationKey)?.();
     const unsubscribers: Array<() => void> = [];
@@ -2174,11 +2199,21 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
       );
     }
 
+    let disposed = false;
     const cleanup = () => {
+      if (disposed) return;
+      disposed = true;
       for (const unsubscribe of unsubscribers.splice(0)) {
         try { unsubscribe(); } catch (error) { console.warn("[phone] cleanup failed", error); }
       }
-      ctx.flow.signal.removeEventListener("abort", cleanup);
+      registrationKey.removeEventListener("abort", cleanup);
+      if (registrationKey.aborted) {
+        clearStoryRecallTimers(runtime);
+        runtime.storyMessageSessionVisible = false;
+        runtime.activeStoryMessages = [];
+        runtime.opening = false;
+        finishStoryMessageSequence(runtime, "flow-abort");
+      }
       if (runtime.openPhoneFromHud === openPhone) {
         runtime.openPhoneFromHud = undefined;
       }
@@ -2187,13 +2222,14 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
       }
     };
     phoneRegistrationCleanups.set(registrationKey, cleanup);
-    ctx.flow.signal.addEventListener("abort", cleanup, { once: true });
+    registrationKey.addEventListener("abort", cleanup, { once: true });
+    return cleanup;
   }
 
   /**
    * 构造宿主挂载 React UI 所需的 props。
    * 会过滤宿主传入的非消息对象，并在闭包内延迟访问 `this.save`，因为 Studio 可能在 render 之后才注入 SaveAPI。
-   * `closePhone` 先 resolve 所有等待中的剧情序列，再销毁 UI，避免 Fragment 永久停在扩展方法块。
+   * `closePhone` 等待 UI 隐藏后再结束剧情序列，防止旧关闭操作影响下一组消息。
    */
   render(): ExtensionRenderData<PhoneUIProps> {
     // render 实例的 context 与 method/onRegister 使用同一宿主上下文，闭包只操作该 Preview 的 runtime。
@@ -2300,17 +2336,23 @@ export class PhoneExtension extends Extension<PhoneUIProps> {
           ),
         isPhoneMounted: () => runtime.phoneMounted,
         closePhone: async () => {
-          finishStoryMessageSequence(runtime, "ui-close");
-          runtime.storyMessageSessionVisible = false;
+          const closingSequence = runtime.pendingStorySequence;
+          const owner = this.context.flow.signal;
           clearStoryRecallTimers(runtime);
           runtime.activeStoryMessages = [];
           runtime.activeStoryPopupPosition = "bottom-right";
           runtime.activeStoryBackground = undefined;
           publishStoryMessages(runtime);
-          this.close();
           // 关闭动画已由 UI 播放完毕（closeWithAnimation）；此处释放 phone 容器，
           // 再唤醒等待中的 openPhoneApp 调用方。hide 与 emit 串行，避免在 UI 仍可见时提前返回。
-          await hidePhoneUi(this.context).finally(() => emitPhoneClosed(this.context.flow.signal));
+          await hidePhoneUi(this.context).finally(() => {
+            // 容器隐藏后才放行下一组，防止旧 close 把刚打开的新消息手机一并关掉。
+            if (runtime.pendingStorySequence === closingSequence) {
+              runtime.storyMessageSessionVisible = false;
+              finishStoryMessageSequence(runtime, "ui-close");
+            }
+            emitPhoneClosed(owner);
+          });
           showPhoneHudUi(this.context, runtime);
         },
         // 不依赖 ctx.ui.show() 的初始 data：首次 render 若尚未拿到消息快照，UI 也能订阅并回放当前会话。

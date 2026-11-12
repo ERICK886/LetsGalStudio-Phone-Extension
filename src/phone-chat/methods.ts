@@ -10,191 +10,21 @@
  * - 导出已构造好的 `method()` 结果（`BrandedExtensionMethod`）。
  * - `run` / `runImmediately` / `skip` 里的 `this` 是本模块 `ChatController` 实例，
  *   `this.save` 为本模块独立存档（无前缀键名）。
- * - 每个执行体先调用 `bindChatSave(this.save)`。
+ * - 每个执行体先调用 `prepareRuntime(this.save, ctx)`。
  */
 
+import { method } from "@avg-studio/sdk";
+import { buildFriendMessageSchemaFields, buildReplySchemaFields } from "./domain/index";
+import { addFriend, joinGroupMember, leaveGroupMember, removeFriend } from "./runtime/actions";
 import { getChatRuntimeKey } from "./runtime/runtime-scope";
-
-
+import { isChatRestoreReplay } from "./runtime/restore-replay";
 import {
-  type ExtensionContext,
-  method,
-} from "@avg-studio/sdk";
-
-import {
-  buildFriendMessageSchemaFields,
-  buildReplySchemaFields,
-  coerceMethodBoolean,
-  normalizeOutgoingStatus,
-  parseFriendMessagesFromParams,
-  parseRepliesFromParams,
-} from "./domain/index";
-import {
-  addFriend,
-  awaitGroupReply,
-  awaitPlayerReply,
-  bindChatSave,
-  cacheAuthorSettings,
-  closeChatPhoneAppAfter,
-  executeGroupMemberMessage,
-  joinGroupMember,
-  leaveGroupMember,
-  openChatPhoneApp,
-  openGroupChatPhoneApp,
-  readAuthorSettings,
-  removeFriend,
-  sendFriendMessages,
-} from "./runtime/index";
-
-/**
- * 绑定 save 并刷新作者设置缓存。
- *
- * @param instanceSave - 本模块实例 this.save
- * @param ctx - 扩展上下文
- */
-function prepareRuntime(instanceSave: unknown, ctx: ExtensionContext): void {
-  bindChatSave(instanceSave as Parameters<typeof bindChatSave>[0], getChatRuntimeKey(ctx));
-  cacheAuthorSettings(readAuthorSettings(ctx), getChatRuntimeKey(ctx));
-}
-
-/**
- * 执行「对方发送消息」方法的核心逻辑。
- *
- * @param ctx - 扩展上下文
- * @param params - 方法块参数（含 `friend` 与 `message` 槽位，及 `openPhone` / `waitUntilClose`）
- * @param instanceSave - 包装类实例 this.save
- * @param options.openPhoneApp - 是否在写入消息后打开手机内页；
- *   仅 `run` 路径置 true，`runImmediately` / `skip` 置 false
- * @returns Promise<void>
- *
- * @remarks
- * 提取为模块级辅助函数，避免 `runImmediately` / `skip` 在静态属性初始化器中
- * 自引用 `chatSendFriendMessagesMethod.run`，从而触发 TS7022/TS7023。
- */
-async function executeSendFriendMessages(
-  ctx: ExtensionContext,
-  params: Record<string, unknown>,
-  instanceSave: unknown,
-  options: { openPhoneApp: boolean },
-): Promise<void> {
-  prepareRuntime(instanceSave, ctx);
-  const friendCharacterId = String(params.friend ?? "");
-  const messages = parseFriendMessagesFromParams(params);
-  if (!friendCharacterId.trim() || messages.length === 0) return;
-  await sendFriendMessages({
-    friendCharacterId,
-    messages,
-  }, getChatRuntimeKey(ctx));
-
-  // schema 默认打开；仅当明确为 false（含字符串 "false"）时跳过。
-  // 未打开时绝不能 waitUntilClose，否则会卡在等待关手机。
-  const shouldOpen =
-    options.openPhoneApp && coerceMethodBoolean(params.openPhone, true);
-  if (!shouldOpen) return;
-
-  const waitUntilClose = coerceMethodBoolean(params.waitUntilClose, false);
-  await openChatPhoneApp({
-    friendCharacterId,
-    waitUntil: waitUntilClose ? "close" : "none",
-  });
-}
-
-async function executeSendGroupMessages(
-  ctx: ExtensionContext,
-  params: Record<string, unknown>,
-  instanceSave: unknown,
-  allowWait: boolean,
-  options: { openPhoneApp: boolean },
-): Promise<void> {
-  prepareRuntime(instanceSave, ctx);
-  await executeGroupMemberMessage(ctx, params, allowWait, options);
-}
-
-/**
- * 执行「等待玩家回复」方法的核心逻辑。
- *
- * @param ctx - 扩展上下文
- * @param params - 方法块参数（含 `friend`、`reply` 槽位、`requireReply`、`openPhone` 等）
- * @param instanceSave - 包装类实例 this.save
- * @param allowWait - true 时按 `requireReply` 决定挂起或仅写入；false 时自动点选第一条（快进/skip）
- * @param options.openPhoneApp - 运行路径是否允许打开手机（`run` 为 true）
- * @returns Promise<void>
- *
- * @remarks
- * - **必须回复**（默认）：打开手机并深开该好友会话，挂起至玩家点选
- * - **非必须**：只写入可选回复，不打开手机、不挂起；玩家稍后打开手机仍可回复
- */
-async function executeAwaitPlayerReply(
-  ctx: ExtensionContext,
-  params: Record<string, unknown>,
-  instanceSave: unknown,
-  allowWait: boolean,
-  options: { openPhoneApp: boolean },
-): Promise<void> {
-  prepareRuntime(instanceSave, ctx);
-  const outgoingStatus = normalizeOutgoingStatus(params.outgoingStatus);
-  const friendCharacterId = String(params.friend ?? "");
-  const replies = parseRepliesFromParams(params);
-  if (!friendCharacterId.trim() || replies.length === 0) return;
-  const requireReply = coerceMethodBoolean(params.requireReply, true);
-  // 正常 run + 必须回复 → 挂起；非必须 → 只写 pending
-  const waitForReply = allowWait && requireReply;
-  // 必须回复时强制打开并跳转会话；非必须绝不打开
-  const shouldOpenPhone = options.openPhoneApp && waitForReply;
-
-  await awaitPlayerReply(ctx, {
-    friendCharacterId,
-    replies,
-    outgoingStatus,
-    allowWait,
-    waitForReply,
-    onPendingWritten: shouldOpenPhone
-      ? () => openChatPhoneApp({ friendCharacterId, waitUntil: "none" })
-      : undefined,
-  });
-
-  // 仅「必须回复且确实挂起过」时才可能关手机
-  if (waitForReply && coerceMethodBoolean(params.closePhoneAfter, false)) {
-    const rawDelay = Number(params.closeDelayMs);
-    const delayMs =
-      Number.isFinite(rawDelay) && rawDelay >= 0 ? rawDelay : 1000;
-    await closeChatPhoneAppAfter(delayMs);
-  }
-}
-
-async function executeAwaitGroupReply(
-  ctx: ExtensionContext,
-  params: Record<string, unknown>,
-  instanceSave: unknown,
-  allowWait: boolean,
-  options: { openPhoneApp: boolean },
-): Promise<void> {
-  prepareRuntime(instanceSave, ctx);
-  const groupId = String(params.groupId ?? "").trim();
-  const replies = parseRepliesFromParams(params);
-  if (!groupId || replies.length === 0) return;
-
-  const requireReply = coerceMethodBoolean(params.requireReply, true);
-  const waitForReply = allowWait && requireReply;
-  const shouldOpenPhone = options.openPhoneApp && waitForReply;
-  await awaitGroupReply(ctx, {
-    groupId,
-    replies,
-    outgoingStatus: normalizeOutgoingStatus(params.outgoingStatus),
-    allowWait,
-    waitForReply,
-    onPendingWritten: shouldOpenPhone
-      ? () => openGroupChatPhoneApp({ groupId, waitUntil: "none" })
-      : undefined,
-  });
-
-  if (waitForReply && coerceMethodBoolean(params.closePhoneAfter, false)) {
-    const rawDelay = Number(params.closeDelayMs);
-    const delayMs =
-      Number.isFinite(rawDelay) && rawDelay >= 0 ? rawDelay : 1000;
-    await closeChatPhoneAppAfter(delayMs);
-  }
-}
+  prepareRuntime,
+  executeSendFriendMessages,
+  executeSendGroupMessages,
+  executeAwaitPlayerReply,
+  executeAwaitGroupReply,
+} from "./runtime/method-execution";
 
 /**
  * 「对方发送消息」方法描述。
@@ -515,14 +345,17 @@ export const chatJoinGroupMethod = method({
   },
   run(ctx, params) {
     prepareRuntime(this.save, ctx);
+    if (isChatRestoreReplay(ctx)) return;
     joinGroupMember(String(params.groupId ?? ""), String(params.member ?? ""), getChatRuntimeKey(ctx));
   },
   runImmediately(ctx, params) {
     prepareRuntime(this.save, ctx);
+    if (isChatRestoreReplay(ctx)) return;
     joinGroupMember(String(params.groupId ?? ""), String(params.member ?? ""), getChatRuntimeKey(ctx));
   },
   skip(ctx, params) {
     prepareRuntime(this.save, ctx);
+    if (isChatRestoreReplay(ctx)) return;
     joinGroupMember(String(params.groupId ?? ""), String(params.member ?? ""), getChatRuntimeKey(ctx));
   },
 });
@@ -546,14 +379,17 @@ export const chatLeaveGroupMethod = method({
   },
   run(ctx, params) {
     prepareRuntime(this.save, ctx);
+    if (isChatRestoreReplay(ctx)) return;
     leaveGroupMember(String(params.groupId ?? ""), String(params.member ?? ""), getChatRuntimeKey(ctx));
   },
   runImmediately(ctx, params) {
     prepareRuntime(this.save, ctx);
+    if (isChatRestoreReplay(ctx)) return;
     leaveGroupMember(String(params.groupId ?? ""), String(params.member ?? ""), getChatRuntimeKey(ctx));
   },
   skip(ctx, params) {
     prepareRuntime(this.save, ctx);
+    if (isChatRestoreReplay(ctx)) return;
     leaveGroupMember(String(params.groupId ?? ""), String(params.member ?? ""), getChatRuntimeKey(ctx));
   },
 });
@@ -577,14 +413,17 @@ export const chatAddFriendMethod = method({
   },
   run(ctx, params) {
     prepareRuntime(this.save, ctx);
+    if (isChatRestoreReplay(ctx)) return;
     addFriend(String(params.friend ?? ""), getChatRuntimeKey(ctx));
   },
   runImmediately(ctx, params) {
     prepareRuntime(this.save, ctx);
+    if (isChatRestoreReplay(ctx)) return;
     addFriend(String(params.friend ?? ""), getChatRuntimeKey(ctx));
   },
   skip(ctx, params) {
     prepareRuntime(this.save, ctx);
+    if (isChatRestoreReplay(ctx)) return;
     addFriend(String(params.friend ?? ""), getChatRuntimeKey(ctx));
   },
 });
@@ -609,14 +448,17 @@ export const chatRemoveFriendMethod = method({
   },
   run(ctx, params) {
     prepareRuntime(this.save, ctx);
+    if (isChatRestoreReplay(ctx)) return;
     removeFriend(String(params.friend ?? ""), getChatRuntimeKey(ctx));
   },
   runImmediately(ctx, params) {
     prepareRuntime(this.save, ctx);
+    if (isChatRestoreReplay(ctx)) return;
     removeFriend(String(params.friend ?? ""), getChatRuntimeKey(ctx));
   },
   skip(ctx, params) {
     prepareRuntime(this.save, ctx);
+    if (isChatRestoreReplay(ctx)) return;
     removeFriend(String(params.friend ?? ""), getChatRuntimeKey(ctx));
   },
 });

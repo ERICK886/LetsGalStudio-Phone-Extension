@@ -17,6 +17,7 @@ import {
   notifyPhoneAppRegistryChanged,
   phoneSdkDiag,
   toPhoneAppId,
+  resolvePhoneAppReference,
   type PhoneAppRegistration,
   type PhoneSdkHost,
 } from "@ink-zenly/phone-sdk/plugin";
@@ -110,7 +111,7 @@ export function installPhoneExtensionSdkHost(): () => void {
     },
     getApp(id) {
       const key = toPhoneAppId(id) ?? id;
-      return getPhoneSdkAppsRegistry().get(key);
+      return resolvePhoneAppReference(id, [...getPhoneSdkAppsRegistry().values()]).app;
     },
     listApps() {
       return [...getPhoneSdkAppsRegistry().values()];
@@ -152,5 +153,5 @@ export function installPhoneExtensionSdkHost(): () => void {
 export function lookupPhoneSdkApp(id: string): PhoneAppRegistration | undefined {
   const key = toPhoneAppId(id);
   if (!key) return undefined;
-  return getPhoneSdkAppsRegistry().get(key);
+  return resolvePhoneAppReference(id, [...getPhoneSdkAppsRegistry().values()]).app;
 }

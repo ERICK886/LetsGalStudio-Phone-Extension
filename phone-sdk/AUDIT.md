@@ -259,3 +259,68 @@ sha512-WpNzltyC2aWiI/bhefHEaJ1pE+2isVgRUFCZUImq1FwCm9kz6MJW/JE6BQq0BuKUBvoAQ1IAO
 ```
 
 发布页：[CLI npm 0.3.8](https://www.npmjs.com/package/@ink-zenly/create-phone-app/v/0.3.8)。本节仅更新已发布 SDK 的仓库说明，未改动 SDK 运行时代码或重发 0.5.27。
+
+## 11. 手机聊天与后续运行周期修复（2026-10-23，未发布）
+
+针对重复记录、特定场景比例错误、会话无法再次进入及后续章节不记录四项反馈，沿宿主与聊天 APP 两条路径检查并修复。以下结论限于本次工作区源码与验证，版本号未修改。
+
+- 重复记录：恢复存档时，聊天方法读取宿主 `flow.isRestoring`，保留已恢复的记录、待回复和变量结果，不再重放追加消息或回复效果；普通 skip/即时执行仍保留原有写入语义，相同文字的正常发送不会被误去重。私聊和群聊均覆盖。
+- 比例错误：手机根容器改为相对 Studio UI Host 画布定位，避免无 transform 的宿主中误用浏览器视口；可用宽高为零时保持收缩，宽高使用同一比例。
+- 再次打开：未配置为好友但已有来信的会话保留在聊天列表，支持返回后再次进入；显式移除好友仍隐藏。剧情消息不再等待可能直到关闭才完成的 `ui.show()`，关闭等待实际隐藏后才放行下一组，避免旧关闭操作关掉新内容。
+- 后续周期：新增 `registerPhoneRuntimeCycle`，在同一引擎的 signal 更新后重新安装宿主导航及聊天设置订阅。聊天重新绑定实时 SaveAPI，UI 在存档变量变化时刷新；旧周期的回复等待、延迟关闭及卸载只清理自身资源，abort 结束剧情消息等待。
+
+验证记录：
+
+- 扫描 `phone-sdk/`、`src/` 下 55 个 `*.test.ts` 文件，232 项全部通过。新增回归覆盖恢复重放、回复变量效果、跨周期存档、导航重装、延迟关闭中止和连续剧情消息。
+- 使用已安装 Chromium/React 执行真实组件的浏览器 DOM 检查：未加好友会话连续返回并进入 3 次，每次仅有一份消息；600×500、240×320、700×900 宿主容器下均保持比例且不越界，剧情消息模式可显示，无浏览器控制台错误。该检查使用模拟 SDK 上下文，不是 Studio 剧本 Preview。
+- 根工程 `pnpm run build` 通过；`git diff --check` 通过。
+- TypeScript 仍只有既有的 `sdk/index.ts:22` 缺少 `./extension-inspector`（TS2307），未修改 SDK 合同副本来规避错误。
+
+边界：恢复去重依赖宿主提供 `flow.isRestoring`，已核对本地 light-engine 源码的实现；未确认用户正在运行的 Studio 是否包含该能力，旧宿主保持原执行语义。`show-message` 仍是原有的临时剧情展示，持久聊天记录由聊天 APP 模块管理。本次未在真实 Studio 中复现和验收具体剧本，未同步、重载、重启、提交、推送或发布。
+
+## 12. 版本号统一更新（2026-10-23，待发布）
+
+- 手机扩展从 1.3.4 升为 1.3.5，根 package.json 与 extension.json 一致；聊天、相册、电话及宿主模块共用该扩展包版本。
+- Phone SDK 从 0.5.27 升为 0.5.28，包含第 11 节宿主修复与 registerPhoneRuntimeCycle；公开入口的版本注释同步更新。
+- CLI 从 0.3.8 升为 0.3.9，SDK 依赖兜底从 `^0.5.27` 更新为 `^0.5.28`。根工程 CLI 依赖改为 `file:cli`，与已使用本仓 CLI 的脚本保持一致，避免依赖尚未发布的 npm 版本。
+- 当前版本说明、安装示例与更新日志同步更新，并标记待发布。历史发布记录、第三方依赖版本、Studio SDK 合同副本及脚手架新项目的初始版本 0.1.0 保留。
+
+验证：CLI 扫描 11 个测试文件，38 项通过；命令行 `--version` 输出 0.3.9。Phone SDK / CLI 本地打包分别包含 116 / 69 个文件，测试文件均未入包，新增 runtime-cycle 源码在 SDK 包内。解包后的独立 CLI 版本解析返回 `^0.5.28`；本仓 CLI 实际生成的 default/minimal 工程也声明 `^0.5.28`，清单与 package.json 的初始版本一致。
+
+根锁文件由 pnpm 离线生成，并保留无关的 Rollup 平台元数据；冻结锁文件检查通过。未重装当前工作区 node_modules。扩展 1.3.5 根构建通过，git diff --check 通过。本次仅更新版本元数据、依赖引用和文档，SDK/内页功能测试沿用第 11 节的 232 项通过记录；此前类型检查的 extension-inspector 缺失问题仍未处理。
+
+独立安装限制：曾尝试在临时工程安装本次 CLI tarball，但本地 store 缺少 `@clack/prompts@0.10.1`，联网重试又因 `registry.npmjs.org` 的 DNS 解析失败而中止。因此本次未完成独立工程安装与构建，包内容检查和根构建不能替代该项验证。
+
+宿主兼容复核：只读检查 `E:/light-engine`，确认 SDK 公开且运行时实现 `flow.isRestoring`、`runtime:started` 和 `variable:changed`，执行相关 5 个测试文件，82 项通过；不据此断言用户已安装 Studio 的版本。未修改 LGS 源码或主进程，未同步、重启、提交、推送或发布。
+
+## 13. SDK 0.5.28 / CLI 0.3.9 发布验证（2026-10-23）
+
+本节记录用户授权后的实际 npm 发布结果，更新第 11、12 节当时未发布及独立安装未完成的状态。手机扩展 1.3.5 由用户自主发布，本次没有发布手机扩展。
+
+- 发布前重新执行 SDK / 内页 55 个测试文件，232 项全部通过；CLI 11 个测试文件，38 项全部通过。
+- SDK tarball 包含 116 个文件、208975 字节，包含新增 runtime-cycle 源码；CLI tarball 包含 69 个文件、66487 字节。两者均不包含测试文件，CLI bin 的 shebang 使用 LF，发布清单及依赖声明已核对。
+- 在独立临时工程安装本次 CLI tarball，实际 bin 的版本、四类帮助页及非法 app-id 拒绝路径通过。使用安装后的 CLI 创建 default/minimal 宿主，并向 default 添加第二个内页；生成依赖范围均为 `^0.5.28`。为发布前验证，将测试工程的 SDK 依赖替换为本次 SDK tarball，分别安装自身依赖并构建成功，未借用根工程 node_modules。
+- SDK 公开后，使用上述 CLI 的 `pack` 从 default 抽离第二个内页；生成工程直接从 npm 安装 SDK 0.5.28 并构建成功，生成 `dist/index.mjs`，扩展包 ID 与程序 ID 分别核对一致。
+- 根工程 CLI 依赖从临时的 `file:cli` 恢复为已发布的 0.3.9；锁文件由 pnpm 生成，integrity 与官方包一致，保留原有 Rollup 平台元数据，冻结锁文件离线校验通过。未重装根工程 node_modules；本仓脚手架命令继续运行 `cli/` 源码。
+- npm 官方源 `latest` 已分别为 SDK 0.5.28 和 CLI 0.3.9；两个版本的 `dist.integrity` 及重新下载的官方 tarball 均与本地发布包一致。北京时间发布时间：SDK 为 2026-10-23 17:51:50，CLI 为 2026-10-23 17:59:06。
+
+已发布包的 SHA-512：
+
+```text
+@ink-zenly/phone-sdk@0.5.28
+sha512-eromQC36VayCwYfku87q6PiK0LOuM2SQeiP+O4E94iZGZa52qC/zVOzqzg7KHDuupxEPqw1uq3GtZ/JybXSFSA==
+
+@ink-zenly/create-phone-app@0.3.9
+sha512-+ZJnEoOAtOIIMNXGiRdPcVEptJsh6J5nHqkbg737INr5UoUqchksXlYJhXr5IPY+46ihyvv0o8SsnU52G7ejyg==
+```
+
+发布页：[SDK npm 0.5.28](https://www.npmjs.com/package/@ink-zenly/phone-sdk/v/0.5.28)、[CLI npm 0.3.9](https://www.npmjs.com/package/@ink-zenly/create-phone-app/v/0.3.9)。本地发布包与校验记录保留于 `release/npm-20261023/`。
+
+类型检查限制仍存在：根工程 `sdk/index.ts:22` 缺少 `./extension-inspector`（TS2307）；CLI 显式允许源码 `.ts` 导入后缀后，仍有 `src/index.ts:228/230/232` 三处 citty showUsage 泛型不匹配（TS2345）和 `src/utils/template.test.ts:82` 参数个数错误（TS2554）。这些与既有诊断一致，未修改 Studio SDK 合同或绕过类型检查。此前根构建通过；独立工程构建和 npm 下载校验不能替代真实 Studio 剧本验收。本次未同步、重启 Studio，未 Git 提交或推送。
+
+
+## 2026-11-12 工作区结构调整
+
+已增补宿主/插件/编辑器公开入口、带来源的注册解析与清理、独立软件设置桥，以及 CLI 项目/软件描述协议。旧根入口、程序 ID 和持久化定义保持兼容。
+
+本次执行记录见 [结构调整验证记录](../architecture/phone-structure-validation.md)：SDK/软件测试 240 项、CLI 测试 40 项通过，实际 tarball 隔离安装与六类工程构建通过。根完整类型检查仍受既有 `sdk/extension-inspector` 缺失阻塞；未进行新代码的真实 Studio 验收，未发布。

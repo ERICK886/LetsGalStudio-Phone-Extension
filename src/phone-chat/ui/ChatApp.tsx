@@ -169,6 +169,7 @@ export function ChatApp(props: PhoneAppRenderProps) {
         threads={state.threads}
         groups={groups}
         friendIds={friendIds}
+        removedFriendIds={state.friendsRemoved}
         bottomInset={safeAreaInsets.bottom}
         onCloseApp={closeApp}
         onChangeTab={session.goTabs}

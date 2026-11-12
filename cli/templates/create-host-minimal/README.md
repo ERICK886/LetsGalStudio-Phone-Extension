@@ -1,8 +1,16 @@
 # {{title}}
 
-LetsGal 手机**宿主**扩展（minimal）。`sdk/` = `@avg-studio/sdk`；phone-sdk = `{{phoneSdkVersion}}`；内页 `src/{{appId}}/`。`vite.config.ts` 已配置 define `__PHONE_HOST_EXTENSION_ID__`。
+工程角色：`{{projectKind}}`；扩展 ID：`{{extensionId}}`。
 
-入口导出 PhoneExtension、PhoneHudExtension、ToastExtension、PhoneEditorExtension；minimal 精简目录内容，仍保留宿主、HUD、通知和作者编辑器模块。
+- `src/index.tsx`：导出 Studio 控制器。
+- `src/phone-apps.ts`：注册软件；与控制器导出缺一不可。
+- `src/apps/{{appId}}/`：软件 UI、控制器与 `phone-app.json`。
+- `phone-project.json`：CLI 目录协议。
 
-**开发：** `pnpm install` → `pnpm watch` → Studio 仅启用本扩展  
-**分发内页：** `pnpm create-phone-app pack {{appId}}` → 产物 `./release/`
+`pnpm install` 安装依赖，`pnpm build` 构建，`pnpm watch` 监听源码。
+`create-phone-app add notes --title 便签` 增加软件。
+`create-phone-app doctor` 检查接入，`create-phone-app pack {{appId}}` 准备独立分发包。
+
+独立软件模式需要同时启用手机宿主。桌面应用引用可填 `{{extensionId}}/{{appId}}`。
+应用设置与存档放在软件控制器，不要因注册或重新挂载重置。
+SDK 新版与 CLI 必须配套；本仓开发时自动使用本地 SDK，发布前按 CLI 文档检查版本。

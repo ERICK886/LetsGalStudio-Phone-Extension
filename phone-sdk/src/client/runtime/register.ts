@@ -6,305 +6,20 @@
  * @version 0.2.0
  */
 
-import { isPhoneAppId, toPhoneAppId } from "./app-id";
+import { toPhoneAppId, parseStudioProgramRef } from "./app-id";
 import { phoneSdkDebug } from "../debug/debug";
 import { getPhoneSdkSlot } from "./slot";
-import { normalizeCustomPanesResolver } from "./normalize-custom-panes";
-import type {
-  PhoneAppRegistration,
-  PhoneAppStyleEditorMeta,
-  PhoneEditorContentItemSchema,
-  PhoneEditorFieldType,
-  PhoneEditorPageSchema,
-} from "./types";
+import { parsePhoneAppRegistration } from "./parse-registration";
+import { resolvePhoneAppReference } from "./resolve-app";
+import type { PhoneAppRegistration } from "./types";
 
 export { isPhoneAppId } from "./app-id";
-
-/**
- * 规范化并校验一条注册描述。
- * `id` 会规约为 Studio 程序 ID（支持误填 `扩展ID/程序ID`）。
- *
- * @param app 原始注册对象
- * @returns 净化后的对象；非法时返回 `null` 并打警告
- */
-function normalizeRegistration(app: PhoneAppRegistration): PhoneAppRegistration | null {
-  if (!app || typeof app !== "object") {
-    console.warn("[phone-sdk] registerPhoneApp: 参数无效");
-    return null;
-  }
-
-  const normalizedId = typeof app.id === "string" ? toPhoneAppId(app.id) : null;
-  if (!normalizedId || !isPhoneAppId(normalizedId)) {
-    console.warn(
-      "[phone-sdk] registerPhoneApp: id 须等于 Studio 程序 ID（@extension({ id })），"
-        + "也可填写「扩展ID/程序ID」由 SDK 自动取程序段。示例：phone-snake 或 ink.zenly.ext-phone-snake/phone-snake",
-      app.id,
-    );
-    return null;
-  }
-
-  if (typeof app.render !== "function") {
-    console.warn("[phone-sdk] registerPhoneApp: render 必须是函数", normalizedId);
-    return null;
-  }
-
-  const title = typeof app.title === "string" && app.title.trim()
-    ? app.title.trim().slice(0, 64)
-    : undefined;
-  const description = typeof app.description === "string" && app.description.trim()
-    ? app.description.trim().slice(0, 160)
-    : undefined;
-  const styleEditor = normalizeStyleEditor(app.styleEditor);
-
-  return {
-    id: normalizedId,
-    ...(title ? { title } : {}),
-    ...(description ? { description } : {}),
-    ...(styleEditor ? { styleEditor } : {}),
-    render: app.render,
-  };
-}
-
-/**
- * 规范化 `styleEditor` 字段；非法对象忽略。
- *
- * @param raw - 原始 styleEditor
- * @returns 净化后的元数据或 undefined
- */
-function normalizeStyleEditor(
-  raw: PhoneAppRegistration["styleEditor"],
-): PhoneAppRegistration["styleEditor"] | undefined {
-  if (!raw || typeof raw !== "object") return undefined;
-
-  const enabled = raw.enabled === false ? false : true;
-  const label =
-    typeof raw.label === "string" && raw.label.trim()
-      ? raw.label.trim().slice(0, 40)
-      : undefined;
-  const icon =
-    typeof raw.icon === "string" && raw.icon.trim()
-      ? raw.icon.trim().slice(0, 64)
-      : undefined;
-  const order =
-    typeof raw.order === "number" && Number.isFinite(raw.order)
-      ? raw.order
-      : undefined;
-  const pages = normalizeEditorPages(raw.pages);
-  const contentItems = normalizeEditorContentItems(raw.contentItems);
-  const settingsModuleId =
-    typeof raw.settingsModuleId === "string" && raw.settingsModuleId.trim()
-      ? raw.settingsModuleId.trim().slice(0, 64)
-      : undefined;
-
-  return {
-    enabled,
-    ...(label ? { label } : {}),
-    ...(icon ? { icon } : {}),
-    ...(order !== undefined ? { order } : {}),
-    ...(settingsModuleId ? { settingsModuleId } : {}),
-    ...(contentItems ? { contentItems } : {}),
-    ...(pages ? { pages } : {}),
-    ...normalizeCustomPanesResolver(raw),
-  };
-}
-
-const FIELD_TYPES = new Set<PhoneEditorFieldType>([
-  "string",
-  "color",
-  "enum",
-  "asset",
-  "shortcut",
-  "boolean",
-  "number",
-  "character",
-]);
-
-/**
- * 规范化 styleEditor.contentItems。
- *
- * @param raw - 原始内容项
- * @returns 净化列表或 undefined
- */
-function normalizeEditorContentItems(
-  raw: PhoneAppStyleEditorMeta["contentItems"] | undefined,
-): PhoneEditorContentItemSchema[] | undefined {
-  if (!Array.isArray(raw) || raw.length === 0) return undefined;
-
-  const items: PhoneEditorContentItemSchema[] = [];
-
-  for (const item of raw.slice(0, 80)) {
-    if (!item || typeof item !== "object") continue;
-    const id =
-      typeof item.id === "string" && item.id.trim()
-        ? item.id.trim().slice(0, 64)
-        : "";
-    const group =
-      typeof item.group === "string" && item.group.trim()
-        ? item.group.trim().slice(0, 40)
-        : "";
-    const label =
-      typeof item.label === "string" && item.label.trim()
-        ? item.label.trim().slice(0, 40)
-        : "";
-    if (!id || !group || !label) continue;
-    if (!FIELD_TYPES.has(item.fieldType)) continue;
-
-    const icon =
-      typeof item.icon === "string" && item.icon.trim()
-        ? item.icon.trim().slice(0, 64)
-        : undefined;
-    const defaultValue =
-      typeof item.defaultValue === "string" ? item.defaultValue : "";
-    const description =
-      typeof item.description === "string" && item.description.trim()
-        ? item.description.trim().slice(0, 240)
-        : undefined;
-    const settingKey =
-      typeof item.settingKey === "string" && item.settingKey.trim()
-        ? item.settingKey.trim().slice(0, 64)
-        : undefined;
-    const allowEmpty = item.allowEmpty === true ? true : undefined;
-    const assetKind = item.fieldType === "asset" &&
-      (item.assetKind === "image" ||
-        item.assetKind === "audio" ||
-        item.assetKind === "video" ||
-        item.assetKind === "any")
-      ? item.assetKind
-      : undefined;
-    const multiline = item.multiline === true ? true : undefined;
-    const min = typeof item.min === "number" && Number.isFinite(item.min) ? item.min : undefined;
-    const max = typeof item.max === "number" && Number.isFinite(item.max) ? item.max : undefined;
-    const step = typeof item.step === "number" && Number.isFinite(item.step) && item.step > 0
-      ? item.step
-      : undefined;
-    const settingsModuleId =
-      typeof item.settingsModuleId === "string" && item.settingsModuleId.trim()
-        ? item.settingsModuleId.trim().slice(0, 64)
-        : undefined;
-    const dependsOn =
-      item.dependsOn &&
-      typeof item.dependsOn === "object" &&
-      typeof item.dependsOn.contentItemId === "string" &&
-      item.dependsOn.contentItemId.trim() &&
-      typeof item.dependsOn.equals === "string"
-        ? {
-            contentItemId: item.dependsOn.contentItemId.trim().slice(0, 64),
-            equals: item.dependsOn.equals.slice(0, 64),
-          }
-        : undefined;
-    const enumOptions = Array.isArray(item.enumOptions)
-      ? item.enumOptions
-          .filter(
-            (opt): opt is { value: string; label: string } =>
-              Boolean(opt) &&
-              typeof opt === "object" &&
-              typeof opt.value === "string" &&
-              typeof opt.label === "string",
-          )
-          .map((opt) => ({
-            value: opt.value.trim().slice(0, 64),
-            label: opt.label.trim().slice(0, 40),
-          }))
-          .filter((opt) => opt.value && opt.label)
-          .slice(0, 40)
-      : undefined;
-
-    items.push({
-      id,
-      group,
-      label,
-      fieldType: item.fieldType,
-      defaultValue,
-      ...(icon ? { icon } : {}),
-      ...(description ? { description } : {}),
-      ...(settingKey ? { settingKey } : {}),
-      ...(allowEmpty ? { allowEmpty } : {}),
-      ...(assetKind ? { assetKind } : {}),
-      ...(multiline ? { multiline } : {}),
-      ...(min !== undefined ? { min } : {}),
-      ...(max !== undefined ? { max } : {}),
-      ...(step !== undefined ? { step } : {}),
-      ...(settingsModuleId ? { settingsModuleId } : {}),
-      ...(dependsOn ? { dependsOn } : {}),
-      ...(enumOptions && enumOptions.length > 0 ? { enumOptions } : {}),
-    });
-  }
-
-  return items.length > 0 ? items : undefined;
-}
-
-/**
- * 规范化 `styleEditor.pages`；非法项丢弃，全空则返回 undefined。
- *
- * @param raw - 原始 pages
- * @returns 净化后的页面列表
- */
-function normalizeEditorPages(
-  raw: PhoneAppStyleEditorMeta["pages"] | undefined,
-): PhoneEditorPageSchema[] | undefined {
-  if (!Array.isArray(raw) || raw.length === 0) return undefined;
-
-  const pages: PhoneEditorPageSchema[] = [];
-
-  for (const item of raw.slice(0, 40)) {
-    if (!item || typeof item !== "object") continue;
-    const id =
-      typeof item.id === "string" && item.id.trim()
-        ? item.id.trim().slice(0, 64)
-        : "";
-    const label =
-      typeof item.label === "string" && item.label.trim()
-        ? item.label.trim().slice(0, 40)
-        : "";
-    if (!id || !label) continue;
-
-    const icon =
-      typeof item.icon === "string" && item.icon.trim()
-        ? item.icon.trim().slice(0, 64)
-        : undefined;
-    const order =
-      typeof item.order === "number" && Number.isFinite(item.order)
-        ? item.order
-        : undefined;
-    const status =
-      item.status === "comingSoon" || item.status === "ready"
-        ? item.status
-        : undefined;
-    const preview =
-      item.preview === "desktop" ||
-      item.preview === "chat" ||
-      item.preview === "phone-call" ||
-      item.preview === "placeholder"
-        ? item.preview
-        : undefined;
-    const contentItemIds = Array.isArray(item.contentItemIds)
-      ? item.contentItemIds
-          .filter((x): x is string => typeof x === "string" && x.trim().length > 0)
-          .map((x) => x.trim().slice(0, 64))
-          .slice(0, 80)
-      : undefined;
-
-    pages.push({
-      id,
-      label,
-      ...(icon ? { icon } : {}),
-      ...(order !== undefined ? { order } : {}),
-      ...(status ? { status } : {}),
-      ...(preview ? { preview } : {}),
-      ...(contentItemIds && contentItemIds.length > 0
-        ? { contentItemIds }
-        : {}),
-    });
-  }
-
-  return pages.length > 0 ? pages : undefined;
-}
 
 /**
  * 向手机扩展注册一个可在手机内部显示的应用。
  *
  * @param app 应用描述（id + render 必填）；`id` 必须与本程序 `@extension({ id })` 一致
- * @returns void
+ * @returns 仅注销本次注册的幂等清理函数；旧实例不会清除新注册
  * @throws 不抛出；非法参数只警告并忽略
  *
  * @example
@@ -322,11 +37,31 @@ function normalizeEditorPages(
  * }
  * ```
  */
-export function registerPhoneApp(app: PhoneAppRegistration): void {
-  const normalized = normalizeRegistration(app);
-  if (!normalized) return;
-
+export function registerPhoneApp(app: PhoneAppRegistration): () => void {
   const slot = getPhoneSdkSlot();
+  const input = app && typeof app === "object" && !app.extensionId && slot.registrationContext
+    ? { ...app, extensionId: slot.registrationContext.extensionId } : app;
+  const parsed = parsePhoneAppRegistration(input);
+  const normalized = parsed.app;
+  if (!normalized) {
+    console.warn("[phone-sdk] 注册描述无效", parsed.issues);
+    return () => undefined;
+  }
+  const existing = slot.host?.getApp(normalized.id) ?? slot.queue.find((item) => item.id === normalized.id) ?? slot.apps?.get(normalized.id);
+  if (existing?.extensionId && normalized.extensionId !== existing.extensionId) {
+    console.warn("[phone-sdk] 程序 ID 已被其他扩展占用，已保留原应用", {
+      id: normalized.id, owner: existing.extensionId, rejectedOwner: normalized.extensionId,
+    });
+    return () => undefined;
+  }
+  slot.registrationTokens ??= new Map();
+  const token = {};
+  slot.registrationTokens.set(normalized.id, token);
+  const dispose = () => {
+    if (slot.registrationTokens?.get(normalized.id) !== token) return;
+    unregisterPhoneApp(normalized.extensionId ? `${normalized.extensionId}/${normalized.id}` : normalized.id);
+  };
+  slot.registrationContext?.disposers.push(dispose);
   slot.unregisterQueue = slot.unregisterQueue.filter((id) => id !== normalized.id);
   if (slot.host) {
     slot.host.registerApp(normalized);
@@ -337,7 +72,7 @@ export function registerPhoneApp(app: PhoneAppRegistration): void {
       queued: false,
     });
     notifyPhoneAppRegistryChanged();
-    return;
+    return dispose;
   }
 
   const index = slot.queue.findIndex((item) => item.id === normalized.id);
@@ -354,6 +89,7 @@ export function registerPhoneApp(app: PhoneAppRegistration): void {
     queueLength: slot.queue.length,
   });
   notifyPhoneAppRegistryChanged();
+  return dispose;
 }
 
 /**
@@ -370,6 +106,10 @@ export function unregisterPhoneApp(id: string): void {
   }
 
   const slot = getPhoneSdkSlot();
+  const reference = parseStudioProgramRef(id)!;
+  const current = slot.host?.getApp(normalizedId) ?? slot.queue.find((item) => item.id === normalizedId) ?? slot.apps?.get(normalizedId);
+  if (reference.extensionId && current?.extensionId && reference.extensionId !== current.extensionId) return;
+  slot.registrationTokens?.delete(normalizedId);
   if (slot.host) {
     slot.host.unregisterApp(normalizedId);
     phoneSdkDebug("unregisterPhoneApp → 已从宿主移除", { id: normalizedId, hostReady: true });
@@ -396,9 +136,8 @@ export function unregisterPhoneApp(id: string): void {
  * @returns 注册对象或 `undefined`
  */
 export function getRegisteredPhoneApp(id: string): PhoneAppRegistration | undefined {
-  const normalizedId = toPhoneAppId(id);
-  if (!normalizedId) return undefined;
-  return getPhoneSdkSlot().host?.getApp(normalizedId);
+  const host = getPhoneSdkSlot().host;
+  return host ? resolvePhoneAppReference(id, host.listApps()).app : undefined;
 }
 
 /**

@@ -70,3 +70,11 @@ export function resolvePhoneSdkVersion(): string {
       "CLI package.json 也未配置 inkZenly.phoneSdkVersion",
   );
 }
+
+/** 本仓联调使用实际源码；独立安装的 CLI 使用发布时固定的 SDK 范围。 */
+export function resolvePhoneSdkDependency(override?: string): string {
+  if (override?.trim()) return override.trim();
+  const local = join(CLI_ROOT, "..", "phone-sdk");
+  if (existsSync(join(local, "package.json"))) return `file:${local.replace(/\\/g, "/")}`;
+  return resolvePhoneSdkVersion();
+}

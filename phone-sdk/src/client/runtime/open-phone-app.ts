@@ -6,6 +6,8 @@
  * @version 0.5.0
  */
 
+import { normalizePhoneAppReference } from "./app-id";
+import { getRegisteredPhoneApp } from "./register";
 import { getPhoneSdkSlot } from "./slot";
 import type { OpenPhoneAppOptions, OpenPhoneAppResult } from "./types";
 
@@ -22,7 +24,7 @@ import type { OpenPhoneAppOptions, OpenPhoneAppResult } from "./types";
 export async function openPhoneApp(
   options: OpenPhoneAppOptions,
 ): Promise<OpenPhoneAppResult> {
-  const appId = String(options.appId ?? "").trim();
+  const appId = normalizePhoneAppReference(options.appId);
   if (!appId) {
     console.warn("[phone-sdk] openPhoneApp: 空 appId，已忽略");
     return "invalid";
@@ -32,6 +34,7 @@ export async function openPhoneApp(
     console.warn("[phone-sdk] openPhoneApp: 手机宿主未安装，已忽略", { appId });
     return "unavailable";
   }
+  if (getPhoneSdkSlot().host && !getRegisteredPhoneApp(appId)) return "unavailable";
   const result = await nav.openPhoneApp({
     appId,
     waitUntil: options.waitUntil === "none" ? "none" : "close",

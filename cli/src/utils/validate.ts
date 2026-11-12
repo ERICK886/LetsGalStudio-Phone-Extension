@@ -28,7 +28,7 @@ export const EXTENSION_ID_RE = /^[a-z][a-z0-9.-]*$/;
  * ```
  */
 export function assertValidAppId(appId: string): void {
-  if (!APP_ID_RE.test(appId)) {
+  if (appId.length > 64 || !APP_ID_RE.test(appId)) {
     throw new Error(
       `非法 app-id「${appId}」。须匹配 ^[a-z][a-z0-9-]*$（小写字母开头，仅小写字母/数字/连字符）`,
     );
@@ -49,7 +49,7 @@ export function assertValidAppId(appId: string): void {
  * ```
  */
 export function assertValidExtensionId(extensionId: string): void {
-  if (!EXTENSION_ID_RE.test(extensionId)) {
+  if (extensionId.length > 128 || !EXTENSION_ID_RE.test(extensionId)) {
     throw new Error(
       `非法 extension-id「${extensionId}」。须匹配 ^[a-z][a-z0-9.-]*$（小写字母开头，可含小写字母/数字/点/连字符）`,
     );

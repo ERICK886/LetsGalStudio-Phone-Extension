@@ -11,7 +11,7 @@ import {
   isInternalSystemSlot,
   resolveUIRef,
 } from "@avg-studio/sdk";
-import { toPhoneAppId } from "@ink-zenly/phone-sdk/plugin";
+import { normalizePhoneAppReference } from "@ink-zenly/phone-sdk/plugin";
 import { getPhoneHostExtensionId } from "../../host-extension-id";
 import type {
   ActionSettingsRow,
@@ -145,7 +145,7 @@ function parseTarget(value: unknown): PhoneTarget | null {
     case "in-phone-app": {
       // 宿主内置内页填程序 ID（如 phone-chat）；跨扩展仍可填「扩展ID/程序ID」，规约为程序 ID 查找。
       if (typeof value.phoneAppId !== "string") return null;
-      const appId = toPhoneAppId(value.phoneAppId);
+      const appId = normalizePhoneAppReference(value.phoneAppId);
       return appId ? { kind: "in-phone-app", phoneAppId: appId } : null;
     }
     default:
@@ -180,7 +180,7 @@ export function getPhoneActionValidationError(
     return "动作名称不能为空且不能超过 32 个字符";
   if (action.target.kind === "in-phone-app") {
     const ref = String(action.target.phoneAppId ?? "").trim();
-    if (!toPhoneAppId(ref)) {
+    if (!normalizePhoneAppReference(ref)) {
       return "Phone SDK 应用 ID 须为程序 ID（如 phone-chat），或「扩展ID/程序ID」";
     }
   }

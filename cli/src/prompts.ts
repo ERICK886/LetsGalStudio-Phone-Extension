@@ -1,3 +1,4 @@
+import { readPhoneProject, projectPath } from "./utils/project.ts";
 /**
  * @file prompts.ts
  * @description create-phone-app 交互向导问题封装（@clack/prompts）。
@@ -308,7 +309,7 @@ export async function promptAddOptions(
  * ```
  */
 export async function promptPackAppId(hostRoot: string): Promise<string> {
-  const srcDir = join(hostRoot, "src");
+  const srcDir = projectPath(hostRoot, readPhoneProject(hostRoot).appsDir);
   let entries: string[] = [];
 
   try {

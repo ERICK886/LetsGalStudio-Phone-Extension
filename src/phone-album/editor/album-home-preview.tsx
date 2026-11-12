@@ -18,7 +18,7 @@ import {
   PhonePreviewStatusBar,
   readPhoneAppearanceValues,
   useTheme,
-} from "@ink-zenly/phone-sdk";
+} from "@ink-zenly/phone-sdk/editor";
 
 import { ALL_ALBUM_ID, CAMERA_ALBUM_ID } from "../constants";
 import { buildAlbumCatalog } from "../domain/index";

@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "phone-chat",
+  "registration": {
+    "entry": "ui/register.tsx",
+    "export": "registerChatPhoneApp"
+  },
+  "controller": {
+    "entry": "index.tsx",
+    "exports": [
+      "ChatController"
+    ]
+  }
+}

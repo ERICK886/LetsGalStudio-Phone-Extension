@@ -36,6 +36,7 @@ import {
 } from "./phone-host-editor-schema";
 import {
   readSectionFieldValues,
+  subscribeModuleSetting,
   writeSectionContentItem,
 } from "./section-settings-bridge";
 
@@ -101,6 +102,11 @@ export function useSchemaEditorPanes(
   }, [ctx, schema, revision]);
 
   const bumpRevision = useCallback(() => setRevision((n) => n + 1), []);
+
+  useEffect(() => {
+    const cleanups = schema.contentItems.map((item) => subscribeModuleSetting(ctx, item.settingsModuleId ?? schema.settingsModuleId, item.settingKey ?? item.id, bumpRevision));
+    return () => { for (const cleanup of cleanups) cleanup(); };
+  }, [ctx, schema, bumpRevision]);
 
   const handleChange = useCallback(
     (id: string, value: string) => {

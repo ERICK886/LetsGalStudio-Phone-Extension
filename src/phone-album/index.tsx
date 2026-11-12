@@ -1,3 +1,4 @@
+import { bindPhoneAppSettings } from "@ink-zenly/phone-sdk/plugin";
 /**
  * @file index.tsx
  * @description 手机相册扩展模块：独立 `@extension` 程序，自有设置 / 存档 / Fragment 方法。
@@ -22,7 +23,7 @@ import {
   type ExtensionContext,
 } from "@avg-studio/sdk";
 
-import { PROGRAM_ID } from "./constants";
+import { PROGRAM_ID, EXTENSION_ID } from "./constants";
 import { buildAlbumSettingsFields } from "./settings-fields";
 import { albumSaveSchemaFields } from "./save-fields";
 import {
@@ -85,6 +86,7 @@ export class PhoneAlbumExtension extends Extension {
    * @param ctx - 本模块扩展上下文
    */
   static onRegister(ctx: ExtensionContext): void {
+    bindPhoneAppSettings(`${EXTENSION_ID}/${PROGRAM_ID}`, ctx.settings, ctx.flow.signal);
     const runtimeKey = getAlbumRuntimeKey(ctx);
     albumRegistrationCleanups.get(runtimeKey)?.();
     cacheAuthorSettings(runtimeKey, readAuthorSettings(ctx));

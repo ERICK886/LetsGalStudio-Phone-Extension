@@ -10,7 +10,7 @@ import type { ExtensionContext } from "@avg-studio/sdk";
 import {
   readModuleSetting,
   writeModuleSetting,
-} from "@ink-zenly/phone-sdk";
+} from "@ink-zenly/phone-sdk/editor";
 
 import { ALBUM_SETTINGS_MODULE_ID } from "./album-app-editor-schema.ts";
 import {

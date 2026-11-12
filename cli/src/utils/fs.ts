@@ -55,6 +55,7 @@ export function findHostRepoRoot(startDir: string): string | null {
   let dir = resolve(startDir);
 
   while (true) {
+    if (existsSync(join(dir, "phone-project.json"))) return dir;
     const indexPath = join(dir, HOST_INDEX_REL);
 
     if (existsSync(indexPath)) {

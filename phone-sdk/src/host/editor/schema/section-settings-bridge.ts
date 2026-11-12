@@ -1,3 +1,18 @@
+import { getPhoneAppSettings } from "../../../client/runtime/app-settings";
+import { listRegisteredPhoneApps } from "../../../client/runtime/register";
+import { parseStudioProgramRef } from "../../../client/runtime/app-id";
+import { getPhoneHostExtensionId } from "../../host-extension-id";
+
+/** 无独立软件的自身设置桥时，禁止误写宿主包下同名字段。 */
+function canUseHostSettings(moduleId: string): boolean {
+  const ref = parseStudioProgramRef(moduleId);
+  if (!ref) return false;
+  const app = listRegisteredPhoneApps().find((item) => item.id === ref.programId);
+  if (ref.extensionId && app?.extensionId && ref.extensionId !== app.extensionId) return false;
+  const owner = ref.extensionId || app?.extensionId;
+  return !owner || owner === getPhoneHostExtensionId();
+}
+
 /**
  * @file section-settings-bridge.ts
  * @description 按分区 schema 跨模块读写 settings（contentItems 驱动）。
@@ -69,7 +84,10 @@ export function readModuleSetting(
   key: string,
 ): unknown {
   try {
-    return ctx.settings.cross.get(moduleId, key);
+    const access = getPhoneAppSettings(moduleId);
+    if (access) return access.get(key);
+    if (!canUseHostSettings(moduleId)) return undefined;
+    return ctx.settings.cross.get(parseStudioProgramRef(moduleId)?.programId ?? moduleId, key);
   } catch (err) {
     console.warn(
       `[phone-editor] settings.cross.get("${moduleId}", "${key}") 失败`,
@@ -95,7 +113,13 @@ export function writeModuleSetting(
   value: unknown,
 ): boolean {
   try {
-    ctx.settings.cross.set(moduleId, key, value);
+    const access = getPhoneAppSettings(moduleId);
+    if (access) { access.set(key, value); return true; }
+    if (!canUseHostSettings(moduleId)) {
+      console.warn("[phone-editor] 独立软件尚未绑定自己的设置上下文，已拒绝写入", moduleId);
+      return false;
+    }
+    ctx.settings.cross.set(parseStudioProgramRef(moduleId)?.programId ?? moduleId, key, value);
     return true;
   } catch (err) {
     console.warn(
@@ -172,4 +196,12 @@ export function writeSectionContentItem(
     contentItemSettingKey(item),
     payload,
   );
+}
+
+/** 订阅优先使用软件自己的设置上下文。 */
+export function subscribeModuleSetting(ctx: ExtensionContext, moduleId: string, key: string, listener: () => void): () => void {
+  const access = getPhoneAppSettings(moduleId);
+  if (access) return access.subscribe(key, listener);
+  if (!canUseHostSettings(moduleId)) return () => undefined;
+  return ctx.settings.cross.subscribe(parseStudioProgramRef(moduleId)?.programId ?? moduleId, key, listener);
 }

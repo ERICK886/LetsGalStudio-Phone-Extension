@@ -10,7 +10,8 @@
   --phone-enter-x: 56px;
   --phone-enter-y: 56px;
   --phone-transform-origin: bottom right;
-  position: fixed;
+  /* 以 Studio UI Host 的画布为包含块；fixed 在无 transform 的宿主中会误用浏览器视口。 */
+  position: absolute;
   inset: 0;
   z-index: 2147483000;
   display: grid;

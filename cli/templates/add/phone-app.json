@@ -1,0 +1,6 @@
+{
+  "schemaVersion": 1,
+  "id": "{{appId}}",
+  "registration": { "entry": "index.tsx", "export": "{{registerFnName}}" },
+  "controller": { "entry": "index.tsx", "exports": ["{{pascalName}}Controller"] }
+}

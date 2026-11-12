@@ -3,12 +3,14 @@
  * @description create-phone-app CLI 入口（citty）：create / add / pack 子命令与无参向导。
  * @author 池水三两升
  * @date 2026-08-01
- * @version 0.3.8
+ * @version 0.3.9
  */
 
 import { readFileSync } from "node:fs";
 import { defineCommand, runCommand, showUsage } from "citty";
 
+import { runDoctor } from "./commands/doctor.ts";
+import { runBuild } from "./commands/build.ts";
 import { runAdd } from "./commands/add.ts";
 import { runCreate } from "./commands/create.ts";
 import { runPack } from "./commands/pack.ts";
@@ -33,7 +35,7 @@ function hasKnownSubcommand(): boolean {
   const argv = process.argv.slice(2);
 
   return argv.some(
-    (arg) => arg === "create" || arg === "add" || arg === "pack",
+    (arg) => ["create", "add", "pack", "doctor", "build"].includes(arg),
   );
 }
 
@@ -56,7 +58,7 @@ function exitWithExpectedError(err: unknown): never {
 const createCmd = defineCommand({
   meta: {
     name: "create",
-    description: "创建手机宿主扩展工程（含首个内页）",
+    description: "创建手机宿主或独立软件工程",
   },
   args: {
     dir: {
@@ -64,6 +66,8 @@ const createCmd = defineCommand({
       required: false,
       description: "目标目录",
     },
+    kind: { type: "string", default: "host", description: "工程角色：host | plugin" },
+    sdk: { type: "string", description: "SDK 版本或绝对 file: 路径；缺省本仓源码/发布固定版本" },
     template: {
       type: "string",
       default: "default",
@@ -90,6 +94,8 @@ const createCmd = defineCommand({
   async run({ args }) {
     await runCreate({
       dir: args.dir,
+      kind: args.kind as "host" | "plugin",
+      sdk: args.sdk,
       template: args.template as "default" | "minimal",
       extensionId: args.extensionId,
       appId: args.appId,
@@ -102,7 +108,7 @@ const createCmd = defineCommand({
 const addCmd = defineCommand({
   meta: {
     name: "add",
-    description: "在本仓库 src/<app-id>/ 添加内页应用",
+    description: "按 phone-project.json 添加软件并导出控制器",
   },
   args: {
     appId: {
@@ -121,7 +127,7 @@ const addCmd = defineCommand({
     force: {
       type: "boolean",
       default: false,
-      description: "允许覆盖已存在的 src/<app-id>/",
+      description: "兼容旧参数；不会覆盖已有软件",
     },
   },
   async run({ args }) {
@@ -137,9 +143,12 @@ const addCmd = defineCommand({
 const packCmd = defineCommand({
   meta: {
     name: "pack",
-    description: "将 src/<app-id>/ 抽离为 release/ 标准内页包",
+    description: "保留真实控制器，构建独立软件包",
   },
   args: {
+    sdk: { type: "string", description: "SDK 版本或绝对 file: 路径" },
+    prepare: { type: "boolean", default: false, description: "只准备源码，不安装或构建" },
+    skipInstall: { type: "boolean", default: false, description: "跳过安装，使用已有依赖构建" },
     appId: {
       type: "positional",
       required: false,
@@ -151,13 +160,13 @@ const packCmd = defineCommand({
     },
     out: {
       type: "string",
-      default: "release",
-      description: "输出目录（相对宿主根或绝对路径）",
+      description: "输出目录，默认 release/<app-id>",
+
     },
     force: {
       type: "boolean",
       default: false,
-      description: "允许写入非空目录",
+      description: "允许更新同一软件的既有 CLI 产物",
     },
     title: {
       type: "string",
@@ -170,6 +179,9 @@ const packCmd = defineCommand({
   },
   async run({ args }) {
     await runPack({
+      sdk: args.sdk,
+      prepare: args.prepare,
+      skipInstall: args.skipInstall,
       appId: args.appId,
       cwd: args.cwd,
       out: args.out,
@@ -178,6 +190,21 @@ const packCmd = defineCommand({
       extensionId: args.extensionId,
     });
   },
+});
+
+const doctorCmd = defineCommand({
+  meta: { name: "doctor", description: "检查手机工程与发布准备" },
+  args: {
+    cwd: { type: "string" },
+    release: { type: "boolean", default: false },
+    json: { type: "boolean", default: false },
+  },
+  run({ args }) { runDoctor(args); },
+});
+const buildCmd = defineCommand({
+  meta: { name: "build", description: "检查软件结构并构建单入口产物" },
+  args: { cwd: { type: "string" } },
+  run({ args }) { runBuild(args); },
 });
 
 const main = defineCommand({
@@ -191,6 +218,8 @@ const main = defineCommand({
     create: createCmd,
     add: addCmd,
     pack: packCmd,
+    doctor: doctorCmd,
+    build: buildCmd,
   },
   async run() {
     // citty quirk：若根 run 与子命令一并触发，仅在无已知子命令时跑向导
@@ -225,11 +254,15 @@ async function start(): Promise<void> {
   try {
     if (rawArgs.includes("--help") || rawArgs.includes("-h")) {
       if (rawArgs.includes("create")) {
-        await showUsage(createCmd, main);
+        await showUsage(createCmd);
       } else if (rawArgs.includes("add")) {
-        await showUsage(addCmd, main);
+        await showUsage(addCmd);
       } else if (rawArgs.includes("pack")) {
-        await showUsage(packCmd, main);
+        await showUsage(packCmd);
+      } else if (rawArgs.includes("doctor")) {
+        await showUsage(doctorCmd);
+      } else if (rawArgs.includes("build")) {
+        await showUsage(buildCmd);
       } else {
         await showUsage(main);
       }

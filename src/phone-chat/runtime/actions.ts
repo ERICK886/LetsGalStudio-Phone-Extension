@@ -186,6 +186,7 @@ export async function awaitConversationReply(
   },
 ): Promise<void> {
   const runtimeKey = getChatRuntimeKey(ctx);
+  const signal = ctx.flow.signal;
   const conversationId = conversationIdForTarget(options.target);
   if (!conversationId || options.replies.length === 0) return;
 
@@ -214,21 +215,23 @@ export async function awaitConversationReply(
     return;
   }
 
-  const wait = createReplyWait(conversationId, ctx.flow.signal, runtimeKey);
+  const wait = createReplyWait(conversationId, signal, runtimeKey);
   upsertPendingReplies({ ...basePending, waitToken: wait.token }, runtimeKey);
   emitChatBus({ type: "replies-changed", conversationId }, runtimeKey);
 
   try {
     if (options.onPendingWritten) await options.onPendingWritten();
   } catch (error) {
-    removePendingReplies(conversationId, runtimeKey);
+    const pending = readChatState(runtimeKey).pendingReplies.find(item => item.waitToken === wait.token);
+    if (pending) removePendingReplies(conversationId, runtimeKey);
     resolveReplyWait(wait.token, runtimeKey);
     emitChatBus({ type: "replies-changed", conversationId }, runtimeKey);
     throw error;
   }
   await wait.promise;
-  if (ctx.flow.signal.aborted) {
-    removePendingReplies(conversationId, runtimeKey);
+  if (signal.aborted) {
+    const pending = readChatState(runtimeKey).pendingReplies.find(item => item.waitToken === wait.token);
+    if (pending) removePendingReplies(conversationId, runtimeKey);
     emitChatBus({ type: "replies-changed", conversationId }, runtimeKey);
   }
 }

@@ -27,12 +27,14 @@ export async function executeGroupMemberMessage(
   allowWait: boolean,
   options: { openPhoneApp: boolean },
 ): Promise<void> {
+  const signal = ctx.flow.signal;
   const groupId = String(params.groupId ?? "").trim();
   const senderCharacterId = String(params.sender ?? "").trim();
   const messages = parseFriendMessagesFromParams(params);
   if (!groupId || !senderCharacterId || messages.length === 0) return;
 
   await sendGroupMessages({ groupId, senderCharacterId, messages }, getChatRuntimeKey(ctx));
+  if (signal.aborted) return;
   const replies = parseRepliesFromParams(params);
   const requireReply =
     replies.length > 0 && coerceMethodBoolean(params.requireReply, true);
@@ -66,11 +68,12 @@ export async function executeGroupMemberMessage(
     });
 
     if (waitForReply) {
+      if (signal.aborted) return;
       if (closePhoneAfter) {
         const rawDelay = Number(params.closeDelayMs);
         const delayMs =
           Number.isFinite(rawDelay) && rawDelay >= 0 ? rawDelay : 1000;
-        await closeChatPhoneAppAfter(delayMs);
+        await closeChatPhoneAppAfter(delayMs, signal);
       }
       return;
     }

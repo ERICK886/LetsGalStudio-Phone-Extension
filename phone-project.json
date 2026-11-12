@@ -1,0 +1,6 @@
+{
+  "schemaVersion": 1,
+  "kind": "host",
+  "appsDir": "src",
+  "registry": "src/phone-apps.ts"
+}

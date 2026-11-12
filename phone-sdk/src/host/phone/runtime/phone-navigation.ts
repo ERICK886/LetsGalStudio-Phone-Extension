@@ -23,13 +23,14 @@ export function createPhoneNavigationController(ctx: ExtensionContext, signal = 
  */
 export function bindPhoneNavigationController(ctx: ExtensionContext): () => void {
   const lifetime = new AbortController();
+  const signal = ctx.flow.signal;
   const abort = () => lifetime.abort();
-  if (ctx.flow.signal.aborted) abort();
-  else ctx.flow.signal.addEventListener("abort", abort, { once: true });
+  if (signal.aborted) abort();
+  else signal.addEventListener("abort", abort, { once: true });
   const uninstall = installNavigationBinding(createPhoneNavigationController(ctx, lifetime.signal));
   return () => {
     abort();
-    ctx.flow.signal.removeEventListener("abort", abort);
+    signal.removeEventListener("abort", abort);
     uninstall();
   };
 }

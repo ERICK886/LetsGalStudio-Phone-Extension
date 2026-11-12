@@ -6,7 +6,7 @@ import {
   writeModuleSetting,
   type PhoneEditorContentItemSchema,
   type PhoneEditorCustomPanes,
-} from "@ink-zenly/phone-sdk";
+} from "@ink-zenly/phone-sdk/editor";
 import React from "react";
 import { PHONE_CALL_EDITOR_SCHEMA } from "./editor-schema";
 import {

@@ -94,12 +94,19 @@ export async function closeChatPhoneApp(): Promise<void> {
  * await closeChatPhoneAppAfter(1000);
  * ```
  */
-export async function closeChatPhoneAppAfter(delayMs: number): Promise<void> {
+export async function closeChatPhoneAppAfter(delayMs: number, signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) return;
   const ms = Number.isFinite(delayMs) && delayMs > 0 ? delayMs : 0;
   if (ms > 0) {
     await new Promise<void>((resolve) => {
-      globalThis.setTimeout(resolve, ms);
+      const finish = () => {
+        globalThis.clearTimeout(timer);
+        signal?.removeEventListener("abort", finish);
+        resolve();
+      };
+      const timer = globalThis.setTimeout(finish, ms);
+      signal?.addEventListener("abort", finish, { once: true });
     });
   }
-  await closeChatPhoneApp();
+  if (!signal?.aborted) await closeChatPhoneApp();
 }

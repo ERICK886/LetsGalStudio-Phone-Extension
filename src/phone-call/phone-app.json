@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "phone-call",
+  "registration": {
+    "entry": "ui.tsx",
+    "export": "registerPhoneCallApp"
+  },
+  "controller": {
+    "entry": "index.tsx",
+    "exports": [
+      "PhoneCallExtension"
+    ]
+  }
+}

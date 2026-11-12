@@ -18,7 +18,7 @@ import {
   type PhoneEditorContentItemSchema,
   type PhoneEditorCustomPanes,
   type ResolvePhoneEditorCustomPanes,
-} from "@ink-zenly/phone-sdk";
+} from "@ink-zenly/phone-sdk/editor";
 
 import {
   AlbumCatalogList,

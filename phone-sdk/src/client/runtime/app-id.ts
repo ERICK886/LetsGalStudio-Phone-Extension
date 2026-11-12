@@ -78,13 +78,13 @@ export function isStudioProgramRefPath(value: unknown): value is string {
  * ```
  */
 export function formatStudioProgramRef(extensionId: string, programId: string): string {
-  if (!extensionId || extensionId.includes("/")) {
+  if (!isPhoneExtensionId(extensionId)) {
     throw new Error(`[phone-sdk] extensionId 非法: ${JSON.stringify(extensionId)}`);
   }
   if (!isPhoneAppId(programId)) {
     throw new Error(`[phone-sdk] programId 非法: ${JSON.stringify(programId)}`);
   }
-  return `${extensionId}/${programId}`;
+  return `${extensionId.trim()}/${programId}`;
 }
 
 /**
@@ -130,7 +130,7 @@ export function parseStudioProgramRef(refOrProgramId: string): StudioProgramRef 
 
   const extensionId = trimmed.slice(0, slash).trim();
   const programId = trimmed.slice(slash + 1).trim();
-  if (!extensionId || extensionId.includes("/") || !isPhoneAppId(programId)) return null;
+  if (!isPhoneExtensionId(extensionId) || !isPhoneAppId(programId)) return null;
 
   return { extensionId, programId };
 }
@@ -156,4 +156,22 @@ export function parseStudioProgramRef(refOrProgramId: string): StudioProgramRef 
 export function toPhoneAppId(idOrStudioRef: string): string | null {
   const parsed = parseStudioProgramRef(idOrStudioRef);
   return parsed ? parsed.programId : null;
+}
+
+/** 扩展归属只接受单段、非空标识，避免不明确的引用。 */
+export function isPhoneExtensionId(value: unknown): value is string {
+  return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(value.trim());
+}
+
+/** 规范化引用但保留扩展段；toPhoneAppId 仍只负责提取旧程序 ID。 */
+export function normalizePhoneAppReference(value: string): string | null {
+  const parsed = parseStudioProgramRef(value);
+  if (!parsed) return null;
+  return parsed.extensionId ? `${parsed.extensionId}/${parsed.programId}` : parsed.programId;
+}
+
+/** 导航消费者匹配自己的程序和来源；继续接受旧版裸程序 ID。 */
+export function matchesPhoneAppReference(reference: string, programId: string, extensionId: string): boolean {
+  const parsed = parseStudioProgramRef(reference);
+  return Boolean(parsed && parsed.programId === programId && (!parsed.extensionId || parsed.extensionId === extensionId));
 }

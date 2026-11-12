@@ -7,7 +7,7 @@
  */
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, dirname, relative } from "node:path";
 
 import pc from "picocolors";
 
@@ -18,7 +18,8 @@ import {
   escapeForJsonString,
 } from "../utils/escape.ts";
 import { findHostRepoRoot } from "../utils/fs.ts";
-import { injectPhoneAppRegistry } from "../utils/inject.ts";
+import { readPhoneProject, projectPath } from "../utils/project.ts";
+import { injectPhoneAppController, injectPhoneAppRegistry } from "../utils/inject.ts";
 import {
   toPackageName,
   toPascalCase,
@@ -62,7 +63,7 @@ function hasAllAddFields(opts: RunAddOptions): boolean {
 /**
  * 执行 add：写入 `src/<app-id>/` 并注入宿主 `src/index.tsx` 注册。
  *
- * 注入失败时不回滚已写入的应用文件，仅提示手动注册（YAGNI）。
+ * 写入前先验证注册清单和根控制器入口；不覆盖已有软件。
  *
  * @param opts - 命令行选项；缺失字段会进入交互补全
  * @returns Promise<void>
@@ -92,7 +93,7 @@ export async function runAdd(opts: RunAddOptions): Promise<void> {
         force: opts.force,
       });
 
-  const { appId, title, force } = filled;
+  const { appId, title } = filled;
   const startDir = opts.cwd?.trim() || process.cwd();
   const root = findHostRepoRoot(startDir);
 
@@ -104,11 +105,19 @@ export async function runAdd(opts: RunAddOptions): Promise<void> {
 
   assertValidAppId(appId);
 
-  const dest = join(root, "src", appId);
+  const project = readPhoneProject(root);
+  const dest = projectPath(root, `${project.appsDir}/${appId}`);
+  const indexPath = projectPath(root, project.registry);
+  const source = readFileSync(indexPath, "utf8");
+  const appImport = "./" + relative(dirname(indexPath), dest).replace(/\\/g, "/");
+  const next = injectPhoneAppRegistry(source, appId, appImport);
+  const rootIndex = join(root, "src", "index.tsx");
+  const rootSource = indexPath === rootIndex ? next : readFileSync(rootIndex, "utf8");
+  const nextRoot = injectPhoneAppController(rootSource, appId, "./" + relative(dirname(rootIndex), dest).replace(/\\/g, "/"));
 
-  if (existsSync(dest) && !force) {
+  if (existsSync(dest)) {
     throw new Error(
-      `目标已存在：${dest}。若确认覆盖请添加 --force`,
+      `目标已存在：${dest}。请直接编辑原软件或使用新 app-id；不会覆盖已有设置和控制器`,
     );
   }
 
@@ -140,21 +149,8 @@ export async function runAdd(opts: RunAddOptions): Promise<void> {
   const templateDir = join(TEMPLATES_DIR, "add");
   const files = await copyTemplateDir(templateDir, dest, vars);
 
-  const indexPath = join(root, "src", "index.tsx");
-
-  try {
-    const source = readFileSync(indexPath, "utf8");
-    const next = injectPhoneAppRegistry(source, appId);
-
-    writeFileSync(indexPath, next, "utf8");
-  } catch (err) {
-    const detail = err instanceof Error ? err.message : String(err);
-
-    // YAGNI：不自动回滚已写入的 src/<app-id>/，提示用户手动注册
-    throw new Error(
-      `应用文件已生成于 ${dest}，但自动注册失败：${detail}。请手动在 src/index.tsx 中注册 ${registerFnName}`,
-    );
-  }
+  writeFileSync(indexPath, indexPath === rootIndex ? nextRoot : next, "utf8");
+  if (indexPath !== rootIndex) writeFileSync(rootIndex, nextRoot, "utf8");
 
   console.log();
   console.log(pc.green("✔ 已添加本仓内页应用"));

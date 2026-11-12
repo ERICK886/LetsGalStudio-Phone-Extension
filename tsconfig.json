@@ -1,17 +1,39 @@
 {
   "compilerOptions": {
     "target": "ES2020",
-    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "lib": [
+      "ES2020",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "module": "ESNext",
     "moduleResolution": "bundler",
     "baseUrl": ".",
     "paths": {
-      "@avg-studio/sdk": ["./sdk/index.ts"],
-      "@ink-zenly/phone-sdk": ["./phone-sdk/src/index.ts"],
-      "@ink-zenly/phone-sdk/plugin": ["./phone-sdk/src/client/index.ts"],
-      "react": ["./node_modules/@types/react/index.d.ts"],
-      "react/jsx-runtime": ["./node_modules/@types/react/jsx-runtime.d.ts"],
-      "react/jsx-dev-runtime": ["./node_modules/@types/react/jsx-dev-runtime.d.ts"]
+      "@avg-studio/sdk": [
+        "./sdk/index.ts"
+      ],
+      "@ink-zenly/phone-sdk": [
+        "./phone-sdk/src/index.ts"
+      ],
+      "@ink-zenly/phone-sdk/plugin": [
+        "./phone-sdk/src/client/index.ts"
+      ],
+      "react": [
+        "./node_modules/@types/react/index.d.ts"
+      ],
+      "react/jsx-runtime": [
+        "./node_modules/@types/react/jsx-runtime.d.ts"
+      ],
+      "react/jsx-dev-runtime": [
+        "./node_modules/@types/react/jsx-dev-runtime.d.ts"
+      ],
+      "@ink-zenly/phone-sdk/host": [
+        "./phone-sdk/src/host.ts"
+      ],
+      "@ink-zenly/phone-sdk/editor": [
+        "./phone-sdk/src/editor.ts"
+      ]
     },
     "jsx": "react-jsx",
     "strict": true,
@@ -21,5 +43,9 @@
     "allowImportingTsExtensions": true,
     "noEmit": true
   },
-  "include": ["src/**/*", "phone-sdk/src/**/*", "vite.config.ts"]
+  "include": [
+    "src/**/*",
+    "phone-sdk/src/**/*",
+    "vite.config.ts"
+  ]
 }

@@ -1,8 +1,20 @@
 # LetsGal Studio 自定义手机扩展
 
+## 手机结构调整（当前源码）
+
+宿主、软件协议、编辑器分别通过 SDK 的 `/host`、`/plugin`、`/editor` 入口使用；`src/phone-apps.ts` 管注册，`src/index.tsx` 管 Studio 控制器导出。既有软件目录和持久化标识保留。
+
+- [结构设计](architecture/phone-structure-design.md)
+- [本次验证与边界](architecture/phone-structure-validation.md)
+- [SDK 接入、设置桥与调用](phone-sdk/docs/plugin-api.md)
+- [CLI 生成、构建、独立打包与发布准备](cli/docs/workflow.md)
+
+以下历史说明中的旧根入口和 bootstrap 仍兼容；新增项目以以上文档为准。新增 API 尚未发布 npm。
+
+
 > 扩展包 ID：`ink.zenly.ext-7a9373`｜ 程序界面：`phone`、`phone-toast`  
-> 扩展版本：`1.3.4` ｜ 需要 LetsGal Studio SDK：`>=1.9.0`
-> 对齐：`@ink-zenly/phone-sdk@0.5.27`（已发布 npm，2026-10-14 核实）｜ `@ink-zenly/create-phone-app@0.3.8`
+> 扩展版本：`1.3.5` ｜ 需要 LetsGal Studio SDK：`>=1.9.0`
+> 当前仓库：`@ink-zenly/phone-sdk@0.5.28` ｜ `@ink-zenly/create-phone-app@0.3.9`（2026-10-23，均已发布 npm；手机扩展 1.3.5 由作者另行发布）
 
 这是一个**游戏里的手机**：剧情里挂上之后，玩家可以打开桌面、点 APP、看聊天消息，还能收到简单的提示（Toast）。
 
@@ -435,7 +447,8 @@ ink.zenly.ext-7a9373.open-phone
 
 | 版本 | 主要变化 |
 |------|------|
-| **1.3.4**（当前） | 对齐 phone-sdk `0.5.27`：注册与监听器异常隔离、关闭等待和会话清理修复；保留聊天 Preview 作用域隔离、完整宿主模板及 Android 触摸样式改进 |
+| **1.3.5**（当前，待发布） | 修复存档恢复时聊天重复写入、已有会话返回后无法重新进入、后续运行周期导航与存档绑定失效、手机容器缩放及连续剧情消息关闭时序；对齐 phone-sdk `0.5.28` / CLI `0.3.9`。恢复去重需要宿主提供 `flow.isRestoring` |
+| **1.3.4** | 对齐 phone-sdk `0.5.27`：注册与监听器异常隔离、关闭等待和会话清理修复；保留聊天 Preview 作用域隔离、完整宿主模板及 Android 触摸样式改进 |
 | **1.3.3** | 聊天存档/设置/回复等待按 Preview 隔离；完善手机导航、编辑器页面和宿主模板；图片消息按原图比例展示，移除 Android 默认触摸高亮 |
 | **1.3.2** | 修复强制来电接听/挂断链路：按钮可交互，选择后立即关闭手机并运行对应片段；电话方法增加 Studio 内联摘要；优化手机内页首次导航与诊断开销；phone-sdk `0.5.26` 支持选择关闭动画 |
 | **1.3.1** | 聊天与相册调整为同包独立扩展模块；新增第一版 `PhoneEditorExtension` |

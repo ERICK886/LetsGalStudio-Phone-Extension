@@ -7,6 +7,14 @@ import {
 } from "./phone-viewport-fit.ts";
 
 describe("computePhoneViewportFit", () => {
+  it("does not expand to full design size when a hidden or tiny host has no content area", () => {
+    const hidden = computePhoneViewportFit("apple", 0, 0);
+    assert.equal(hidden.scale, 0);
+    assert.equal(hidden.width, 0);
+    assert.equal(hidden.height, 0);
+    assert.equal(computePhoneViewportFit("android", -20, 380).scale, 0);
+    assert.equal(computePhoneViewportFit("apple", 195, 390).scale, 0.5);
+  });
   it("keeps the Apple design size when the viewport has enough room", () => {
     assert.deepEqual(computePhoneViewportFit("apple", 1000, 1000), {
       scale: 1,

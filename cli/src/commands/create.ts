@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 /**
  * @file create.ts
  * @description `create-phone-app create`：脚手架手机宿主扩展工程（含首个内页）。
@@ -10,7 +11,7 @@ import { join, resolve } from "node:path";
 
 import pc from "picocolors";
 
-import { resolvePhoneSdkVersion, TEMPLATES_DIR } from "../constants.ts";
+import { resolvePhoneSdkDependency, TEMPLATES_DIR } from "../constants.ts";
 import { promptCreateOptions } from "../prompts.ts";
 import {
   escapeForJsString,
@@ -39,6 +40,8 @@ export type RunCreateOptions = {
   appId?: string;
   title?: string;
   force?: boolean;
+  kind?: "host" | "plugin";
+  sdk?: string;
 };
 
 /**
@@ -111,6 +114,7 @@ function hasAllCreateFields(opts: RunCreateOptions): boolean {
  * ```
  */
 export async function runCreate(opts: RunCreateOptions): Promise<void> {
+  if (opts.kind && opts.kind !== "host" && opts.kind !== "plugin") throw new Error("kind 必须是 host 或 plugin");
   const extensionIdHint = opts.extensionId?.trim();
   const appIdHint = opts.appId?.trim();
 
@@ -152,6 +156,9 @@ export async function runCreate(opts: RunCreateOptions): Promise<void> {
   assertValidAppId(appId);
 
   const dest = resolve(filled.dir);
+  if (existsSync(join(dest, "extension.json")) || existsSync(join(dest, "phone-project.json"))) {
+    throw new Error("目标已是扩展工程；请用 add 添加软件，不覆盖现有设置和控制器");
+  }
 
   if (isDirectoryNonEmpty(dest) && !force) {
     throw new Error(
@@ -162,19 +169,21 @@ export async function runCreate(opts: RunCreateOptions): Promise<void> {
   const pascalName = toPascalCase(appId);
   const registerFnName = toRegisterFnName(appId);
   const packageName = toPackageName(extensionId);
-  const phoneSdkVersion = resolvePhoneSdkVersion();
+  const phoneSdkVersion = resolvePhoneSdkDependency(opts.sdk);
   const author = "池水三两升";
   const date = todayDate();
 
   // title → JSX/MD/注释原文；titleJs → TS 双引号字面量；titleJson → extension.json
   const vars: Record<string, string> = {
     appId,
+    projectKind: opts.kind ?? "host",
+    hostExports: opts.kind === "plugin" ? "" : 'export { PhoneExtension, PhoneHudExtension, ToastExtension, default } from "@ink-zenly/phone-sdk/host";\nexport { PhoneEditorExtension } from "@ink-zenly/phone-sdk/editor";',
     title,
     titleJs: escapeForJsString(title),
     titleJson: escapeForJsonString(title),
     packageName,
     extensionId,
-    phoneSdkVersion,
+    phoneSdkVersion: escapeForJsonString(phoneSdkVersion),
     author,
     date,
     pascalName,
@@ -186,18 +195,18 @@ export async function runCreate(opts: RunCreateOptions): Promise<void> {
     template === "minimal" ? "create-host-minimal" : "create-host-default";
   const hostTemplateDir = join(TEMPLATES_DIR, templateName);
   const addTemplateDir = join(TEMPLATES_DIR, "add");
-  const appDest = join(dest, "src", appId);
+  const appDest = join(dest, "src", "apps", appId);
 
   const hostFiles = await copyTemplateDir(hostTemplateDir, dest, vars);
   const appFiles = await copyTemplateDir(addTemplateDir, appDest, vars);
   const sdkFiles = await copyBundledAvgStudioSdk(dest);
 
   console.log();
-  console.log(pc.green("✔ 已创建手机宿主扩展工程"));
+  console.log(pc.green(`✔ 已创建手机${opts.kind === "plugin" ? "独立软件" : "宿主"}扩展工程`));
   console.log(`  目录：${pc.cyan(dest)}`);
   console.log(`  模板：${pc.cyan(templateName)}`);
   console.log(`  宿主扩展包 id：${pc.cyan(extensionId)}`);
-  console.log(`  内页：${pc.cyan(`src/${appId}/`)}（${title}）`);
+  console.log(`  内页：${pc.cyan(`src/apps/${appId}/`)}（${title}）`);
   console.log(
     `  文件：${hostFiles.length + appFiles.length} 个（宿主 ${hostFiles.length} + 内页 ${appFiles.length}）`,
   );
@@ -211,10 +220,10 @@ export async function runCreate(opts: RunCreateOptions): Promise<void> {
   console.log();
   console.log(pc.bold("开发（含手机宿主）："));
   console.log("  pnpm watch");
-  console.log("  # Studio 仅启用本扩展即可预览");
+  console.log("  # 宿主工程可独立启用；plugin 工程还需启用手机宿主");
   console.log();
   console.log(pc.bold("分发标准内页包："));
-  console.log(`  pnpm create-phone-app pack ${appId}`);
-  console.log("  # 产物在 ./release/；extension.json.id 默认等于 app-id");
+  console.log(`  create-phone-app pack ${appId}（使用与本次生成相同的 CLI）`);
+  console.log("  # 产物在 ./release/<app-id>/；extension.json.id 默认等于 app-id");
   console.log();
 }

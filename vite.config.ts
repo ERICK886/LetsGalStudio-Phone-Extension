@@ -71,6 +71,8 @@ export default defineConfig({
         "phone-sdk/src/client/index.ts",
       ),
 
+      "@ink-zenly/phone-sdk/host": path.resolve(rootDir, "phone-sdk/src/host.ts"),
+      "@ink-zenly/phone-sdk/editor": path.resolve(rootDir, "phone-sdk/src/editor.ts"),
       "@ink-zenly/phone-sdk": path.resolve(rootDir, "phone-sdk/src/index.ts"),
     },
   },

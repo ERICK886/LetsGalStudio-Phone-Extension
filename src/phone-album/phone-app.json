@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "phone-album",
+  "registration": {
+    "entry": "ui/register.tsx",
+    "export": "registerPhoneAlbumPhoneApp"
+  },
+  "controller": {
+    "entry": "index.tsx",
+    "exports": [
+      "PhoneAlbumExtension"
+    ]
+  }
+}

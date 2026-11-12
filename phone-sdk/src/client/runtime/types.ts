@@ -6,6 +6,7 @@
  * @version 0.5.0
  */
 
+import type { PhoneAppSettingsBinding } from "./app-settings";
 import type { ReactNode } from "react";
 
 /**
@@ -88,6 +89,8 @@ export interface PhoneAppRenderProps {
  */
 export interface PhoneAppRegistration {
   id: string;
+  /** 来源扩展清单 ID；旧插件可省略。不是程序 ID 的命名空间。 */
+  extensionId?: string;
   title?: string;
   description?: string;
   render: (props: PhoneAppRenderProps) => ReactNode;
@@ -346,6 +349,12 @@ export interface PhoneSdkHost {
  */
 export interface PhoneSdkGlobalSlot {
   host?: PhoneSdkHost;
+  phoneAppSettings?: Set<PhoneAppSettingsBinding>;
+  /** 同步注册作用域，供同一插件的旧式注册函数继承来源。 */
+  registrationContext?: { extensionId: string; disposers: Array<() => void> };
+  registrationTokens?: Map<string, object>;
+  phonePlugins?: Map<string, { dispose: () => void }>;
+
   /** 宿主安装前暂存的注册请求 */
   queue: PhoneAppRegistration[];
   /** 宿主安装前暂存的注销 id */

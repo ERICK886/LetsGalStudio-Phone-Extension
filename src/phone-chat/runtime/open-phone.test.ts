@@ -4,9 +4,23 @@ import {
   PHONE_SDK_GLOBAL_KEY,
   getPhoneSdkSlot,
 } from "@ink-zenly/phone-sdk/plugin";
-import { openChatPhoneApp } from "./open-phone.ts";
+import { closeChatPhoneAppAfter, openChatPhoneApp } from "./open-phone.ts";
 
 describe("chat phone navigation", () => {
+  it("cancels an old reply's delayed close when the run changes", async () => {
+    const cycle = new AbortController();
+    let closed = 0;
+    getPhoneSdkSlot().navigation = {
+      openPhoneApp: async () => "opened",
+      closePhoneApp: async () => { closed++; },
+    };
+    const closing = closeChatPhoneAppAfter(60_000, cycle.signal);
+    cycle.abort();
+    await closing;
+    assert.equal(closed, 0);
+    await closeChatPhoneAppAfter(0);
+    assert.equal(closed, 1);
+  });
   beforeEach(() => {
     delete (globalThis as Record<string, unknown>)[PHONE_SDK_GLOBAL_KEY];
   });

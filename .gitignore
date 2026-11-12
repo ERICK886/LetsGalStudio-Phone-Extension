@@ -1,6 +1,10 @@
 node_modules
 dist
 docs
+!phone-sdk/docs/
+!phone-sdk/docs/*.md
+!cli/docs/
+!cli/docs/*.md
 sdk
 *.log
 .DS_Store

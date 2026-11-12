@@ -199,7 +199,7 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
   } | null | undefined>(undefined);
   if (initialPhoneAppRef.current === undefined) {
     const pending = messageMode ? null : getLatestPhoneNavigate();
-    const appId = pending ? (toPhoneAppId(pending.appId) ?? pending.appId) : "";
+    const appId = pending?.appId.trim() ?? "";
     initialPhoneAppRef.current =
       pending && appId && lookupPhoneSdkApp(appId)
         ? { appId, seq: pending.seq }
@@ -1222,7 +1222,7 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
       : undefined;
     const registered = lookupPhoneSdkApp(phoneAppId);
     // 注册表按程序 ID 索引；作者填写的是「扩展ID/程序ID」时规约为程序 ID。
-    const resolvedAppId = lookupDiag?.normalizedId ?? toPhoneAppId(phoneAppId) ?? phoneAppId;
+    const resolvedAppId = phoneAppId.trim();
     if (!registered) {
       phoneSdkDiagWarn("打开内页失败：注册表未命中", {
         phase: "open-in-phone-app-miss",

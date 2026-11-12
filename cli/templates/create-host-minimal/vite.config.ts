@@ -57,6 +57,7 @@ export default defineConfig(() => {
   return {
     plugins: [react()],
     define: {
+      __PHONE_EXTENSION_ID__: JSON.stringify(hostExtensionId),
       __PHONE_HOST_EXTENSION_ID__: JSON.stringify(hostExtensionId),
     },
     build: {

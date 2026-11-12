@@ -38,6 +38,8 @@ export interface HomeTabsScreenProps {
   groups: readonly ChatGroupDefinition[];
   /** 好友角色 ID 列表 */
   friendIds: string[];
+  /** 显式移除的好友仍隐藏会话；未配置为好友的来信允许从聊天列表重新打开。 */
+  removedFriendIds: readonly string[];
   /**
    * 底部安全区高度（px），由 TabBar 背景吸收。
    * 父级根容器应使用 `includeBottom: false` 的 safe-area padding，
@@ -77,7 +79,7 @@ export function HomeTabsScreen(props: HomeTabsScreenProps) {
   const visibleThreads = [...props.threads, ...groupPlaceholders].filter((thread) =>
     parseConversationId(conversationIdForThread(thread))?.kind === "group"
       ? true
-      : props.friendIds.includes(thread.friendCharacterId),
+      : !props.removedFriendIds.includes(thread.friendCharacterId),
   );
 
   return (

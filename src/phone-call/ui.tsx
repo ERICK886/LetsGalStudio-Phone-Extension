@@ -1,7 +1,7 @@
 import { useExtensionContext } from "@avg-studio/sdk";
-import { clearPhoneNavigatePending, closePhoneApp, registerPhoneApp, subscribePhoneNavigate, type PhoneAppRenderProps } from "@ink-zenly/phone-sdk/plugin";
+import { clearPhoneNavigatePending, matchesPhoneAppReference, closePhoneApp, registerPhoneApp, subscribePhoneNavigate, type PhoneAppRenderProps } from "@ink-zenly/phone-sdk/plugin";
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { PROGRAM_ID } from "./constants";
+import { PROGRAM_ID, EXTENSION_ID } from "./constants";
 import { addRecord, getActiveIncomingCall, getIncomingCall, getOutgoingStory, listContacts, phoneCallDebug, readPhoneCallState, resolveActiveIncomingCall, resolveDialTarget, resolveIncomingCall, subscribeActiveIncomingCall, subscribePhoneCall } from "./runtime";
 import { getPhoneCallSettings } from "./settings";
 import { PHONE_CALL_EDITOR_SCHEMA } from "./editor-schema";
@@ -31,7 +31,7 @@ function PhoneCallApp(props:PhoneAppRenderProps){ ensureCss(); const ctx=useExte
   useEffect(()=>{phoneCallDebug("ui-mounted",{appId:props.appId,hasIncoming:Boolean(getIncomingCall(ctx))});return()=>phoneCallDebug("ui-unmounted",{appId:props.appId})},[ctx,props.appId]);
   useEffect(()=>subscribePhoneCall(ctx,()=>{phoneCallDebug("ui-store-event",{hasIncoming:Boolean(getIncomingCall(ctx))});setVersion(v=>v+1)}),[ctx]);
   useEffect(()=>subscribeActiveIncomingCall(()=>{phoneCallDebug("ui-incoming-bridge-event",{hasIncoming:Boolean(getActiveIncomingCall())});setVersion(v=>v+1)}),[]);
-  useEffect(()=>subscribePhoneNavigate(req=>{if(req.appId===PROGRAM_ID){phoneCallDebug("ui-navigation-event",{navigateSeq:req.seq,screen:String(req.payload?.screen??""),sessionId:String(req.payload?.sessionId??"")});if((req.payload as any)?.screen==="incoming")setVersion(v=>v+1);clearPhoneNavigatePending(req.seq)}}),[]);
+  useEffect(()=>subscribePhoneNavigate(req=>{if(matchesPhoneAppReference(req.appId, PROGRAM_ID, EXTENSION_ID)){phoneCallDebug("ui-navigation-event",{navigateSeq:req.seq,screen:String(req.payload?.screen??""),sessionId:String(req.payload?.sessionId??"")});if((req.payload as any)?.screen==="incoming")setVersion(v=>v+1);clearPhoneNavigatePending(req.seq)}}),[]);
   useEffect(()=>{phoneCallDebug("ui-render-state",{hasIncoming:Boolean(incoming),incomingSessionId:incoming?.id??null,tab,version})},[incoming?.id,tab,version]);
   useEffect(()=>incoming?startIncomingRingtone(ctx.sound,settings.incomingRingtone):undefined,[ctx.sound,incoming?.id,settings.incomingRingtone]);
   useEffect(()=>{

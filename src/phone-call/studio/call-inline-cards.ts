@@ -9,7 +9,7 @@
  */
 
 import { EXTENSION_ID, PROGRAM_ID } from "../constants";
-import { resolveStudioCharacterLabel } from "../../phone-chat/studio/chat-inline-cards";
+import { resolveStudioCharacterLabel } from "../../shared/studio-character-label";
 
 const CARD_ATTRIBUTE = "data-call-inline-card";
 const HOST_ATTRIBUTE = "data-call-inline-card-host";

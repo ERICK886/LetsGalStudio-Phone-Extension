@@ -1,3 +1,4 @@
+import { bindPhoneAppSettings } from "@ink-zenly/phone-sdk/plugin";
 /**
  * @file index.tsx
  * @description 手机聊天扩展模块：独立 `@extension` 程序，自有设置 / 存档 / Fragment 方法。
@@ -14,6 +15,7 @@
  */
 
 import { getChatRuntimeKey } from "./runtime/runtime-scope";
+import { registerPhoneRuntimeCycle } from "@ink-zenly/phone-sdk/plugin";
 
 
 import {
@@ -24,7 +26,7 @@ import {
   type ExtensionContext,
 } from "@avg-studio/sdk";
 
-import { PROGRAM_ID } from "./constants";
+import { PROGRAM_ID, EXTENSION_ID } from "./constants";
 import { buildChatSettingsFields } from "./settings-fields";
 import { chatSaveSchemaFields } from "./save-fields";
 import {
@@ -42,7 +44,7 @@ import {
   cacheAuthorSettings,
   readAuthorSettings,
 } from "./runtime/settings";
-import { bindChatSave, disposeChatStore } from "./runtime/store";
+import { bindChatSaveForContext, disposeChatStore, restoreChatSaveBinding } from "./runtime/store";
 import { emitChatBus } from "./runtime/bus";
 import { syncChatDesktopBadge } from "./runtime/desktop-badge";
 import { resolveReplyWaitsForFriend } from "./runtime/reply-wait";
@@ -89,11 +91,16 @@ export class ChatController extends Extension {
    * @param ctx - 本模块扩展上下文
    */
   static onRegister(ctx: ExtensionContext): void {
-    if (ctx.flow.signal.aborted) return;
+    registerPhoneRuntimeCycle(ctx, "phone-chat", () => ChatController.registerRuntime(ctx));
+  }
+
+  private static registerRuntime(ctx: ExtensionContext): () => void {
+    const signal = ctx.flow.signal;
     const registrationKey = getChatRuntimeKey(ctx);
     settingsRegistrationCleanups.get(registrationKey)?.();
+    restoreChatSaveBinding(ctx);
     cacheAuthorSettings(readAuthorSettings(ctx), getChatRuntimeKey(ctx));
-    const unsubscribers: Array<() => void> = [];
+    const unsubscribers: Array<() => void> = [bindPhoneAppSettings(`${EXTENSION_ID}/${PROGRAM_ID}`, ctx.settings, signal)];
     for (const key of CHAT_SETTINGS_KEYS) {
       const unsubscribe = ctx.settings.subscribe(key, () => {
         cacheAuthorSettings(readAuthorSettings(ctx), getChatRuntimeKey(ctx));
@@ -113,28 +120,29 @@ export class ChatController extends Extension {
           console.warn("[phone-chat] 释放设置订阅失败", error);
         }
       }
-      resolveReplyWaitsForFriend(undefined, getChatRuntimeKey(ctx));
-      disposeChatStore(getChatRuntimeKey(ctx));
-      ctx.flow.signal.removeEventListener("abort", cleanup);
+      resolveReplyWaitsForFriend(undefined, registrationKey);
+      disposeChatStore(registrationKey);
+      signal.removeEventListener("abort", cleanup);
       if (settingsRegistrationCleanups.get(registrationKey) === cleanup) {
         settingsRegistrationCleanups.delete(registrationKey);
       }
     };
     settingsRegistrationCleanups.set(registrationKey, cleanup);
-    ctx.flow.signal.addEventListener("abort", cleanup, { once: true });
+    signal.addEventListener("abort", cleanup, { once: true });
 
     try {
       syncChatDesktopBadge(getChatRuntimeKey(ctx));
     } catch (error) {
       console.warn("[phone-chat] 初始同步桌面角标失败", error);
     }
+    return cleanup;
   }
 
   /**
    * 实例初始化时绑定本模块 save。
    */
   onInit(): void {
-    bindChatSave(this.save as Parameters<typeof bindChatSave>[0], getChatRuntimeKey(this.context));
+    bindChatSaveForContext(this.save as Parameters<typeof bindChatSaveForContext>[0], this.context);
     syncChatDesktopBadge(getChatRuntimeKey(this.context));
   }
 

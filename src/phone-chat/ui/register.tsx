@@ -7,10 +7,10 @@
  *
  * @remarks
  * 注册程序 ID = `phone-chat`；展示名 / 编辑器 Tab 为「聊天APP」。
- * 编辑 schema 使用 phone-sdk 内置 `CHAT_APP_EDITOR_SCHEMA`。
+ * 编辑 schema 由聊天软件自有的 editor/ 提供： `CHAT_APP_EDITOR_SCHEMA`。
  */
 
-import { CHAT_APP_EDITOR_SCHEMA } from "@ink-zenly/phone-sdk";
+import { CHAT_APP_EDITOR_SCHEMA } from "../editor/chat-app-editor-schema";
 import { registerPhoneApp } from "@ink-zenly/phone-sdk/plugin";
 
 import { PROGRAM_ID } from "../constants";

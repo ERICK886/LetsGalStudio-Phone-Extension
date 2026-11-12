@@ -5,7 +5,7 @@ import {
   readModuleSetting,
   useTheme,
   writeModuleSetting,
-} from "@ink-zenly/phone-sdk";
+} from "@ink-zenly/phone-sdk/editor";
 import React from "react";
 import { PHONE_CALL_SETTINGS_MODULE_ID } from "./editor-schema";
 

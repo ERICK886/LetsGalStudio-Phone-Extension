@@ -19,8 +19,10 @@ for (const template of ["default", "minimal"] as const) {
       for (const name of ["PhoneExtension", "PhoneHudExtension", "ToastExtension", "PhoneEditorExtension"]) {
         assert.ok(names.includes(name), `Missing ${name}`);
       }
-      assert.match(entry, /bootstrapPhonePluginApps\(definePhonePluginRegistry\(/);
-      assert.match(readFileSync(join(root, "src/test-shop/index.tsx"), "utf8"), /registerPhoneApp\(/);
+      assert.match(entry, /import "\.\/phone-apps"/);
+      assert.ok(names.includes("TestShopController"));
+      assert.match(readFileSync(join(root, "src/phone-apps.ts"), "utf8"), /registerPhonePlugin/);
+      assert.match(readFileSync(join(root, "src/apps/test-shop/index.tsx"), "utf8"), /registerPhoneApp\(/);
     } finally {
       assert.ok(resolve(root).startsWith(resolve(tmpdir()) + sep));
       rmSync(root, { recursive: true, force: true });

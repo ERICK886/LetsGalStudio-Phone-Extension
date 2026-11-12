@@ -1,226 +1,107 @@
-/**
- * @file pack.ts
- * @description `create-phone-app pack`：将宿主内 `src/<app-id>/` 抽离为标准内页包。
- * @author 池水三两升
- * @date 2026-08-01
- * @version 0.3.2
- */
-
-import { spawnSync } from "node:child_process";
-import { cpSync, existsSync } from "node:fs";
-import { join, resolve } from "node:path";
-
-import pc from "picocolors";
-
-import { resolvePhoneSdkVersion, TEMPLATES_DIR } from "../constants.ts";
-import {
-  escapeForJsString,
-  escapeForJsonString,
-} from "../utils/escape.ts";
-import { findHostRepoRoot, isDirectoryNonEmpty } from "../utils/fs.ts";
-import {
-  toPackageName,
-  toPascalCase,
-  toRegisterFnName,
-} from "../utils/names.ts";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync, realpathSync } from "node:fs";
+import { dirname, join, relative, resolve, sep, isAbsolute } from "node:path";
+import { resolvePhoneSdkDependency, TEMPLATES_DIR } from "../constants.ts";
 import { promptPackAppId } from "../prompts.ts";
+import { escapeForJsString, escapeForJsonString } from "../utils/escape.ts";
+import { findHostRepoRoot, isDirectoryNonEmpty } from "../utils/fs.ts";
+import { toPackageName } from "../utils/names.ts";
+import { collectPackageSources } from "../utils/package-sources.ts";
+import { projectPath, readPhoneAppManifest, readPhoneProject } from "../utils/project.ts";
+import { runPackageCommand } from "../utils/run-command.ts";
 import { copyBundledAvgStudioSdk } from "../utils/sdk-bundle.ts";
 import { copyTemplateDir } from "../utils/template.ts";
-import {
-  assertValidAppId,
-  assertValidExtensionId,
-} from "../utils/validate.ts";
+import { assertValidAppId, assertValidExtensionId } from "../utils/validate.ts";
 
-/** pack 命令入参 */
 export type RunPackOptions = {
-  /** 要抽离的内页 app-id；缺省时交互选择 */
-  appId?: string;
-  /** 查找宿主根的起始目录，默认 `process.cwd()` */
-  cwd?: string;
-  /** 输出目录（相对宿主根或绝对路径），默认 `release` */
-  out?: string;
-  /** 允许写入非空目标目录 */
-  force?: boolean;
-  /** 扩展显示标题，默认与 app-id 相同 */
-  title?: string;
-  /**
-   * 内页包 extension.json.id；缺省等于 app-id。
-   */
-  extensionId?: string;
+  appId?: string; cwd?: string; out?: string; force?: boolean;
+  title?: string; extensionId?: string; sdk?: string;
+  /** 仅生成可审阅源码，不安装、不构建。 */
+  prepare?: boolean;
+  /** 使用已有依赖构建。 */
+  skipInstall?: boolean;
 };
 
-/** pack-release 模板目录名 */
-const PACK_TEMPLATE = "pack-release";
-
-/** release 产物中禁止出现的目录名 */
-const BANNED_RELEASE_DIRS = [
-  "phone-sdk",
-  "scripts",
-  "docs",
-  "dist-dev",
-] as const;
-
-/**
- * 今日日期（本地时区），格式 YYYY-MM-DD。
- *
- * @returns 日期字符串
- */
-function todayDate(): string {
-  const d = new Date();
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-
-  return `${yyyy}-${mm}-${dd}`;
+function isWithin(parent: string, child: string): boolean {
+  const rel = relative(parent, child);
+  return !isAbsolute(rel) && rel !== ".." && !rel.startsWith(`..${sep}`);
 }
 
-/**
- * 在指定目录同步执行 shell 命令。
- *
- * @param cwd - 工作目录
- * @param command - 可执行命令名（如 `pnpm`）
- * @param args - 命令参数
- * @returns void
- * @throws Error 进程退出码非 0 时抛出中文错误
- *
- * @example
- * ```ts
- * runInDir("/tmp/release", "pnpm", ["install"]);
- * ```
- */
-function runInDir(cwd: string, command: string, args: string[]): void {
-  const result = spawnSync(command, args, {
-    cwd,
-    stdio: "inherit",
-    shell: true,
-  });
-
-  if (result.status !== 0) {
-    throw new Error(
-      `命令失败（exit ${result.status}）：${command} ${args.join(" ")} @ ${cwd}`,
-    );
-  }
-}
-
-/**
- * 断言 release 目录不含禁止的子目录。
- *
- * @param outDir - release 根目录
- * @returns void
- * @throws Error 存在禁止目录时抛出
- */
-function assertBannedDirsAbsent(outDir: string): void {
-  for (const banned of BANNED_RELEASE_DIRS) {
-    if (existsSync(join(outDir, banned))) {
-      throw new Error(`release 不应包含 ${banned}/`);
-    }
-  }
-}
-
-/**
- * 执行 pack：渲染 pack-release 骨架、拷贝内页源码、捆绑 sdk 并构建。
- *
- * @param opts - 命令选项
- * @returns Promise<void>
- * @throws Error 未找到宿主根、app-id 非法/缺失、内页不存在、目标非空、构建失败时抛出
- *
- * @example
- * ```ts
- * await runPack({ appId: "demo-shop", force: true });
- * // => 在宿主根 ./release/ 生成标准内页包
- * ```
- */
-export async function runPack(opts: RunPackOptions): Promise<void> {
-  const hostRoot = findHostRepoRoot(opts.cwd ?? process.cwd());
-
-  if (!hostRoot) {
-    throw new Error(
-      "未找到宿主仓库根：请在含 definePhonePluginRegistry 的宿主工程目录内执行 pack",
-    );
-  }
-
-  let appId = opts.appId?.trim();
-
-  if (!appId) {
-    if (process.stdout.isTTY) {
-      appId = await promptPackAppId(hostRoot);
-    } else {
-      throw new Error("请指定 app-id");
-    }
-  }
-
-  assertValidAppId(appId);
-
-  const appDir = join(hostRoot, "src", appId);
-  const appIndexPath = join(appDir, "index.tsx");
-
-  if (!existsSync(appIndexPath)) {
-    throw new Error(`未找到内页目录：src/${appId}/（缺少 index.tsx）`);
-  }
-
-  const outDir = resolve(hostRoot, opts.out?.trim() || "release");
-
-  if (isDirectoryNonEmpty(outDir) && !opts.force) {
-    throw new Error(
-      `目标目录非空：${outDir}。若确认覆盖请添加 --force`,
-    );
-  }
-
-  const title = opts.title?.trim() || appId;
-  const extensionId = (opts.extensionId?.trim() || appId);
-  assertValidExtensionId(extensionId);
-
-  const pascalName = toPascalCase(appId);
-  const registerFnName = toRegisterFnName(appId);
-  const packageName = toPackageName(extensionId);
-  const phoneSdkVersion = resolvePhoneSdkVersion();
-  const author = "池水三两升";
-  const date = todayDate();
-
-  const vars: Record<string, string> = {
-    appId,
-    title,
-    titleJs: escapeForJsString(title),
-    titleJson: escapeForJsonString(title),
-    packageName,
-    extensionId,
-    phoneSdkVersion,
-    author,
-    date,
-    pascalName,
-    registerFnName,
+/** 输出不能覆盖工程、源码、SDK、依赖或配置；force 也不能绕过。 */
+export function assertPackOutput(root: string, out: string, force: boolean, appId: string): void {
+  const canonical = (target: string): string => {
+    if (existsSync(target)) return realpathSync(target);
+    const parent = dirname(target);
+    if (parent === target) return target;
+    return resolve(canonical(parent), relative(parent, target));
   };
-
-  const templateDir = join(TEMPLATES_DIR, PACK_TEMPLATE);
-  await copyTemplateDir(templateDir, outDir, vars);
-
-  const destAppDir = join(outDir, "src", appId);
-  cpSync(appDir, destAppDir, { recursive: true });
-
-  await copyBundledAvgStudioSdk(outDir);
-
-  runInDir(outDir, "pnpm", ["install"]);
-  runInDir(outDir, "pnpm", ["build"]);
-
-  const distEntry = join(outDir, "dist", "index.mjs");
-
-  if (!existsSync(distEntry)) {
-    throw new Error(`构建完成后未找到 dist/index.mjs：${distEntry}`);
+  root = canonical(root);
+  out = canonical(out);
+  if (isWithin(out, root) || ["src", "phone-sdk", "cli", "sdk", "node_modules", ".git"].some((dir) => isWithin(join(root, dir), out))) {
+    throw new Error(`输出目录会覆盖源码或工程：${out}`);
   }
+  if (isDirectoryNonEmpty(out)) {
+    const marker = join(out, "phone-package.json");
+    if (!force || !existsSync(marker) || JSON.parse(readFileSync(marker, "utf8")).appId !== appId) {
+      throw new Error(`目标目录非空：${out}；仅同一应用的 CLI 产物允许 --force 覆盖`);
+    }
+  }
+}
 
-  assertBannedDirsAbsent(outDir);
-
-  console.log();
-  console.log(pc.green("✔ 已抽离标准内页包"));
-  console.log(`  目录：${pc.cyan(outDir)}`);
-  console.log(`  扩展包 id：${pc.cyan(extensionId)}`);
-  console.log(`  内页程序 id：${pc.cyan(appId)}（${title}）`);
-  console.log(`  入口：${pc.cyan("dist/index.mjs")}`);
-  console.log();
-  console.log(pc.bold("分发说明："));
-  console.log(
-    "  本包为标准内页扩展，需同时启用手机宿主扩展",
-  );
-  console.log(`  宿主 phoneAppId 须配置为 ${pc.cyan(appId)}`);
-  console.log();
+export async function runPack(opts: RunPackOptions): Promise<void> {
+  const root = findHostRepoRoot(opts.cwd ?? process.cwd());
+  if (!root) throw new Error("未找到手机宿主或独立软件工程");
+  let appId = opts.appId?.trim();
+  if (!appId) {
+    if (!process.stdout.isTTY) throw new Error("请指定 app-id");
+    appId = await promptPackAppId(root);
+  }
+  assertValidAppId(appId);
+  const project = readPhoneProject(root);
+  const appDir = projectPath(root, `${project.appsDir}/${appId}`);
+  if (!existsSync(appDir)) throw new Error(`未找到内页目录：${project.appsDir}/${appId}`);
+  const manifest = readPhoneAppManifest(appDir, appId);
+  const sources = collectPackageSources(root, appDir);
+  const extensionId = opts.extensionId?.trim() || appId;
+  assertValidExtensionId(extensionId);
+  const out = resolve(root, opts.out?.trim() || `release/${appId}`);
+  assertPackOutput(root, out, opts.force ?? false, appId);
+  const sourcePackage = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as {
+    dependencies?: Record<string, string>; peerDependencies?: Record<string, string>;
+  };
+  const extraDependencies: Record<string, string> = {};
+  for (const name of sources.dependencies) {
+    if (["react", "react-dom", "@avg-studio/sdk", "@ink-zenly/phone-sdk"].includes(name)) continue;
+    const version = sourcePackage.dependencies?.[name] ?? sourcePackage.peerDependencies?.[name];
+    if (!version || /^(file:|link:|workspace:)/.test(version)) throw new Error(`应用依赖 ${name} 缺少可分发的版本声明`);
+    extraDependencies[name] = version;
+  }
+  const title = opts.title?.trim() || appId;
+  const appRelative = relative(join(root, "src"), appDir).replace(/\\/g, "/");
+  const modulePath = (entry: string) => `./${appRelative}/${entry.replace(/\.[cm]?[jt]sx?$/, "")}`;
+  await copyTemplateDir(join(TEMPLATES_DIR, "pack-release"), out, {
+    appId, title, titleJs: escapeForJsString(title), titleJson: escapeForJsonString(title),
+    extensionId, packageName: toPackageName(extensionId), phoneSdkVersion: escapeForJsonString(resolvePhoneSdkDependency(opts.sdk)),
+    registerFnName: manifest.registration.export, registrationImport: modulePath(manifest.registration.entry),
+    controllerExports: manifest.controller.exports.join(", "), controllerImport: modulePath(manifest.controller.entry),
+    author: "", date: new Date().toISOString().slice(0, 10),
+  });
+  for (const file of sources.files) {
+    const dest = projectPath(out, relative(root, file));
+    mkdirSync(dirname(dest), { recursive: true });
+    copyFileSync(file, dest);
+  }
+  await copyBundledAvgStudioSdk(out);
+  const packagePath = join(out, "package.json");
+  const pkg = JSON.parse(readFileSync(packagePath, "utf8"));
+  Object.assign(pkg.dependencies, extraDependencies);
+  writeFileSync(packagePath, JSON.stringify(pkg, null, 2) + "\n");
+  writeFileSync(join(out, "phone-project.json"), JSON.stringify({ ...project, kind: "plugin", registry: "src/index.tsx" }, null, 2) + "\n");
+  writeFileSync(join(out, "phone-package.json"), JSON.stringify({ schemaVersion: 1, appId, extensionId, sourceFiles: sources.files.map((file) => relative(root, file).replace(/\\/g, "/")) }, null, 2) + "\n");
+  if (!opts.prepare) {
+    if (!opts.skipInstall) runPackageCommand(out, "install");
+    runPackageCommand(out, "build");
+    if (!existsSync(join(out, "dist/index.mjs"))) throw new Error("构建未生成 dist/index.mjs");
+  }
+  console.log(`已${opts.prepare ? "准备源码" : "构建独立软件"}：${out}`);
+  console.log(`手机桌面引用：${extensionId}/${appId}。设置/存档控制器已原样保留，未上传或发布。`);
 }

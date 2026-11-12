@@ -7,6 +7,7 @@
  */
 
 import path from "node:path";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 import react from "@vitejs/plugin-react";
@@ -34,6 +35,7 @@ export default defineConfig(() => {
 
   return {
     plugins: [react()],
+    define: { __PHONE_EXTENSION_ID__: JSON.stringify(JSON.parse(readFileSync(path.join(rootDir, "extension.json"), "utf8")).id) },
     build: {
       lib: {
         entry: path.resolve(rootDir, "src/index.tsx"),

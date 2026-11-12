@@ -38,7 +38,7 @@ import {
 
   useTheme,
 
-} from "@ink-zenly/phone-sdk";
+} from "@ink-zenly/phone-sdk/editor";
 
 
 

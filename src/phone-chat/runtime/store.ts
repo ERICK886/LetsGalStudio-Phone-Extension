@@ -10,7 +10,7 @@
  * 多模块下存档键与逻辑名一致（无 chat 前缀）。
  */
 
-import type { SaveAPI } from "@avg-studio/sdk";
+import type { ExtensionContext, SaveAPI } from "@avg-studio/sdk";
 import type {
   ChatGroupMemberOverride,
   ChatMessage,
@@ -22,7 +22,7 @@ import type {
 } from "../types/index";
 import { normalizeGroupMemberOverrides } from "../domain/groups";
 import { normalizeReplyEffectOperator } from "../domain/effects";
-import { deleteChatScopedState, getChatScopedState } from "./runtime-scope";
+import { deleteChatScopedState, getChatRuntimeKey, getChatScopedState } from "./runtime-scope";
 import { emitChatBus } from "./bus";
 
 /**
@@ -54,6 +54,22 @@ export function bindChatSave(api: ChatSaveApi | SaveAPI<Record<string, unknown>>
   const runtime = runtimeFor(runtimeKey);
   runtime.saveApi = api as ChatSaveApi;
   runtime.memoryState = readFromApi(runtime.saveApi);
+}
+
+/** 保存的是宿主的 live SaveAPI，而不是上一章节的消息快照。 */
+export function bindChatSaveForContext(
+  api: ChatSaveApi | SaveAPI<Record<string, unknown>>,
+  ctx: ExtensionContext,
+): void {
+  const binding = getChatScopedState<{ api?: ChatSaveApi }>("save-binding", ctx.flow, () => ({}));
+  binding.api = api as ChatSaveApi;
+  bindChatSave(api, getChatRuntimeKey(ctx));
+}
+
+/** softReset 后新 signal 的 store 仍从当前存档读取；空档也必须原样保留。 */
+export function restoreChatSaveBinding(ctx: ExtensionContext): void {
+  const binding = getChatScopedState<{ api?: ChatSaveApi }>("save-binding", ctx.flow, () => ({}));
+  if (binding.api) bindChatSave(binding.api, getChatRuntimeKey(ctx));
 }
 
 export function disposeChatStore(runtimeKey: object): void {

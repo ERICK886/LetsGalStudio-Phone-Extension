@@ -13,7 +13,7 @@ import type {
   PhoneEditorContentItemSchema,
   PhoneEditorPageSchema,
   PhoneEditorSectionSchema,
-} from "@ink-zenly/phone-sdk";
+} from "@ink-zenly/phone-sdk/editor";
 
 /** 相册模块 id（与 `@extension({ id: "phone-album" })` / `PROGRAM_ID` 一致）。 */
 export const ALBUM_SETTINGS_MODULE_ID = "phone-album";
