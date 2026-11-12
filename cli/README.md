@@ -14,10 +14,10 @@ create-phone-app pack acme-notes --cwd ./notes --prepare
 create-phone-app doctor --cwd ./notes --release
 ```
 
-默认不覆盖现有扩展工程/软件；旧 `add --force` 不再覆盖软件源码。发布前必须使用配套的新 SDK，更新固定版本并完成隔离产物验证。本次不修改版本号或执行发布。下方旧版章节保留作迁移参考，路径以新生成的 `phone-project.json` 为准。
+默认不覆盖现有扩展工程/软件；旧 `add --force` 不再覆盖软件源码。发布前必须使用配套的新 SDK，更新固定版本并完成隔离产物验证。本次配套版本为 CLI 0.4.1 / SDK 0.7.0。下方旧版章节保留作迁移参考，路径以新生成的 `phone-project.json` 为准。
 
 
-当前版本：`0.3.9`（2026-10-23）。独立安装时生成的 Phone SDK 依赖为 `^0.5.28`；default/minimal 宿主均导出四个宿主模块。
+当前版本：`0.4.1`（2026-11-13）。独立安装时生成的 Phone SDK 依赖为 `^0.7.0`；default/minimal 宿主均导出四个宿主模块。
 
 > 包名：`@ink-zenly/create-phone-app`
 > 用途：脚手架生成 LetsGal 手机宿主扩展与内页应用（Phone SDK plugin）
@@ -60,14 +60,14 @@ pnpm create-phone-app
 ### npm 包
 
 ```powershell
-pnpm dlx @ink-zenly/create-phone-app@0.3.9 create .\my-host `
+pnpm dlx @ink-zenly/create-phone-app@0.4.1 create .\my-host `
   --template default `
   --extensionId com.acme.my-phone `
   --appId my-shop `
   --title "我的商店"
 ```
 
-本仓开发仍推荐：`pnpm create-phone-app`。独立工程执行 `add` / `pack` 时，使用 `pnpm dlx @ink-zenly/create-phone-app@0.3.9 add ...` 或 `pack ...`；生成的工程本身没有 `create-phone-app` script。
+本仓开发仍推荐：`pnpm create-phone-app`。独立工程执行 `add` / `pack` 时，使用 `pnpm dlx @ink-zenly/create-phone-app@0.4.1 add ...` 或 `pack ...`；生成的工程本身没有 `create-phone-app` script。
 
 运行环境：Node.js >= 18；`pack` 还需要 PATH 中已有 pnpm。`--version` 与包清单使用同一版本来源。
 
@@ -84,7 +84,7 @@ pnpm dlx @ink-zenly/create-phone-app@0.3.9 create .\my-host `
 
 ## `create`：手机宿主扩展
 
-在目标目录生成**宿主** Vite + TypeScript 扩展骨架：入口 `src/index.tsx` 导出 `PhoneExtension`、`PhoneHudExtension`、`ToastExtension`、`PhoneEditorExtension` 并注册首个内页 `src/<app-id>/`。依赖 `@ink-zenly/phone-sdk` 的 **npm 版本**（当前 `inkZenly.phoneSdkVersion` 为 `^0.5.28`），捆绑 `@avg-studio/sdk` 于 `./sdk`。`create` 宿主模板的 `vite.config.ts` 已从 `extension.json` 注入 `__PHONE_HOST_EXTENSION_ID__`。
+在目标目录生成**宿主** Vite + TypeScript 扩展骨架：入口 `src/index.tsx` 导出 `PhoneExtension`、`PhoneHudExtension`、`ToastExtension`、`PhoneEditorExtension` 并注册首个内页 `src/<app-id>/`。依赖 `@ink-zenly/phone-sdk` 的 **npm 版本**（当前 `inkZenly.phoneSdkVersion` 为 `^0.7.0`），捆绑 `@avg-studio/sdk` 于 `./sdk`。`create` 宿主模板的 `vite.config.ts` 已从 `extension.json` 注入 `__PHONE_HOST_EXTENSION_ID__`。
 
 ```powershell
 pnpm create-phone-app create .\my-host --template default `
@@ -195,7 +195,7 @@ pnpm create-phone-app add notes --title "便签" --force
 ## 与 `demo-shop` / phone-sdk 的关系
 
 - **`src/demo-shop/`**：本仓手写参考内页；`add` / `create` 生成的内页结构与之对齐。
-- **`@ink-zenly/phone-sdk`**：宿主与内页 API；CLI 通过读取本仓 `phone-sdk/package.json` 的 `version`，在模板 `package.json` 中写入 `^<version>`。独立 npm 包没有相邻 SDK 源码时，使用自身 `inkZenly.phoneSdkVersion`（当前 `^0.5.28`）。
+- **`@ink-zenly/phone-sdk`**：宿主与内页 API；CLI 通过读取本仓 `phone-sdk/package.json` 的 `version`，在模板 `package.json` 中写入 `^<version>`。独立 npm 包没有相邻 SDK 源码时，使用自身 `inkZenly.phoneSdkVersion`（当前 `^0.7.0`）。
 - **禁止**脚手架默认输出 `file:../phone-sdk`；联调时可本地改依赖，勿改 CLI 默认行为。
 - **`pack`** 会在 release 目录自动 `pnpm install` + `pnpm build`；**create / add** 首版不自动 install。
 

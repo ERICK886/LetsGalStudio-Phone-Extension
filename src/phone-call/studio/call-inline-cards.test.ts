@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { readFileSync } from "node:fs";
 import {
   CALL_INLINE_CARD_ACCENT,
   CALL_INLINE_CARD_METHOD_META,
@@ -53,12 +52,4 @@ describe("phone call inline cards", () => {
     );
   });
 
-  it("uses the same Studio character-name resolver as chat cards", () => {
-    const source = readFileSync(
-      new URL("./call-inline-cards.ts", import.meta.url),
-      "utf8",
-    );
-    assert.match(source, /resolveStudioCharacterLabel/);
-    assert.doesNotMatch(source, /collectCharacterNames/);
-  });
 });

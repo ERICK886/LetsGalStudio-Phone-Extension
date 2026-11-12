@@ -324,3 +324,17 @@ sha512-+ZJnEoOAtOIIMNXGiRdPcVEptJsh6J5nHqkbg737INr5UoUqchksXlYJhXr5IPY+46ihyvv0o
 已增补宿主/插件/编辑器公开入口、带来源的注册解析与清理、独立软件设置桥，以及 CLI 项目/软件描述协议。旧根入口、程序 ID 和持久化定义保持兼容。
 
 本次执行记录见 [结构调整验证记录](../architecture/phone-structure-validation.md)：SDK/软件测试 240 项、CLI 测试 40 项通过，实际 tarball 隔离安装与六类工程构建通过。根完整类型检查仍受既有 `sdk/extension-inspector` 缺失阻塞；未进行新代码的真实 Studio 验收，未发布。
+
+## 15. SDK 0.6.0 / CLI 0.4.0 npm 发布验证（2026-11-12）
+
+上述结构调整已随 SDK 0.6.0 和 CLI 0.4.0 发布，官方 latest 与下载产物完整性均已核验。发布准备时补充修复独立安装的 CLI 错把相邻 SDK 当成本地源码的问题，CLI 测试增至 43 项通过。
+
+公开版本在全新隔离目录完成 default/minimal 宿主、独立软件模板、pack 拆包的安装、构建与 doctor --release。四个工程均通过，锁文件确认实际使用 npm 官方 SDK 0.6.0。根锁文件冻结离线检查通过；未同步 Studio，未进行真实剧本 Preview 验收。详见 [发布记录](../architecture/phone-npm-release-20261112.md)。
+
+## 16. SDK 0.7.0 / CLI 0.4.1 发布与测试清理（2026-11-13）
+
+手机本体停靠、刷新定位、外侧点击拦截及首页关闭按钮移除已随 SDK 0.7.0 发布。CLI 0.4.1 默认生成 `^0.7.0`。官方 latest、dist.integrity 和重新下载的 tarball 均已核验。
+
+移除 3 个低价值测试文件和 1 条源码匹配断言后，SDK/软件 245 项、CLI 40 项测试通过；本次根工程与 CLI 类型检查均通过。发布前实际 tarball 完成独立宿主/软件安装构建，发布后 npm 版本完成 default/minimal 宿主、独立软件、拆包四类工程验证。根锁文件冻结离线校验通过。
+
+最新外侧点击修复的实机验收仍以用户按 Esc 中止为边界，不将自动化验证记为实机通过。版本、清理范围与证据见 [发布记录](../architecture/phone-npm-release-20261113.md)。

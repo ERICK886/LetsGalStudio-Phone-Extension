@@ -4,14 +4,14 @@
 
 新增 `/host` 与 `/editor`，保留根入口；插件继续使用 `/plugin`。推荐 `registerPhonePlugin` 统一来源和生命周期，独立软件通过 `bindPhoneAppSettings` 提供自身设置上下文。
 
-完整的新接入文档见 [手机软件接入与调用](docs/plugin-api.md)。以下原有 API/示例作为兼容资料保留；新增接口尚未发布，不能由旧 npm 版本号推断已经可用。
+完整的新接入文档见 [手机软件接入与调用](docs/plugin-api.md)。以下原有 API/示例作为兼容资料保留；新增接口从 0.6.0 开始提供，旧 0.5.x 包不包含这些接口。
 
 
-LetsGal 游戏内手机的宿主 SDK。本文对应 **0.5.28**（2026-10-23），新增运行周期重新绑定，并修复手机容器缩放与连续剧情消息关闭时序。
+LetsGal 游戏内手机的宿主 SDK。本文对应 **0.7.0**（2026-11-13），将 HUD 改为手机本体停靠，修复刷新初始定位与外侧点击穿透，移除首页关闭按钮；保留 0.6.0 的分层入口、来源解析、统一插件注册和独立软件设置桥。
 
 SDK 提供手机桌面、内页容器、HUD、Toast、作者编辑器与跨 bundle 桥接。聊天、相册、电话等业务内页由扩展工程注册，SDK 不内置这些 APP。
 
-工作区新增的常驻手机、刷新定位和兼容说明见 [常驻手机与视口停靠](docs/docked-phone.md)；该调整尚未发布到 npm。
+0.7.0 的常驻手机、刷新定位和兼容说明见 [常驻手机与视口停靠](docs/docked-phone.md)。
 
 ## 1. 入口与架构
 
@@ -37,7 +37,7 @@ openPhoneApp → 导航 pending → 手机 UI → registration.render
 
 ### 依赖
 
-本仓联调使用 `"@ink-zenly/phone-sdk": "file:phone-sdk"`；独立工程使用 `@ink-zenly/phone-sdk@^0.5.28`。CLI 0.3.9 的独立安装兜底与本仓解析均为 `^0.5.28`；旧 CLI 0.3.8 使用 `^0.5.27`，旧脚手架工程请显式更新 SDK 依赖。
+本仓联调使用 `"@ink-zenly/phone-sdk": "file:phone-sdk"`；独立工程使用 `@ink-zenly/phone-sdk@^0.7.0`。CLI 0.4.1 的独立安装兜底为 `^0.7.0`，本仓开发默认引用本地 SDK；旧脚手架工程请显式更新 SDK 依赖。
 
 宿主需 React 18、React DOM、Studio SDK、Vite 和 React 插件。本包声明 React/React DOM/Studio SDK 为 peerDependencies，声明 `@chakra-ui/react`、`@emotion/react` 为 dependencies；安装宿主时提供这些 peers，编辑器依赖由包管理器安装。独立安装构建应使用打出的 SDK 包验证，不能只依赖本仓根工程的依赖。
 

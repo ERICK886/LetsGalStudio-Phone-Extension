@@ -18,8 +18,8 @@ importers:
         specifier: ^11.14.1
         version: 11.14.1(@emotion/react@11.14.0(@types/react@18.3.31)(react@18.3.1))(@types/react@18.3.31)(react@18.3.1)
       '@ink-zenly/create-phone-app':
-        specifier: 0.3.9
-        version: 0.3.9
+        specifier: 0.4.1
+        version: 0.4.1
       '@ink-zenly/phone-sdk':
         specifier: file:phone-sdk
         version: file:phone-sdk(@avg-studio/sdk@file:sdk(react@18.3.1))(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -522,8 +522,8 @@ packages:
   '@floating-ui/utils@0.2.12':
     resolution: {integrity: sha512-HpCo8tmWzLVad5s2d19EhAz5zqrrQ6s69qd6moPMQvkOuSwDT1YgRfWSVuc4ennqrgv3OHppiOGMQ7oC13yIww==}
 
-  '@ink-zenly/create-phone-app@0.3.9':
-    resolution: {integrity: sha512-+ZJnEoOAtOIIMNXGiRdPcVEptJsh6J5nHqkbg737INr5UoUqchksXlYJhXr5IPY+46ihyvv0o8SsnU52G7ejyg==}
+  '@ink-zenly/create-phone-app@0.4.1':
+    resolution: {integrity: sha512-h7wX3fJXyrVftuoKLfwe/WRCw5QQ0mb+LF6CFFz7CghC45XWWBeHXcWt4RsVPryQDxp5kJr3/Vyu/aNXsFu0QQ==}
     engines: {node: '>=18'}
     hasBin: true
 
@@ -1731,12 +1731,13 @@ snapshots:
 
   '@floating-ui/utils@0.2.12': {}
 
-  '@ink-zenly/create-phone-app@0.3.9':
+  '@ink-zenly/create-phone-app@0.4.1':
     dependencies:
       '@clack/prompts': 0.10.1
       citty: 0.1.6
       picocolors: 1.1.1
       tsx: 4.23.1
+      typescript: 5.9.3
 
   '@ink-zenly/phone-sdk@file:phone-sdk(@avg-studio/sdk@file:sdk(react@18.3.1))(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
     dependencies:

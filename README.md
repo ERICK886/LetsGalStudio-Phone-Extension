@@ -6,15 +6,17 @@
 
 - [结构设计](architecture/phone-structure-design.md)
 - [本次验证与边界](architecture/phone-structure-validation.md)
+- [SDK 0.6.0 / CLI 0.4.0 npm 发布验证](architecture/phone-npm-release-20261112.md)
+- [SDK 0.7.0 / CLI 0.4.1 npm 发布验证](architecture/phone-npm-release-20261113.md)
 - [SDK 接入、设置桥与调用](phone-sdk/docs/plugin-api.md)
 - [CLI 生成、构建、独立打包与发布准备](cli/docs/workflow.md)
 
-以下历史说明中的旧根入口和 bootstrap 仍兼容；新增项目以以上文档为准。新增 API 尚未发布 npm。
+以下历史说明中的旧根入口和 bootstrap 仍兼容；新增项目以以上文档为准。新增 API 从 SDK 0.6.0 / CLI 0.4.0 开始提供。
 
 
 > 扩展包 ID：`ink.zenly.ext-7a9373`｜ 程序界面：`phone`、`phone-toast`  
 > 扩展版本：`1.3.5` ｜ 需要 LetsGal Studio SDK：`>=1.9.0`
-> 当前仓库：`@ink-zenly/phone-sdk@0.5.28` ｜ `@ink-zenly/create-phone-app@0.3.9`（2026-10-23，均已发布 npm；手机扩展 1.3.5 由作者另行发布）
+> 当前仓库：`@ink-zenly/phone-sdk@0.7.0` ｜ `@ink-zenly/create-phone-app@0.4.1`（2026-11-13；手机扩展 1.3.5 由作者另行发布）
 
 这是一个**游戏里的手机**：剧情里挂上之后，玩家可以打开桌面、点 APP、看聊天消息，还能收到简单的提示（Toast）。
 

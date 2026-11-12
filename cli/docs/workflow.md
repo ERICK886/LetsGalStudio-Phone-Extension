@@ -70,7 +70,7 @@ pnpm --dir cli pack --pack-destination ../release/artifacts
 
 `doctor --release` 检查软件描述、入口、依赖、安装后的 SDK 子入口和 `dist/index.mjs`，拒绝本地 SDK 依赖。它不声称已完成真实 Studio 验收，也不自动发布。
 
-本次新增 SDK API 与 CLI 模板须配套发布：先确定一个未占用的新 SDK 版本，更新 CLI 的 `inkZenly.phoneSdkVersion`，生成 tarball 并用独立工程验证；确认 SDK 版本在 npm 可用后再发布依赖它的 CLI。当前源码保留已有版本号，产物仅用于本地验证，不能覆盖远端同版本。
+本次新增 SDK API 与 CLI 模板须配套发布：先确定一个未占用的新 SDK 版本，更新 CLI 的 `inkZenly.phoneSdkVersion`，生成 tarball 并用独立工程验证；确认 SDK 版本在 npm 可用后再发布依赖它的 CLI。本次配套版本为 SDK `0.7.0` 与 CLI `0.4.1`，CLI 默认生成 `^0.7.0` SDK 依赖。远端版本不可覆盖，每次发布必须使用新版本。
 
 发布审核需区分：SDK/CLI npm 包、完整手机扩展、独立软件扩展。工坊扩展通过 Studio 的正式上传流程交付，CLI 不代替上传、不推送 Git、不创建 tag。不要把 `pack` 成功表述为已上线。
 

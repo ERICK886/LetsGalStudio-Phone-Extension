@@ -7,7 +7,7 @@
  */
 
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { basename, dirname, join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -17,6 +17,19 @@ export const CLI_ROOT = join(__dirname, "..");
 
 /** 模板根目录 */
 export const TEMPLATES_DIR = join(CLI_ROOT, "templates");
+
+/** 只有开发仓库的 cli/ 才能使用相邻源码，不能把 npm 同 scope 的包误认成本仓。 */
+function monorepoSdkRoot(): string | undefined {
+  const root = dirname(CLI_ROOT);
+  const sdk = join(root, "phone-sdk");
+  if (
+    basename(CLI_ROOT) !== "cli" ||
+    CLI_ROOT.split(sep).includes("node_modules") ||
+    !existsSync(join(root, "phone-project.json")) ||
+    !existsSync(join(sdk, "package.json"))
+  ) return undefined;
+  return sdk;
+}
 
 /**
  * 解析脚手架应写入的 `@ink-zenly/phone-sdk` npm 版本范围。
@@ -34,9 +47,10 @@ export const TEMPLATES_DIR = join(CLI_ROOT, "templates");
  * ```
  */
 export function resolvePhoneSdkVersion(): string {
-  const monorepoPkg = join(CLI_ROOT, "..", "phone-sdk", "package.json");
+  const localSdk = monorepoSdkRoot();
+  const monorepoPkg = localSdk ? join(localSdk, "package.json") : undefined;
 
-  if (existsSync(monorepoPkg)) {
+  if (monorepoPkg) {
     try {
       const pkg = JSON.parse(readFileSync(monorepoPkg, "utf8")) as {
         version?: string;
@@ -74,7 +88,7 @@ export function resolvePhoneSdkVersion(): string {
 /** 本仓联调使用实际源码；独立安装的 CLI 使用发布时固定的 SDK 范围。 */
 export function resolvePhoneSdkDependency(override?: string): string {
   if (override?.trim()) return override.trim();
-  const local = join(CLI_ROOT, "..", "phone-sdk");
-  if (existsSync(join(local, "package.json"))) return `file:${local.replace(/\\/g, "/")}`;
+  const local = monorepoSdkRoot();
+  if (local) return `file:${local.replace(/\\/g, "/")}`;
   return resolvePhoneSdkVersion();
 }

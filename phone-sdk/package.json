@@ -1,6 +1,6 @@
 {
   "name": "@ink-zenly/phone-sdk",
-  "version": "0.5.28",
+  "version": "0.7.0",
   "description": "LetsGal 自定义手机扩展 SDK：宿主 PhoneExtension / ToastExtension / PhoneEditorExtension，以及内页 registerPhoneApp 插件 API",
   "author": "池水三两升",
   "license": "MIT",
@@ -56,7 +56,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ink-zenly/ext-7a9373.git",
+    "url": "git+https://github.com/ERICK886/LetsGalStudio-Phone-Extension.git",
     "directory": "phone-sdk"
   }
 }
