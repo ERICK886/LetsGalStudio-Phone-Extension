@@ -1479,11 +1479,27 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
   };
 
   const handleOutsidePointerDown = (event: PointerEvent<HTMLDivElement>) => {
-    event.stopPropagation();
     if (event.target === event.currentTarget) {
       event.preventDefault();
-      void closeWithAnimation().catch(reportPhoneCloseError);
+      event.stopPropagation();
+      event.nativeEvent.stopImmediatePropagation();
     }
+  };
+
+  // Studio 的原生 mousedown 监听早于 React 冒泡处理，必须在捕获阶段拦截。
+  // 不 preventDefault，保留输入框聚焦；内页仍通过 pointer 和 click 处理交互。
+  const stopPhoneMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
+    event.stopPropagation();
+    event.nativeEvent.stopImmediatePropagation();
+  };
+
+  const handleOutsideClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (event.target !== event.currentTarget) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.nativeEvent.stopImmediatePropagation();
+    // 等本次点击完成再收回，避免长按过程中机身停靠后 mouseup/click 落到剧情。
+    if (event.button === 0) void closeWithAnimation().catch(reportPhoneCloseError);
   };
 
   const updateAppOverride = (
@@ -1632,11 +1648,10 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
       style={rootStyle}
       onKeyDownCapture={docked ? undefined : handleKeyDown}
       onWheelCapture={docked ? undefined : handleWheelCapture}
-      onPointerDownCapture={!docked && messageMode ? handleStoryAdvancePointerDown : undefined}
-      onMouseDownCapture={!docked && messageMode ? suppressStoryMouseEvent : undefined}
-      onClickCapture={!docked && messageMode ? suppressStoryMouseEvent : undefined}
+      onPointerDownCapture={docked ? undefined : messageMode ? handleStoryAdvancePointerDown : handleOutsidePointerDown}
+      onMouseDownCapture={messageMode && !docked ? suppressStoryMouseEvent : stopPhoneMouseDown}
+      onClickCapture={docked ? undefined : messageMode ? suppressStoryMouseEvent : handleOutsideClick}
       onClick={!docked && !messageMode ? (event) => event.stopPropagation() : undefined}
-      onPointerDown={docked || messageMode ? undefined : handleOutsidePointerDown}
     >
       <style>{phoneCss}</style>
       <div
@@ -1753,17 +1768,6 @@ export const PhoneUIContent: React.FC<PhoneUIProps> = ({
                     ⚙
                   </button>
                 )}
-                <button
-                  type="button"
-                  className="phone-round-button"
-                  aria-label="关闭手机"
-                  title="关闭手机"
-                  onClick={() => void closeWithAnimation().catch(reportPhoneCloseError)}
-                  disabled={Boolean(activeInPhoneAppId)}
-                  tabIndex={activeInPhoneAppId ? -1 : undefined}
-                >
-                  ×
-                </button>
               </div>
             </div>
           )}

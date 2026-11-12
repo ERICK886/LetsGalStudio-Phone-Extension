@@ -199,14 +199,6 @@ export function PhoneAppearancePreview({
                 >
                   ⚙
                 </button>
-                <button
-                  type="button"
-                  className="phone-round-button"
-                  aria-label="关闭手机（预览不可用）"
-                  tabIndex={-1}
-                >
-                  ×
-                </button>
               </div>
             </div>
 
