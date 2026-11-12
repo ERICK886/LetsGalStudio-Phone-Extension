@@ -5,7 +5,7 @@
  *              + `ChatController` + `PhoneAlbumExtension` + `PhoneCallExtension`。
  * @author 池水三两升
  * @date 2026-08-10
- * @version 1.3.5
+ * @version 1.4.0
  *
  * @remarks
  * - 宿主与编辑器：`@ink-zenly/phone-sdk`（main）。

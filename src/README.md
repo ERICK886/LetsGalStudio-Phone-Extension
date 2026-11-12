@@ -9,7 +9,7 @@
 
 > 面向开发者：在本仓或脚手架工程中开发手机内页、使用 CLI / phone-sdk。  
 > 作者侧「如何使用手机」（挂载、设置、消息、Toast）见根目录 [README.md](../README.md)。  
-> 当前仓库：`@ink-zenly/phone-sdk@0.5.28` ｜ `@ink-zenly/create-phone-app@0.3.9` ｜ Studio SDK 清单要求 `>=1.9.0`。SDK / CLI 已于 2026-10-23 发布 npm；手机扩展 1.3.5 由作者另行发布。
+> 当前仓库：`@ink-zenly/phone-sdk@0.7.0` ｜ `@ink-zenly/create-phone-app@0.4.1` ｜ Studio SDK 清单要求 `>=1.9.0`。SDK / CLI 已于 2026-11-13 发布 npm，见[发布验证](../architecture/phone-npm-release-20261113.md)；手机扩展 1.4.0 由作者另行发布。
 
 手机宿主搭建、完整公开 API、编辑器 schema 与生命周期约定见 [Phone SDK 参考](../phone-sdk/README.md)。当前完整性、测试结果与待完善项见 [SDK 检查报告](../phone-sdk/AUDIT.md)。
 
@@ -32,7 +32,7 @@
 | 目标 | 路径 |
 |------|------|
 | 在本仓加内页 | `pnpm create-phone-app add <app-id>` → [§2.3](#23-路径-a在本仓库开发内页推荐入门) |
-| 从零新建宿主 | `pnpm dlx @ink-zenly/create-phone-app@0.3.9 create …` → [§2.4](#24-路径-b从零创建宿主--内页) / [§3](#3-脚手架-create-phone-app-详解) |
+| 从零新建宿主 | `pnpm dlx @ink-zenly/create-phone-app@0.4.1 create …` → [§2.4](#24-路径-b从零创建宿主--内页) / [§3](#3-脚手架-create-phone-app-详解) |
 | 分发标准内页包 | `pnpm create-phone-app pack <app-id>` → [§2.3 步骤 6](#步骤-6可选pack-成标准内页包) |
 | SDK 双入口与依赖 | [§5](#5-phone-sdk-包说明与-api-要点) |
 | 版本变更 | [§6](#6-版本更新日志) |
@@ -51,12 +51,12 @@
 
 ```text
 LetsGal Studio SDK          >= 1.9.0
-本仓扩展                    1.3.5
-@ink-zenly/phone-sdk        0.5.28（本地 CLI 生成 ^0.5.28）
-@ink-zenly/create-phone-app 0.3.9
+本仓扩展                    1.4.0
+@ink-zenly/phone-sdk        0.7.0（本地 CLI 生成 ^0.7.0）
+@ink-zenly/create-phone-app 0.4.1
 ```
 
-本仓联调使用 `"@ink-zenly/phone-sdk": "file:phone-sdk"`，CLI 依赖固定为已发布的 `0.3.9`，本仓脚手架命令仍直接运行 `cli/` 源码；独立工程可使用 `@ink-zenly/phone-sdk@0.5.28`。下文 CLI 示例固定使用 0.3.9；已有旧工程需要手动升级 SDK 依赖。聊天、相册、电话与宿主共用扩展包版本 1.3.5，没有独立发布版本；脚手架新建工程的初始版本仍为 0.1.0。
+本仓联调使用 `"@ink-zenly/phone-sdk": "file:phone-sdk"`，CLI 依赖固定为已发布的 `0.4.1`，本仓脚手架命令仍直接运行 `cli/` 源码；独立工程可使用 `@ink-zenly/phone-sdk@0.7.0`。下文 CLI 示例固定使用 0.4.1；已有旧工程需要手动升级 SDK 依赖。聊天、相册、电话与宿主共用扩展包版本 1.4.0，没有独立发布版本；脚手架新建工程的初始版本仍为 0.1.0。
 
 ### 构建与重载（开发）
 
@@ -285,7 +285,7 @@ pnpm create-phone-app pack my-mail --title "邮件" --extensionId com.acme.my-ma
 适合不改本仓、单独开工程：
 
 ```powershell
-pnpm dlx @ink-zenly/create-phone-app@0.3.9 create .\my-host `
+pnpm dlx @ink-zenly/create-phone-app@0.4.1 create .\my-host `
   --template default `
   --extensionId com.acme.my-phone `
   --appId my-shop `
@@ -301,7 +301,7 @@ pnpm watch
 - 宿主入口（导出 Phone / HUD / Toast / Editor）；`extension.json.id` = 你指定的 `--extensionId`
 - 首个内页 `src/my-shop/`（`--appId`，与宿主 id **独立**）
 - `vite` 注入 `__PHONE_HOST_EXTENSION_ID__`（见 [§4](#4-宿主扩展包-id-注入phone-sdk--040)）
-- 依赖 `@ink-zenly/phone-sdk` 与捆绑 `sdk/`；本仓解析与 CLI 0.3.9 独立安装均生成 `^0.5.28`。旧 CLI 0.3.7 的配置兜底为 `^0.5.5`，旧脚手架工程请显式更新 SDK 依赖。
+- 依赖 `@ink-zenly/phone-sdk` 与捆绑 `sdk/`；本仓解析与 CLI 0.4.1 独立安装均生成 `^0.7.0`。旧 CLI 0.3.7 的配置兜底为 `^0.5.5`，旧脚手架工程请显式更新 SDK 依赖。
 
 之后在该工程内继续 `add` 更多内页，或改 `src/my-shop/app.tsx`。  
 Studio 中启用的是**该宿主扩展**的 `extension.json.id`（例如 `com.acme.my-phone`），不是本仓官方 id。
@@ -351,7 +351,7 @@ export class ShopController extends Extension {
 | 内页（plugin） | 只从 `@ink-zenly/phone-sdk/plugin` 引用 API；由宿主或内页包入口打包 |
 
 本仓开发：`package.json` 可用 `"@ink-zenly/phone-sdk": "file:phone-sdk"`。  
-脚手架优先读取本仓 phone-sdk/package.json 的版本；独立发布态才使用 CLI `inkZenly.phoneSdkVersion` 兜底。默认写 npm 范围，不改成默认 `file:`。CLI 0.3.9 与仓库 default/minimal 模板均导出宿主、HUD、Toast 和编辑器；旧版 CLI 工程的补齐方式见 [SDK 参考](../phone-sdk/README.md)。phone-sdk 已声明 Chakra / Emotion 依赖。
+脚手架优先读取本仓 phone-sdk/package.json 的版本；独立发布态才使用 CLI `inkZenly.phoneSdkVersion` 兜底。默认写 npm 范围，不改成默认 `file:`。CLI 0.4.1 与仓库 default/minimal 模板均导出宿主、HUD、Toast 和编辑器；旧版 CLI 工程的补齐方式见 [SDK 参考](../phone-sdk/README.md)。phone-sdk 已声明 Chakra / Emotion 依赖。
 
 ### 2.7 内页开发检查清单
 
@@ -378,7 +378,7 @@ export class ShopController extends Extension {
 
 ## 3. 脚手架 create-phone-app 详解
 
-包名：`@ink-zenly/create-phone-app@0.3.9`（[npm](https://www.npmjs.com/package/@ink-zenly/create-phone-app)）。
+包名：`@ink-zenly/create-phone-app@0.4.1`（[npm](https://www.npmjs.com/package/@ink-zenly/create-phone-app)）。
 源码在仓库 `cli/`；完整选项见 [`../cli/README.md`](../cli/README.md)。内页联调步骤见 [§2](#2-内页应用完整开发流程)。
 
 ### 3.1 三条命令各干什么
@@ -401,7 +401,7 @@ pnpm create-phone-app add --help
 pnpm create-phone-app pack --help
 
 # 无本仓：用已发布包（注意钉版本）
-pnpm dlx @ink-zenly/create-phone-app@0.3.9 create .\my-host `
+pnpm dlx @ink-zenly/create-phone-app@0.4.1 create .\my-host `
   --template default `
   --extensionId com.acme.my-phone `
   --appId my-shop `
@@ -486,7 +486,7 @@ pnpm create-phone-app pack my-mail --title "邮件"
 pnpm create-phone-app pack my-mail --extensionId com.acme.my-mail-ext --title "邮件"
 
 # 已发布包
-pnpm dlx @ink-zenly/create-phone-app@0.3.9 create .\my-host --template minimal `
+pnpm dlx @ink-zenly/create-phone-app@0.4.1 create .\my-host --template minimal `
   --extensionId tiny-host --appId my-shop --title "我的商店"
 ```
 
@@ -520,7 +520,7 @@ CSS 使用通用选择器 `[data-phone-root]` / `[data-phone-toast-root]`；DOM 
 
 ## 5. phone-sdk 包说明与 API 要点
 
-包名：`@ink-zenly/phone-sdk`，当前仓库版本 `0.5.28`。源码在 `phone-sdk/`；完整宿主与 API 参考见 [SDK README](../phone-sdk/README.md)。以下只作开发流程摘要，不用于判断 npm 当前发布状态。
+包名：`@ink-zenly/phone-sdk`，当前仓库版本 `0.7.0`。源码在 `phone-sdk/`；完整宿主与 API 参考见 [SDK README](../phone-sdk/README.md)。以下只作开发流程摘要，不用于判断 npm 当前发布状态。
 
 ### 5.1 两个入口，不要混用
 
@@ -553,12 +553,12 @@ phone-sdk/src/
 ```json
 {
   "dependencies": {
-    "@ink-zenly/phone-sdk": "^0.5.28"
+    "@ink-zenly/phone-sdk": "^0.7.0"
   }
 }
 ```
 
-此版本范围从 0.5.28 开始；React / React DOM 与 Studio SDK 的接入要求见 SDK 参考。
+此版本范围从 0.7.0 开始；React / React DOM 与 Studio SDK 的接入要求见 SDK 参考。
 
 约定：
 
@@ -666,14 +666,15 @@ clearPhoneAppBadge("chat");
 ## 6. 版本更新日志
 
 下列要点依据本仓库 `git` 历史与 npm 已发布版本整理。  
-早期记录中的 **npm 已发布**版本：phone-sdk `0.3.0`、`0.3.1`、`0.4.0`、`0.4.6`、`0.4.7`、`0.5.0`；create-phone-app `0.1.0`–`0.1.5`、`0.3.0`–`0.3.5`。phone-sdk `0.5.27` 的发布记录日期为 2026-10-14；当前仓库 phone-sdk `0.5.28` / CLI `0.3.9` 已于 2026-10-23 发布并核对官方 tarball，此处早期列表不是完整发布清单。
+早期记录中的 **npm 已发布**版本：phone-sdk `0.3.0`、`0.3.1`、`0.4.0`、`0.4.6`、`0.4.7`、`0.5.0`；create-phone-app `0.1.0`–`0.1.5`、`0.3.0`–`0.3.5`。phone-sdk `0.5.27` 的发布记录日期为 2026-10-14，phone-sdk `0.5.28` / CLI `0.3.9` 于 2026-10-23 发布；当前 phone-sdk `0.7.0` / CLI `0.4.1` 的发布与安装构建结果见 [2026-11-13 发布验证](../architecture/phone-npm-release-20261113.md)。此处早期列表不是完整发布清单。
 中间仅出现在 git、未单独发到 npm 的版本号，会标注「仓库版本」。
 
 ### 6.1 本仓扩展（`extension.json`）
 
 | 版本 | 要点 |
 |------|------|
-| **1.3.5**（当前，待发布） | 修复聊天恢复重放重复记录、返回后再次进入、跨运行周期存档/导航绑定、手机容器比例及连续剧情消息关闭时序；恢复去重依赖宿主 flow.isRestoring。对齐 SDK 0.5.28 / CLI 0.3.9。 |
+| **1.4.0**（当前，待发布） | 拆分宿主、软件协议与编辑器入口，完善独立软件注册和 CLI 工作流；手机本体常驻停靠，刷新直接定位，展开/收回保留内页；修复外侧点击穿透并移除首页关闭按钮。对齐 SDK 0.7.0 / CLI 0.4.1，保留既有设置与存档。 |
+| **1.3.5** | 修复聊天恢复重放重复记录、返回后再次进入、跨运行周期存档/导航绑定、手机容器比例及连续剧情消息关闭时序；恢复去重依赖宿主 flow.isRestoring。对齐 SDK 0.5.28 / CLI 0.3.9。 |
 | **1.3.4** | 对齐 phone-sdk 0.5.27，交付注册/关闭/会话清理和编辑器契约修复。 |
 | **1.3.3** | 聊天运行时按 Preview 隔离；完善宿主生命周期、编辑器与模板；图片消息展示和 Android 触摸样式改进。 |
 | **1.3.2** | 强制来电跨上下文桥接与首次点击链路修复；接听/挂断后无动画关闭手机并调用对应片段；新增电话方法内联卡片；优化 Phone SDK 首帧内页导航和按需诊断。 |
@@ -699,7 +700,8 @@ clearPhoneAppBadge("chat");
 
 | 版本 | npm | 要点 |
 |------|-----|------|
-| **0.5.28**（当前） | ✅ npm（2026-10-23） | 新增 registerPhoneRuntimeCycle，支持同一引擎后继运行周期重新绑定；修复剧情消息显示/关闭竞态、中止清理与手机容器等比缩放。 |
+| **0.7.0**（当前） | ✅ npm（2026-11-13） | 手机本体常驻停靠、刷新初始定位、内页保留与外侧点击隔离；移除首页关闭按钮。见[发布验证](../architecture/phone-npm-release-20261113.md)。 |
+| **0.5.28** | ✅ npm（2026-10-23） | 新增 registerPhoneRuntimeCycle，支持同一引擎后继运行周期重新绑定；修复剧情消息显示/关闭竞态、中止清理与手机容器等比缩放。 |
 | **0.5.27** | ✅ npm（2026-10-14） | 修复注册顺序、监听器异常隔离、导航/动画关闭等待与会话清理；保留 character / phone-call 编辑器声明；公开 OpenPhoneAppPosition；修复第三方页面与内置编辑器适配冲突。 |
 | **0.5.26** | ✅ npm（2026-09-27） | `closePhoneApp({ animated })` 支持调用方选择动画或立即关闭；修复 `waitUntil: "none"` 被 `ui.show()` 阻塞；首次挂载可直接进入目标内页；重型调试与诊断改为显式开启。发布时补齐编辑器依赖声明并排除测试文件。 |
 | **0.5.6** | 本地 | 宿主内置内页 Phone SDK 应用 ID 恢复为可只填程序 ID；跨扩展仍支持 `扩展ID/程序ID`。 |
@@ -723,7 +725,8 @@ clearPhoneAppBadge("chat");
 
 | 版本 | npm | 要点 |
 |------|-----|------|
-| **0.3.9**（当前） | ✅ npm（2026-10-23） | SDK 兜底更新为 `^0.5.28`，本仓与独立 CLI 的 create/add/pack 版本解析同步；生成工程仍从 0.1.0 起步。 |
+| **0.4.1**（当前） | ✅ npm（2026-11-13） | 新工程使用 SDK `^0.7.0`；宿主、独立软件及拆包工程均完成安装、构建与 doctor 验证。见[发布验证](../architecture/phone-npm-release-20261113.md)。 |
+| **0.3.9** | ✅ npm（2026-10-23） | SDK 兜底更新为 `^0.5.28`，本仓与独立 CLI 的 create/add/pack 版本解析同步；生成工程仍从 0.1.0 起步。 |
 | **0.3.8** | ✅ npm，2026-10-14 核实 | SDK 兜底更新为 `^0.5.27`；default/minimal 导出四个宿主模块并设置 bootstrap 归属；命令行版本读取包清单。 |
 | **0.3.7** | ✅ | SDK 兜底更新为 `^0.5.5`。 |
 | **0.3.6** | ✅ | `inkZenly.phoneSdkVersion` → `^0.5.1`；脚手架默认依赖支持 `closePhoneApp`。 |
